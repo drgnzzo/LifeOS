@@ -1171,53 +1171,46 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(fechaEl) fechaEl.value=hoy;
   _inyectarToggleModo();
 
-  // ── Inicio con dial como landing ──
-  // Estrategia: bloquear visibilidad del anverso desde el inicio.
-  // El browser puede renderizar todo en background sin que el usuario lo vea.
-  // El dial aparece solo, limpio, sobre negro.
-  // Al cerrar el dial → anverso aparece con fade (ya renderizado).
+  // ── LANDING: el dial es lo primero que ve el usuario ──
+  // RAWEntry.html ya tiene board-anverso con display:none y un #splash-dial negro.
+  // Secuencia:
+  //   Frame 1 → abrirDial() — el dial Canvas se crea y muestra sobre el splash negro
+  //   Al cerrar → mostrar anverso + desvanecer splash
 
-  var _anversoEl = document.getElementById('board-anverso');
   var _dialLandingUsed = false;
 
-  // Ocultar anverso inmediatamente — antes de cualquier paint
-  if(_anversoEl){
-    _anversoEl.style.visibility = 'hidden';
-    _anversoEl.style.opacity = '0';
-  }
-
-  // Abrir dial en el siguiente frame — el browser ya puede renderizar el anverso en bg
+  // Abrir el dial en el primer frame disponible
   requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      abrirDial();
-      // Fade-in del overlay del dial
-      if(_dialOverlay){
-        _dialOverlay.style.opacity = '0';
-        _dialOverlay.style.transition = 'opacity 350ms cubic-bezier(.16,1,.3,1)';
-        requestAnimationFrame(function(){
-          if(_dialOverlay) _dialOverlay.style.opacity = '1';
-        });
-      }
-    });
+    abrirDial();
   });
 
-  // Wrapper de cerrarDial: primera vez revela el anverso
+  // Patch de cerrarDial: primera vez revela el anverso
   var _origCerrarDial = cerrarDial;
   cerrarDial = function(){
     _origCerrarDial();
     if(!_dialLandingUsed){
       _dialLandingUsed = true;
+      // Mostrar anverso
       var anv = document.getElementById('board-anverso');
       if(anv){
-        anv.style.visibility = 'visible';
+        anv.style.display = '';
+        anv.style.opacity = '0';
         anv.style.transition = 'opacity 400ms ease';
         requestAnimationFrame(function(){
-          anv.style.opacity = '1';
+          requestAnimationFrame(function(){
+            anv.style.opacity = '1';
+          });
         });
       }
+      // Desvanecer y quitar el splash negro
+      var splash = document.getElementById('splash-dial');
+      if(splash){
+        splash.style.opacity = '0';
+        setTimeout(function(){
+          if(splash.parentNode) splash.parentNode.removeChild(splash);
+        }, 500);
+      }
     }
-    // Limpiar transition del overlay para opens futuros
-    setTimeout(function(){ if(_dialOverlay) _dialOverlay.style.transition = ''; }, 400);
   };
 
   setChip('load','Cargando');
