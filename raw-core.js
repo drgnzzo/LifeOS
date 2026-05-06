@@ -333,17 +333,13 @@ function _crearDialOverlay(){
   _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(850px,88vw);height:min(850px,88vw);position:relative';
   _dialCtx = _dialCanvas.getContext('2d');
 
-  // Overlay centrado — fondo atmósferico del design system
-  // opacity:0 desde el inicio para que el fade-in funcione correctamente
+  // Overlay del dial — sin backdrop-filter (el splash negro es el fondo)
+  // opacity:0 desde el inicio para fade-in limpio
   _dialOverlay.style.cssText = [
     'position:fixed','inset:0','z-index:9000',
     'display:none','align-items:center','justify-content:center',
     'opacity:0',
-    'background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),rgba(4,4,14,0.6)',
-    'backdrop-filter:blur(26px) saturate(160%) brightness(0.72)',
-    '-webkit-backdrop-filter:blur(26px) saturate(160%) brightness(0.72)',
-    'background-image:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),linear-gradient(rgba(120,80,200,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.025) 1px,transparent 1px)',
-    'background-size:auto,auto,48px 48px,48px 48px',
+    'background:transparent',
   ].join(';');
 
   // ── Panel derecho — navegación a otras secciones ──
@@ -966,8 +962,24 @@ function abrirDial(){
   _crearDialOverlay();
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   _dialDraw();
-  // El overlay ya nace con opacity:0 en su cssText.
-  // Solo ponemos display:flex y en el siguiente frame activamos la transición + opacity:1
+
+  // Si el splash ya fue removido (segunda apertura), poner el fondo blur de nuevo
+  var splashGone = !document.getElementById('splash-dial');
+  if(splashGone){
+    _dialOverlay.style.background =
+      'radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),' +
+      'radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),' +
+      'rgba(4,4,14,0.6)';
+    _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
+    _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
+  } else {
+    // Primera vez: splash negro es el fondo, overlay transparente
+    _dialOverlay.style.background = 'transparent';
+    _dialOverlay.style.backdropFilter = 'none';
+    _dialOverlay.style.webkitBackdropFilter = 'none';
+  }
+
+  _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
   _dialVisible = true;
   requestAnimationFrame(function(){
