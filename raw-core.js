@@ -1223,27 +1223,25 @@ window.addEventListener('DOMContentLoaded',()=>{
   _dialVisible = true;
   _dialOverlay.style.pointerEvents = 'auto';
 
-  // Quitar el CSS de bloqueo + fade-in del canvas
+  // Secuencia correcta para el fade:
+  // rAF 1: quitar render-block → browser ve negro del splash
+  // rAF 2: browser pintó el negro → ahora activar fade-in del canvas
   requestAnimationFrame(function(){
-    // Eliminar render-block — ahora el splash negro es el único fondo
     var rb = document.getElementById('render-block');
     if(rb) rb.parentNode.removeChild(rb);
 
-    // Hacer visible el splash explícitamente
-    var splash = document.getElementById('splash-dial');
-    if(splash) splash.style.visibility = 'visible';
+    // Un frame más para que el browser procese el negro antes del fade
+    requestAnimationFrame(function(){
+      _dialCanvas.style.opacity = '1';
 
-    // Fade-in del canvas
-    _dialCanvas.style.opacity = '1';
-
-    // Nav panel
-    var navPanel = document.getElementById('dial-nav-panel');
-    if(navPanel){
-      navPanel.style.opacity = '0';
-      navPanel.style.transition = 'opacity 350ms cubic-bezier(.16,1,.3,1)';
-      navPanel.style.display = window.innerWidth < 900 ? 'none' : 'flex';
-      requestAnimationFrame(function(){ navPanel.style.opacity = '1'; });
-    }
+      var navPanel = document.getElementById('dial-nav-panel');
+      if(navPanel){
+        navPanel.style.opacity = '0';
+        navPanel.style.transition = 'opacity 400ms cubic-bezier(.16,1,.3,1)';
+        navPanel.style.display = window.innerWidth < 900 ? 'none' : 'flex';
+        requestAnimationFrame(function(){ navPanel.style.opacity = '1'; });
+      }
+    });
   });
 
   // Registrar eventos del dial
