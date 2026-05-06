@@ -1215,7 +1215,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Dibujar el canvas pero empezar invisible
   _dialDraw();
   _dialCanvas.style.opacity = '0';
-  _dialCanvas.style.transition = 'opacity 1100ms ease-out';
+  _dialCanvas.style.transition = 'opacity 2000ms ease-out';
 
   // Mostrar el overlay (transparente) para que el canvas sea visible
   _dialOverlay.style.display = 'flex';
@@ -1235,7 +1235,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       var navPanel = document.getElementById('dial-nav-panel');
       if(navPanel){
         navPanel.style.opacity = '0';
-        navPanel.style.transition = 'opacity 800ms ease-out';
+        navPanel.style.transition = 'opacity 1600ms ease-out';
         navPanel.style.display = window.innerWidth < 900 ? 'none' : 'flex';
         setTimeout(function(){ navPanel.style.opacity = '1'; }, 16);
       }
