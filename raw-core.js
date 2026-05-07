@@ -449,7 +449,7 @@ function _crearDialOverlay(){
 
   function _hRow(label, valId, color){
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:11px;color:#7A8499">'+label+'</span>' +
+      '<span style="font-size:11px;color:rgba(200,208,230,0.45)">'+label+'</span>' +
       '<span id="'+valId+'" style="font-size:12px;font-weight:700;color:'+(color||'#C8D0E0')+';font-variant-numeric:tabular-nums">—</span>' +
     '</div>';
   }
@@ -481,7 +481,7 @@ function _crearDialOverlay(){
   var _p1 = _mkP('hud-patrimonio','calc(50% - min(470px,56vw))','calc(50% - min(500px,60vw))',200);
   _p1.innerHTML = _hTitle('Patrimonio','#22C55E','fa-landmark') +
     '<div style="padding:10px 14px 6px">' +
-      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Disponible hoy</div>' +
+      '<div style="font-size:9px;color:rgba(200,208,230,0.45);font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Disponible hoy</div>' +
       '<div id="_hud-saldo" style="font-size:22px;font-weight:800;color:#22C55E;letter-spacing:-.02em;text-shadow:0 0 16px rgba(34,197,94,0.5)">—</div>' +
     '</div>' +
     _hRow('Apartados','_hud-apart','#F59E0B') +
@@ -493,7 +493,7 @@ function _crearDialOverlay(){
   var _p2 = _mkP('hud-financiero','calc(50% - min(470px,56vw))','calc(50% + min(260px,31vw))',220);
   _p2.innerHTML = _hTitle('Financiero','#22D3EE','fa-chart-line') +
     '<div style="padding:10px 14px 6px">' +
-      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Excedente del mes</div>' +
+      '<div style="font-size:9px;color:rgba(200,208,230,0.45);font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Excedente del mes</div>' +
       '<div id="_hud-fin-exc" style="font-size:22px;font-weight:800;color:#22D3EE;letter-spacing:-.02em;text-shadow:0 0 16px rgba(34,211,238,0.5)">—</div>' +
     '</div>' +
     _hRow('Ingresos','_hud-fin-ing','#22C55E') +
@@ -517,15 +517,15 @@ function _crearDialOverlay(){
   var _p4 = _mkP('hud-activity','calc(50% - min(140px,17vw))','calc(50% + min(260px,31vw))',220);
   _p4.innerHTML = _hTitle('Activity + Logros','#FB923C','fa-bolt') +
     '<div style="padding:10px 14px 8px">' +
-      '<div style="font-size:9px;color:#7A8499;text-transform:uppercase;letter-spacing:.10em;margin-bottom:8px">Hoy</div>' +
+      '<div style="font-size:9px;color:rgba(200,208,230,0.45);text-transform:uppercase;letter-spacing:.10em;margin-bottom:8px">Hoy</div>' +
       '<div style="display:flex;gap:8px;margin-bottom:10px">' +
         '<div style="flex:1;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:8px;padding:8px;text-align:center">' +
           '<div id="_hud-act-done" style="font-size:22px;font-weight:800;color:#FB923C;line-height:1">—</div>' +
-          '<div style="font-size:8px;color:#7A8499;text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Hábitos</div>' +
+          '<div style="font-size:8px;color:rgba(200,208,230,0.45);text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Hábitos</div>' +
         '</div>' +
         '<div style="flex:1;background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.3);border-radius:8px;padding:8px;text-align:center">' +
           '<div id="_hud-lgr-done" style="font-size:22px;font-weight:800;color:#FACC15;line-height:1">—</div>' +
-          '<div style="font-size:8px;color:#7A8499;text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Logros</div>' +
+          '<div style="font-size:8px;color:rgba(200,208,230,0.45);text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Logros</div>' +
         '</div>' +
       '</div>' +
       _hRow('Racha','_hud-racha','#FB923C') +
@@ -1460,6 +1460,12 @@ window.addEventListener('DOMContentLoaded',()=>{
         anv.style.opacity = '1';
       }
 
+      // Ocultar HUD panels — estaban visibles del landing
+      if(window._hudPanels){ window._hudPanels.forEach(function(hp){
+        hp.el.style.opacity='0';
+        hp.el.style.visibility='hidden';
+      }); }
+
       // Quitar splash inmediatamente
       var splash = document.getElementById('splash-dial');
       if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
@@ -1848,11 +1854,33 @@ window.irAActivity = window.irAActivity || function(){
 window.irANutricion = window.irANutricion || function(){
   _irAPanel('board-nutricion','nutricion');
   var body = document.getElementById('nut-panel-body');
-  if(body && body.children.length && !body.querySelector('.fa-spin')) return;
+  // Mostrar spinner y siempre recargar datos frescos
   if(body) body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(255,255,255,.25)"><i class="fas fa-circle-notch fa-spin" style="font-size:18px;color:#4ade80"></i></div>';
   if(typeof api!=='undefined'){
     api.getNutricion().then(function(d){
       if(typeof window.renderNutricion==='function') window.renderNutricion(d);
+      else {
+        // Fallback inline si renderNutricion no está disponible aún
+        var b = document.getElementById('nut-panel-body'); if(!b) return;
+        if(!d||!d.ok){ b.innerHTML='<div style="padding:40px;text-align:center;color:rgba(255,255,255,.25);font-size:13px">Sin registros de nutrición</div>'; return; }
+        var dias = d.semana || Object.values(d.dias||{});
+        if(!dias.length){ b.innerHTML='<div style="padding:40px;text-align:center;color:rgba(255,255,255,.25);font-size:13px">Sin registros esta semana</div>'; return; }
+        var html = '<div style="padding:0 20px 24px;display:flex;flex-direction:column;gap:12px">';
+        dias.forEach(function(dia){
+          if(!dia.items||!dia.items.length) return;
+          html += '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.06)">'+dia.fecha+'</div>';
+          dia.items.forEach(function(it){
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+              '<span style="font-size:10px;font-weight:600;padding:2px 7px;border:1px solid rgba(140,100,220,.25);color:rgba(167,139,250,.7);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;border-radius:4px">'+(it.momento||'—')+'</span>' +
+              '<span style="flex:1;font-size:13px;color:rgba(255,255,255,.8)">'+(it.alimento||it.comida||'—')+'</span>' +
+              (it.cal?'<span style="font-size:11px;font-weight:700;color:#fb923c;flex-shrink:0">'+Math.round(it.cal)+' kcal</span>':'') +
+            '</div>';
+          });
+          html += '</div>';
+        });
+        html += '</div>';
+        b.innerHTML = html;
+      }
     }).catch(function(){
       if(body) body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(239,68,68,.4);font-size:12px">Error al cargar Nutrición</div>';
     });
@@ -2265,24 +2293,24 @@ document.addEventListener('DOMContentLoaded', function(){
 
       function kpiPill(tipo, done, total){
         var c = CAT[tipo];
-        return '<div style="display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid #1E2740">'+
+        return '<div style="display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid rgba(140,100,220,0.14)">'+
           '<i class="fas '+c.icon+'" style="font-size:16px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
-          '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:#7A8499">'+c.label+'</div>'+
+          '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45)">'+c.label+'</div>'+
           '<div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">'+
             '<span style="color:'+c.color+'">'+done+'</span>'+
-            '<span style="color:#4A5266"> / '+total+'</span>'+
+            '<span style="color:rgba(200,208,230,0.25)"> / '+total+'</span>'+
           '</div></div>'+
         '</div>';
       }
 
       // ── HEADER BAR ──
       var header =
-        '<div style="display:flex;align-items:center;background:#141B2D;border-bottom:1px solid #1E2740;'+
+        '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-bottom:1px solid rgba(140,100,220,0.14);'+
              'height:72px;padding:0 20px;gap:0;flex-shrink:0;overflow:hidden">'+
           // Volver
           '<div onclick="_lgrVolver ? _lgrVolver() : (typeof volverAlAnverso===\'function\'&&volverAlAnverso())"'+
                ' style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;'+
-               'background:#0F1524;border:1px solid #26304A;border-radius:8px;cursor:pointer;'+
+               'background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:8px;cursor:pointer;'+
                'margin-right:16px;flex-shrink:0;transition:all .15s"'+
                ' onmouseover="this.style.borderColor=\'#3B82F6\'" onmouseout="this.style.borderColor=\'#26304A\'">'+
             '<i class="fas fa-arrow-left" style="color:#22D3EE;font-size:14px"></i>'+
@@ -2290,7 +2318,7 @@ document.addEventListener('DOMContentLoaded', function(){
           // Título
           '<div style="margin-right:32px;flex-shrink:0">'+
             '<div style="font-size:18px;font-weight:700;letter-spacing:.05em;color:#fff">ACTIVITY CHECK</div>'+
-            '<div style="font-size:11px;color:#7A8499;margin-top:1px">Tu progreso, tu recompensa</div>'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);margin-top:1px">Tu progreso, tu recompensa</div>'+
           '</div>'+
           // KPIs
           '<div style="display:flex;align-items:center;flex:1;overflow:hidden">'+
@@ -2300,15 +2328,15 @@ document.addEventListener('DOMContentLoaded', function(){
             kpiPill('movie',       totales.doneM, totales.movie)+
             '<div style="display:flex;align-items:center;gap:8px;padding:0 20px">'+
               '<i class="fas fa-star" style="font-size:16px;color:#EC4899;filter:drop-shadow(0 0 6px rgba(236,72,153,0.4))"></i>'+
-              '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:#7A8499">PENDIENTES</div>'+
+              '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45)">PENDIENTES</div>'+
               '<div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">'+
                 '<span style="color:#EC4899">'+totales.doneN+'</span>'+
-                '<span style="color:#4A5266"> / '+totales.norut+'</span>'+
+                '<span style="color:rgba(200,208,230,0.25)"> / '+totales.norut+'</span>'+
               '</div></div>'+
             '</div>'+
           '</div>'+
           // Anillo progreso
-          '<div style="display:flex;align-items:center;gap:14px;flex-shrink:0;padding-left:20px;border-left:1px solid #1E2740">'+
+          '<div style="display:flex;align-items:center;gap:14px;flex-shrink:0;padding-left:20px;border-left:1px solid rgba(140,100,220,0.14)">'+
             '<svg width="64" height="64" viewBox="0 0 64 64">'+
               '<circle cx="32" cy="32" r="28" fill="none" stroke="#26304A" stroke-width="4"/>'+
               '<circle cx="32" cy="32" r="28" fill="none" stroke="#3B82F6" stroke-width="4"'+
@@ -2317,10 +2345,10 @@ document.addEventListener('DOMContentLoaded', function(){
                 ' style="filter:drop-shadow(0 0 6px rgba(59,130,246,0.6));transition:stroke-dashoffset .8s"/>'+
               '<text x="32" y="37" text-anchor="middle" font-size="14" font-weight="700" fill="#fff" font-family="system-ui">'+pctGeneral+'%</text>'+
             '</svg>'+
-            '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:#7A8499;margin-bottom:2px">PROGRESO GENERAL</div>'+
+            '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);margin-bottom:2px">PROGRESO GENERAL</div>'+
             '<div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">'+
               '<span style="color:#3B82F6">'+doneAll+'</span>'+
-              '<span style="color:#4A5266"> / '+totalAll+'</span>'+
+              '<span style="color:rgba(200,208,230,0.25)"> / '+totalAll+'</span>'+
             '</div></div>'+
           '</div>'+
         '</div>';
@@ -2340,8 +2368,8 @@ document.addEventListener('DOMContentLoaded', function(){
           {k:'hoy_no', ico:'fa-circle',           tip:'Sin check hoy'},
         ];
         return '<div class="_act-filter-bar" data-tipo="'+tipo+'" style="'+
-          'display:flex;gap:4px;padding:6px 12px;background:#0A0E1A;border-bottom:1px solid #1E2740;align-items:center">'+
-          '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;color:#4A5266;text-transform:uppercase;margin-right:4px;flex-shrink:0">Orden</span>'+
+          'display:flex;gap:4px;padding:6px 12px;background:rgba(6,4,14,0.95);border-bottom:1px solid rgba(140,100,220,0.14);align-items:center">'+
+          '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-right:4px;flex-shrink:0">Orden</span>'+
           BTNS.map(function(b){
             var on = (cur===b.k);
             return '<button class="_act-filter-btn" data-tipo="'+tipo+'" data-filter="'+b.k+'" title="'+b.tip+'" style="'+
@@ -2391,29 +2419,29 @@ document.addEventListener('DOMContentLoaded', function(){
 
       function habTable(items, tipo){
         var c = CAT[tipo]; var dias = c.dias;
-        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:#4A5266;font-size:12px">Sin hábitos</div>';
+        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin hábitos</div>';
         var sorted = applyHabFilter(items, tipo);
         var h = filterBar(tipo);
         h += '<table style="width:100%;border-collapse:collapse">';
-        h += '<tr><th style="text-align:left;padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.10em;color:#7A8499;border-bottom:1px solid #1E2740">HÁBITO</th>';
+        h += '<tr><th style="text-align:left;padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.45);border-bottom:1px solid rgba(140,100,220,0.14)">HÁBITO</th>';
         dias.forEach(function(d){
           var esH=(d===diaKey);
           h += '<th style="text-align:center;padding:6px 4px;font-size:10px;font-weight:'+(esH?700:600)+';'+
-               'color:'+(esH?c.color:'#7A8499')+';border-bottom:1px solid #1E2740;min-width:36px;'+
+               'color:'+(esH?c.color:'#7A8499')+';border-bottom:1px solid rgba(140,100,220,0.14);min-width:36px;'+
                (esH?'text-shadow:0 0 8px '+c.glow:'')+'">'+(DLBL[d]||d)+'</th>';
         });
         h += '</tr>';
         sorted.forEach(function(hab){
           var allDone = dias.every(function(dia){ return hab.checks&&hab.checks[dia]; });
           h += '<tr class="_hab-row" style="transition:background .15s;cursor:default"'+
-               ' onmouseover="this.style.background=\'#1A2238\'" onmouseout="this.style.background=\'transparent\'">'+
-               '<td style="padding:8px 16px;border-bottom:1px solid #1E2740">'+
-                 (hab.sims||hab.bw?'<div style="font-size:10px;font-weight:600;letter-spacing:.10em;color:#4A5266;text-transform:uppercase;margin-bottom:1px">'+(hab.sims||hab.bw)+'</div>':'')+
+               ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
+               '<td style="padding:8px 16px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+                 (hab.sims||hab.bw?'<div style="font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-bottom:1px">'+(hab.sims||hab.bw)+'</div>':'')+
                  '<div style="font-size:13px;font-weight:500;color:'+(allDone?c.color:'#C8D0E0')+';'+
                  (allDone?'text-shadow:0 0 8px '+c.glow:'')+'">' + hab.nombre+'</div>'+
                '</td>';
           dias.forEach(function(dia){
-            h += '<td style="text-align:center;padding:6px 4px;border-bottom:1px solid #1E2740">'+
+            h += '<td style="text-align:center;padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
                  chkCircle(hab.fila, dia, hab.checks&&hab.checks[dia], tipo)+'</td>';
           });
           h += '</tr>';
@@ -2424,15 +2452,15 @@ document.addEventListener('DOMContentLoaded', function(){
 
       // ── LISTA ITEMS ──
       function itemList(items, tipo){
-        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:#4A5266;font-size:12px">Sin registros</div>';
+        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
         var sorted = applyItemFilter(items, tipo);
         return filterBar(tipo)+
           '<div style="display:flex;flex-direction:column">'+
           sorted.map(function(it){
             var done=it.completado===true||it.completado==='Sí'||it.completado==='Si';
             return '<div class="_item-row" style="display:flex;align-items:center;gap:10px;padding:8px 16px;'+
-              'transition:background .15s;border-bottom:1px solid #1E2740"'+
-              ' onmouseover="this.style.background=\'#1A2238\'" onmouseout="this.style.background=\'transparent\'">'+
+              'transition:background .15s;border-bottom:1px solid rgba(140,100,220,0.14)"'+
+              ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
               chkItem(it.fila, tipo, done)+
               '<span style="font-size:13px;font-weight:500;color:'+(done?'#4A5266':'#C8D0E0')+';'+
               'word-break:break-word;overflow-wrap:anywhere;min-width:0">'+it.nombre+'</span>'+
@@ -2448,11 +2476,11 @@ document.addEventListener('DOMContentLoaded', function(){
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
             '<div style="display:flex;align-items:center;gap:7px">'+
               '<i class="fas '+c.icon+'" style="font-size:11px;color:'+c.color+'"></i>'+
-              '<span style="font-size:12px;font-weight:500;color:#C8D0E0">'+c.label.charAt(0)+c.label.slice(1).toLowerCase()+'</span>'+
+              '<span style="font-size:12px;font-weight:500;color:rgba(220,220,240,0.85)">'+c.label.charAt(0)+c.label.slice(1).toLowerCase()+'</span>'+
             '</div>'+
-            '<span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:#C8D0E0">'+done+' / '+total+'</span>'+
+            '<span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:rgba(220,220,240,0.85)">'+done+' / '+total+'</span>'+
           '</div>'+
-          '<div style="height:4px;background:#0A0E1A;border-radius:2px;overflow:hidden">'+
+          '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
             '<div style="height:100%;width:'+pct+'%;background:'+c.color+';border-radius:2px;'+
             'box-shadow:0 0 6px '+c.glow+';transition:width .4s"></div>'+
           '</div>'+
@@ -2462,23 +2490,23 @@ document.addEventListener('DOMContentLoaded', function(){
       var sidebar =
         '<div style="width:260px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;padding:16px">'+
           // Recompensa
-          '<div style="background:#0F1524;border:1px solid #26304A;border-radius:12px;padding:16px;'+
+          '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:16px;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
               '<i class="fas fa-cube" style="font-size:14px;color:#3B82F6"></i>'+
-              '<span style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#7A8499">RECOMPENSA ACTUAL</span>'+
+              '<span style="font-size:10px;font-weight:700;letter-spacing:.12em;color:rgba(200,208,230,0.45)">RECOMPENSA ACTUAL</span>'+
             '</div>'+
             '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">Maestro del progreso</div>'+
-            '<div style="font-size:11px;color:#7A8499;margin-bottom:10px">Completa '+totalAll+' actividades para desbloquear</div>'+
-            '<div style="height:4px;background:#0A0E1A;border-radius:2px;overflow:hidden;margin-bottom:5px">'+
-              '<div style="height:100%;width:'+pctGeneral+'%;background:#3B82F6;border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5);transition:width .8s"></div>'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);margin-bottom:10px">Completa '+totalAll+' actividades para desbloquear</div>'+
+            '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden;margin-bottom:5px">'+
+              '<div style="height:100%;width:'+pctGeneral+'%;background:linear-gradient(90deg,#7C3AED,#A855F7);border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5);transition:width .8s"></div>'+
             '</div>'+
             '<div style="display:flex;justify-content:flex-end;font-size:11px;font-weight:600;color:#3B82F6;font-variant-numeric:tabular-nums">'+doneAll+' / '+totalAll+'</div>'+
           '</div>'+
           // Categorías
-          '<div style="background:#0F1524;border:1px solid #26304A;border-radius:12px;padding:16px;'+
+          '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:16px;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
-            '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:#7A8499;margin-bottom:14px">CATEGORÍAS</div>'+
+            '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:rgba(200,208,230,0.45);margin-bottom:14px">CATEGORÍAS</div>'+
             sidebarBar('personal',    totales.doneP, totales.personal)+
             sidebarBar('electronics', totales.doneE, totales.electronics)+
             sidebarBar('libro',       totales.doneL, totales.libro)+
@@ -2492,7 +2520,7 @@ document.addEventListener('DOMContentLoaded', function(){
               '<i class="fas fa-chart-line" style="font-size:13px;color:#3B82F6"></i>'+
               '<span style="font-size:12px;font-weight:700;color:#fff">SIGUE ASÍ</span>'+
             '</div>'+
-            '<div style="font-size:11px;color:#7A8499;line-height:1.5">'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);line-height:1.5">'+
               (pctGeneral>=70?'¡Llevas un excelente ritmo! Cada hábito completado te acerca a tu mejor versión.':
                pctGeneral>=40?'Vas bien. Mantén el ritmo y cierra tus anillos hoy.':
                'Empieza pequeño. Un hábito a la vez hace la diferencia.')+
@@ -2503,10 +2531,10 @@ document.addEventListener('DOMContentLoaded', function(){
       // ── PANEL WRAPPER ──
       function panelCol(tipo, inner){
         var c = CAT[tipo];
-        return '<div data-panel-tipo="'+tipo+'" style="flex:1;min-width:0;background:#0F1524;border:1px solid #26304A;border-radius:12px;'+
+        return '<div data-panel-tipo="'+tipo+'" style="flex:1;min-width:0;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
                'display:flex;flex-direction:column;overflow:hidden;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
-          '<div style="padding:14px 16px 12px;border-bottom:1px solid #1E2740;display:flex;align-items:center;gap:8px">'+
+          '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px">'+
             '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
             '<span style="font-size:13px;font-weight:700;letter-spacing:.08em;color:'+c.color+'">'+c.label+'</span>'+
           '</div>'+
@@ -2521,32 +2549,32 @@ document.addEventListener('DOMContentLoaded', function(){
       var xpPct    = xpMax>0?Math.round(xpActual/xpMax*100):0;
 
       var footer =
-        '<div style="display:flex;align-items:center;background:#141B2D;border-top:1px solid #1E2740;'+
+        '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-top:1px solid rgba(140,100,220,0.14);'+
              'height:64px;padding:0;flex-shrink:0">'+
           // Nivel + XP
-          '<div style="display:flex;align-items:center;gap:12px;flex:1;padding:0 24px;border-right:1px solid #1E2740">'+
-            '<div style="width:36px;height:36px;border-radius:8px;background:#0A0E1A;border:1px solid #26304A;'+
+          '<div style="display:flex;align-items:center;gap:12px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<div style="width:36px;height:36px;border-radius:8px;background:rgba(6,4,14,0.95);border:1px solid rgba(140,100,220,0.18);'+
                  'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
-              '<span style="font-size:13px;font-weight:800;color:#3B82F6">'+nivel+'</span>'+
+              '<span style="font-size:13px;font-weight:800;color:#A78BFA">'+nivel+'</span>'+
             '</div>'+
             '<div style="flex:1">'+
               '<div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:3px">NIVEL '+nivel+
-                ' <span style="font-size:10px;color:#7A8499;font-weight:500;font-variant-numeric:tabular-nums">'+xpActual+' / '+xpMax+' XP</span></div>'+
-              '<div style="height:4px;background:#0A0E1A;border-radius:2px;overflow:hidden">'+
-                '<div style="height:100%;width:'+xpPct+'%;background:#3B82F6;border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5)"></div>'+
+                ' <span style="font-size:10px;color:rgba(200,208,230,0.45);font-weight:500;font-variant-numeric:tabular-nums">'+xpActual+' / '+xpMax+' XP</span></div>'+
+              '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
+                '<div style="height:100%;width:'+xpPct+'%;background:linear-gradient(90deg,#7C3AED,#A855F7);border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5)"></div>'+
               '</div>'+
             '</div>'+
           '</div>'+
           // Racha
-          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid #1E2740">'+
+          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
             '<i class="fas fa-fire" style="font-size:20px;color:#FB923C;filter:drop-shadow(0 0 8px rgba(251,146,60,0.6))"></i>'+
-            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#7A8499">RACHA ACTUAL</div>'+
+            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">RACHA ACTUAL</div>'+
             '<div style="font-size:16px;font-weight:700;color:#FB923C">'+doneAll+' actividades</div></div>'+
           '</div>'+
           // Misión diaria
-          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid #1E2740">'+
+          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
             '<i class="fas fa-bullseye" style="font-size:16px;color:#A855F7"></i>'+
-            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#7A8499">PROGRESO HOY</div>'+
+            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">PROGRESO HOY</div>'+
             '<div style="font-size:13px;font-weight:600;color:#fff;margin-top:1px">'+
               doneAll+' / '+totalAll+' <span style="color:#A855F7;font-size:11px;font-weight:700">+50 XP</span>'+
             '</div></div>'+
@@ -2557,11 +2585,11 @@ document.addEventListener('DOMContentLoaded', function(){
                  'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
               '<span style="font-size:13px;font-weight:800;color:#A855F7">'+(nivel+1)+'</span>'+
             '</div>'+
-            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#7A8499">PRÓXIMO NIVEL</div>'+
-            '<div style="font-size:12px;font-weight:600;color:#C8D0E0;margin-top:1px">'+
-              '<span style="color:#A855F7">+500 XP</span> <span style="color:#4A5266">|</span> <span style="color:#22D3EE">+$250</span>'+
+            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">PRÓXIMO NIVEL</div>'+
+            '<div style="font-size:12px;font-weight:600;color:rgba(220,220,240,0.85);margin-top:1px">'+
+              '<span style="color:#A855F7">+500 XP</span> <span style="color:rgba(200,208,230,0.25)">|</span> <span style="color:#22D3EE">+$250</span>'+
             '</div></div>'+
-            '<i class="fas fa-box" style="font-size:18px;color:#7A8499;margin-left:auto"></i>'+
+            '<i class="fas fa-box" style="font-size:18px;color:rgba(200,208,230,0.45);margin-left:auto"></i>'+
           '</div>'+
         '</div>';
 
@@ -2571,7 +2599,7 @@ document.addEventListener('DOMContentLoaded', function(){
       if(!board) return;
       board.style.display = 'flex';
       board.style.flexDirection = 'column';
-      board.style.background = '#0A0E1A';
+      board.style.background = 'rgba(4,4,14,0.97)';
       board.style.overflow = 'hidden';
 
       board.innerHTML =
@@ -2665,17 +2693,17 @@ document.addEventListener('DOMContentLoaded', function(){
   if(typeof window.renderNutricion !== 'function'){
     window.renderNutricion = function(data){
       var body=document.getElementById('nut-panel-body'); if(!body) return;
-      if(!data||!data.ok){body.innerHTML='<div style="padding:40px;text-align:center;color:#4A5266;font-size:13px">Sin registros</div>';return;}
+      if(!data||!data.ok){body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(200,208,230,0.25);font-size:13px">Sin registros</div>';return;}
       var dias=data.semana||Object.values(data.dias||{});
-      if(!dias.length){body.innerHTML='<div style="padding:40px;text-align:center;color:#4A5266;font-size:13px">Sin registros</div>';return;}
+      if(!dias.length){body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(200,208,230,0.25);font-size:13px">Sin registros</div>';return;}
       var html='<div style="padding:0 20px 24px;display:flex;flex-direction:column;gap:12px">';
       dias.forEach(function(dia){
         if(!dia.items||!dia.items.length) return;
-        html+='<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7A8499;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #1E2740">'+dia.fecha+'</div>';
+        html+='<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(200,208,230,0.45);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid rgba(140,100,220,0.14)">'+dia.fecha+'</div>';
         dia.items.forEach(function(it){
-          html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1E2740">'+
-            '<span style="font-size:10px;font-weight:600;padding:2px 7px;border:1px solid #26304A;color:#7A8499;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;border-radius:4px">'+(it.momento||'—')+'</span>'+
-            '<span style="flex:1;font-size:13px;color:#C8D0E0">'+it.alimento+'</span>'+
+          html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+            '<span style="font-size:10px;font-weight:600;padding:2px 7px;border:1px solid rgba(140,100,220,0.18);color:rgba(200,208,230,0.45);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;border-radius:4px">'+(it.momento||'—')+'</span>'+
+            '<span style="flex:1;font-size:13px;color:rgba(220,220,240,0.85)">'+(it.alimento||it.comida||'—')+'</span>'+
             (it.cal?'<span style="font-size:11px;font-weight:700;color:#F97316;flex-shrink:0">'+Math.round(it.cal)+' kcal</span>':'')+
           '</div>';
         });
