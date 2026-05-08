@@ -869,7 +869,6 @@ function _crearDialOverlay(){
   _hudPanels.forEach(function(hp){ document.body.appendChild(hp.el); });
 
     window._hudPanels = _hudPanels;
-  var _navPanel = _pRight;
 
   // ── Actualizar paneles con datos reales ──
   window._refrescarEspejos = function(datos){
