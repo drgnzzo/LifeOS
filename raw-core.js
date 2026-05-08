@@ -539,214 +539,198 @@ function _crearDialOverlay(){
   window._reposicionarHUD = _reposicionarHUD;
 
   // ══════════════════════════════════════
-  //  HELPERS VISUALES
+  //  HELPERS VISUALES — v2: cards separadas, textos grandes
   // ══════════════════════════════════════
 
-  // Sección header con borde neón superior animado
-  function _sec(label, color, icon){
-    var g = color+'55';
-    return '<div style="position:relative;display:flex;align-items:center;gap:9px;padding:14px 18px 12px;flex-shrink:0">' +
-      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';box-shadow:0 0 8px '+g+',0 0 20px '+g+';animation:hudAccPulse 3s ease-in-out infinite;--acc:'+color+'"></div>' +
-      '<div style="position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;animation:hudScan 5s linear infinite;background:linear-gradient(90deg,transparent 0%,'+color+'55 50%,transparent 100%)"></div>' +
-      '<div style="width:26px;height:26px;border-radius:8px;background:'+color+'18;border:1px solid '+color+'40;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px '+color+'22">' +
-        '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 5px '+color+')"></i>' +
-      '</div>' +
-      '<span style="font-size:10px;font-weight:800;letter-spacing:.20em;text-transform:uppercase;color:'+color+';text-shadow:0 0 10px '+color+'88">'+label+'</span>' +
-    '</div>' +
-    '<div style="height:1px;background:linear-gradient(90deg,'+color+'50,rgba(140,100,220,0.08),transparent);margin:0"></div>';
-  }
-
-  // Valor hero — número grande con glow
-  function _hero(id, color, sublabel, unit){
-    return '<div style="padding:14px 18px 10px">' +
-      '<div style="font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(200,208,230,0.30);margin-bottom:6px">'+sublabel+'</div>' +
-      '<div style="display:flex;align-items:baseline;gap:5px">' +
-        '<div id="'+id+'" style="font-size:32px;font-weight:800;color:'+color+';letter-spacing:-.03em;line-height:1;text-shadow:0 0 24px '+color+'55,0 0 48px '+color+'22;animation:hudValIn .6s ease-out">—</div>' +
-        (unit?'<span style="font-size:12px;color:'+color+'66;font-weight:600">'+unit+'</span>':'') +
-      '</div>' +
+  // Card contenedor con borde de color y línea top neón
+  function _card(color, children){
+    return '<div style="margin:10px 14px 0;border-radius:12px;border:1px solid '+color+'28;'+
+      'background:linear-gradient(135deg,rgba(20,12,40,0.65),rgba(14,8,28,0.50));'+
+      'overflow:hidden;position:relative">'+
+      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';'+
+        'box-shadow:0 0 10px '+color+',0 0 20px '+color+'44;opacity:.85;animation:hudAccPulse 3s ease-in-out infinite;--acc:'+color+'"></div>'+
+      children+
     '</div>';
   }
 
-  // Fila stat: label izq + barra central + valor der
+  // Header de card
+  function _cHdr(label, color, icon){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px 10px">'+
+      '<div style="width:30px;height:30px;border-radius:8px;background:'+color+'18;border:1px solid '+color+'40;'+
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px '+color+'25">'+
+        '<i class="fas '+icon+'" style="font-size:12px;color:'+color+';filter:drop-shadow(0 0 5px '+color+')"></i>'+
+      '</div>'+
+      '<span style="font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;'+
+        'color:'+color+';text-shadow:0 0 10px '+color+'88">'+label+'</span>'+
+    '</div>';
+  }
+
+  // Hero — valor grande
+  function _hero(id, color, sublabel){
+    return '<div style="padding:4px 14px 14px">'+
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;'+
+        'color:rgba(200,208,230,0.35);margin-bottom:6px">'+sublabel+'</div>'+
+      '<div id="'+id+'" style="font-size:34px;font-weight:800;color:'+color+';letter-spacing:-.03em;line-height:1;'+
+        'text-shadow:0 0 24px '+color+'55,0 0 48px '+color+'22">—</div>'+
+    '</div>';
+  }
+
+  // Fila stat — label 13px, valor 14px
   function _row(label, id, color, barId, emoji){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:6px 18px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<div style="display:flex;align-items:center;gap:5px;width:105px;flex-shrink:0">' +
-        (emoji?'<span style="font-size:11px">'+emoji+'</span>':'<div style="width:6px;height:6px;border-radius:50%;background:'+color+';box-shadow:0 0 5px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>') +
-        '<span style="font-size:10px;color:rgba(200,208,230,0.42);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>' +
-      '</div>' +
-      (barId?'<div style="flex:1;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden"><div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+color+'80;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)"></div></div>':'<div style="flex:1"></div>') +
-      '<span id="'+id+'" style="font-size:12px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;flex-shrink:0;text-shadow:0 0 6px '+color+'55;min-width:60px;text-align:right">—</span>' +
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;'+
+      'border-top:1px solid rgba(255,255,255,0.05)">'+
+      '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
+        (emoji
+          ? '<span style="font-size:14px;flex-shrink:0">'+emoji+'</span>'
+          : '<div style="width:8px;height:8px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>')+
+        '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+label+'</span>'+
+      '</div>'+
+      (barId
+        ? '<div style="width:50px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;flex-shrink:0">'+
+            '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+color+'80;border-radius:2px;transition:width .8s ease"></div>'+
+          '</div>' : '')+
+      '<span id="'+id+'" style="font-size:14px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;'+
+        'flex-shrink:0;text-shadow:0 0 8px '+color+'55;min-width:72px;text-align:right">—</span>'+
     '</div>';
   }
 
-  // Bloque duo (2 valores lado a lado)
+  // Duo: 2 valores en cajas
   function _duo(id1,lbl1,c1, id2,lbl2,c2){
-    return '<div style="display:flex;gap:8px;padding:10px 18px 8px">' +
-      '<div style="flex:1;background:'+c1+'10;border:1px solid '+c1+'30;padding:10px 12px;position:relative;overflow:hidden">' +
-        '<div style="position:absolute;top:0;left:0;right:0;height:1px;background:'+c1+';opacity:.5;box-shadow:0 0 6px '+c1+'"></div>' +
-        '<div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:'+c1+'80;margin-bottom:5px">'+lbl1+'</div>' +
-        '<div id="'+id1+'" style="font-size:20px;font-weight:800;color:'+c1+';text-shadow:0 0 14px '+c1+'55;line-height:1">—</div>' +
-      '</div>' +
-      '<div style="flex:1;background:'+c2+'10;border:1px solid '+c2+'30;padding:10px 12px;position:relative;overflow:hidden">' +
-        '<div style="position:absolute;top:0;left:0;right:0;height:1px;background:'+c2+';opacity:.5;box-shadow:0 0 6px '+c2+'"></div>' +
-        '<div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:'+c2+'80;margin-bottom:5px">'+lbl2+'</div>' +
-        '<div id="'+id2+'" style="font-size:20px;font-weight:800;color:'+c2+';text-shadow:0 0 14px '+c2+'55;line-height:1">—</div>' +
-      '</div>' +
+    return '<div style="display:flex;gap:8px;padding:8px 14px 12px">'+
+      '<div style="flex:1;background:'+c1+'10;border:1px solid '+c1+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
+        '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+c1+';opacity:.6;box-shadow:0 0 8px '+c1+'"></div>'+
+        '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:'+c1+'90;margin-bottom:7px">'+lbl1+'</div>'+
+        '<div id="'+id1+'" style="font-size:22px;font-weight:800;color:'+c1+';text-shadow:0 0 14px '+c1+'55;line-height:1">—</div>'+
+      '</div>'+
+      '<div style="flex:1;background:'+c2+'10;border:1px solid '+c2+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
+        '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+c2+';opacity:.6;box-shadow:0 0 8px '+c2+'"></div>'+
+        '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:'+c2+'90;margin-bottom:7px">'+lbl2+'</div>'+
+        '<div id="'+id2+'" style="font-size:22px;font-weight:800;color:'+c2+';text-shadow:0 0 14px '+c2+'55;line-height:1">—</div>'+
+      '</div>'+
     '</div>';
   }
 
-  // Barra de nivel Maslow con dot + nombre + barra + monto
+  // Maslow con nombre 13px
   function _maslow(label, id, barId, color){
-    return '<div style="padding:5px 18px">' +
-      '<div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">' +
-        '<div style="width:7px;height:7px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>' +
-        '<span style="font-size:10px;color:rgba(220,220,240,0.55);flex:1">'+label+'</span>' +
-        '<span id="'+id+'" style="font-size:11px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+color+'66">—</span>' +
-      '</div>' +
-      '<div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;margin-left:14px">' +
-        '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 5px '+color+'80;border-radius:2px;transition:width .9s cubic-bezier(.4,0,.2,1)"></div>' +
-      '</div>' +
+    return '<div style="padding:8px 14px;border-top:1px solid rgba(255,255,255,0.04)">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'+
+        '<div style="width:8px;height:8px;border-radius:50%;background:'+color+';box-shadow:0 0 7px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>'+
+        '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.70);flex:1">'+label+'</span>'+
+        '<span id="'+id+'" style="font-size:13px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+color+'66">—</span>'+
+      '</div>'+
+      '<div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;margin-left:16px">'+
+        '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 6px '+color+'80;border-radius:2px;transition:width .9s ease"></div>'+
+      '</div>'+
     '</div>';
   }
 
-  // Botón navegación full-width
+  // Botón nav
   function _nav(label, icon, color, fn){
     var b = document.createElement('div');
-    b.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 18px;cursor:pointer;transition:background .15s;border-bottom:1px solid rgba(255,255,255,0.04);position:relative;overflow:hidden';
+    b.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;'+
+      'transition:background .15s;border-top:1px solid rgba(255,255,255,0.05)';
     b.innerHTML =
-      '<div style="width:28px;height:28px;border-radius:8px;background:'+color+'15;border:1px solid '+color+'35;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px '+color+'20">' +
-        '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>' +
-      '</div>' +
-      '<span style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.75);flex:1;letter-spacing:.04em">'+label+'</span>' +
-      '<i class="fas fa-chevron-right" style="font-size:9px;color:'+color+'60"></i>';
-    b.addEventListener('mouseenter',function(){
-      b.style.background = color+'12';
-      b.querySelector('span').style.color = '#fff';
-    });
-    b.addEventListener('mouseleave',function(){
-      b.style.background = 'transparent';
-      b.querySelector('span').style.color = 'rgba(220,220,240,0.75)';
-    });
-    b.addEventListener('click',function(e){
-      e.stopPropagation(); cerrarDial();
-      if(typeof window[fn]==='function') window[fn]();
-    });
+      '<div style="width:32px;height:32px;border-radius:9px;background:'+color+'15;border:1px solid '+color+'35;'+
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px '+color+'20">'+
+        '<i class="fas '+icon+'" style="font-size:12px;color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>'+
+      '</div>'+
+      '<span style="font-size:13px;font-weight:600;color:rgba(220,220,240,0.75);flex:1;letter-spacing:.04em">'+label+'</span>'+
+      '<i class="fas fa-chevron-right" style="font-size:10px;color:'+color+'60"></i>';
+    b.addEventListener('mouseenter',function(){ b.style.background=color+'14'; b.querySelector('span').style.color='#fff'; });
+    b.addEventListener('mouseleave',function(){ b.style.background='transparent'; b.querySelector('span').style.color='rgba(220,220,240,0.75)'; });
+    b.addEventListener('click',function(e){ e.stopPropagation(); cerrarDial(); if(typeof window[fn]==='function') window[fn](); });
     return b;
   }
 
-  // Divisor con label
-  function _div(label){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 18px 4px">' +
-      '<div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(140,100,220,0.25),rgba(140,100,220,0.05))"></div>' +
-      '<span style="font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(167,139,250,0.35)">'+label+'</span>' +
-      '<div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(140,100,220,0.05),rgba(140,100,220,0.25))"></div>' +
-    '</div>';
-  }
-
   // ══════════════════════════════════════
-  //  PANEL IZQUIERDO — Patrimonio + Necesidades + Bitácora
+  //  PANEL IZQUIERDO — 3 cards
   // ══════════════════════════════════════
   var _pLeft = _mkHudPanel('hud-left','left');
   _pLeft.style.setProperty('--hud-glow','rgba(34,197,94,0.14)');
+  _pLeft.innerHTML =
+    _card('#22C55E',
+      _cHdr('Patrimonio','#22C55E','fa-landmark') +
+      _hero('_hud-saldo','#22C55E','Disponible hoy') +
+      '<div style="padding:0 14px 10px">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:5px">'+
+          '<span style="font-size:11px;color:rgba(200,208,230,0.35);text-transform:uppercase;letter-spacing:.10em">Fondo emergencia</span>'+
+          '<span id="_hud-fondo-pct" style="font-size:12px;font-weight:700;color:#22C55E">—</span>'+
+        '</div>'+
+        '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
+          '<div id="_hud-fondo-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(34,197,94,.5);border-radius:3px;transition:width .8s ease"></div>'+
+        '</div>'+
+      '</div>'+
+      _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','🏦') +
+      _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','💳') +
+      _row('Efectivo', '_hud-efec',  '#FCD34D',null,'💵') +
+      _row('Apartados','_hud-apart', '#F59E0B',null,'🔒')
+    ) +
+    _card('#A855F7',
+      _cHdr('Necesidades','#A855F7','fa-layer-group') +
+      _maslow('Fisiológicas',   '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
+      _maslow('Seguridad',      '_hud-nec-2','_hud-nec-2-bar','#F59E0B') +
+      _maslow('Afiliación',     '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
+      _maslow('Reconocimiento', '_hud-nec-4','_hud-nec-4-bar','#A855F7') +
+      _maslow('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E')
+    ) +
+    _card('#C084FC',
+      _cHdr('Bitácora','#C084FC','fa-book-open') +
+      _row('Pensamientos','_hud-pens','#C084FC',null,'💭') +
+      _row('Relaciones',  '_hud-rels','#EC4899',null,'👥') +
+      _row('Salud',       '_hud-sal', '#EF4444',null,'❤️') +
+      _row('Entrenamiento','_hud-ent','#FB923C',null,'💪')
+    ) +
+    '<div style="height:10px"></div>';
 
-  // Construir HTML del panel izquierdo
-  var leftHTML =
-    // ── PATRIMONIO ──
-    _sec('Patrimonio','#22C55E','fa-landmark') +
-    _hero('_hud-saldo','#22C55E','Disponible hoy') +
-    // Barra de fondo emergencia
-    '<div style="padding:0 18px 10px">' +
-      '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
-        '<span style="font-size:9px;color:rgba(200,208,230,0.30);text-transform:uppercase;letter-spacing:.10em">Fondo emergencia</span>' +
-        '<span id="_hud-fondo-pct" style="font-size:9px;font-weight:700;color:#22C55E;text-shadow:0 0 6px rgba(34,197,94,.5)">—</span>' +
-      '</div>' +
-      '<div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden">' +
-        '<div id="_hud-fondo-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(34,197,94,.5);border-radius:2px;transition:width .8s ease"></div>' +
-      '</div>' +
-    '</div>' +
-    _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','🏦') +
-    _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','💳') +
-    _row('Efectivo', '_hud-efec',  '#FCD34D',null,'💵') +
-    _row('Apartados','_hud-apart', '#F59E0B',null,'🔒') +
-
-    // ── NECESIDADES ──
-    _div('') +
-    _sec('Necesidades','#A855F7','fa-layer-group') +
-    _maslow('Fisiológicas',  '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
-    _maslow('Seguridad',     '_hud-nec-2','_hud-nec-2-bar','#F59E0B') +
-    _maslow('Afiliación',    '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
-    _maslow('Reconocimiento','_hud-nec-4','_hud-nec-4-bar','#A855F7') +
-    _maslow('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E') +
-
-    // ── BITÁCORA ──
-    _div('') +
-    _sec('Bitácora','#C084FC','fa-book-open') +
-    _row('Pensamientos', '_hud-pens','#C084FC',null,'💭') +
-    _row('Relaciones',   '_hud-rels','#EC4899',null,'👥') +
-    _row('Salud',        '_hud-sal', '#EF4444',null,'❤️') +
-    _row('Entrenamiento','_hud-ent', '#FB923C',null,'💪');
-
-  _pLeft.innerHTML = leftHTML;
   _pLeft.appendChild(_nav('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
   _pLeft.appendChild(_nav('Ver Necesidades','fa-layer-group','#A855F7','irABitacora'));
 
   // ══════════════════════════════════════
-  //  PANEL DERECHO — Financiero + Activity/Logros + Navegación
+  //  PANEL DERECHO — 2 cards + nav
   // ══════════════════════════════════════
   var _pRight = _mkHudPanel('hud-right','right');
   _pRight.style.setProperty('--hud-glow','rgba(34,211,238,0.14)');
+  _pRight.innerHTML =
+    _card('#22D3EE',
+      _cHdr('Financiero','#22D3EE','fa-chart-line') +
+      _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
+      _duo('_hud-fin-ing','Ingresos','#22C55E','_hud-fin-egr','Egresos','#EF4444') +
+      _row('Ahorro %',  '_hud-fin-aho','#FACC15','_hud-aho-bar',null) +
+      _row('Runway',    '_hud-runway', '#22D3EE',null,'🛫') +
+      _row('Gasto/día', '_hud-gastoDia','#A78BFA',null,'📊')
+    ) +
+    _card('#FB923C',
+      _cHdr('Activity + Logros','#FB923C','fa-bolt') +
+      _duo('_hud-act-done','Hábitos hoy','#FB923C','_hud-lgr-done','Logros','#FACC15') +
+      '<div style="padding:8px 14px 14px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+          '<div style="display:flex;align-items:center;gap:7px">'+
+            '<i class="fas fa-fire" style="font-size:15px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>'+
+            '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.55);text-transform:uppercase;letter-spacing:.10em">Racha</span>'+
+          '</div>'+
+          '<span id="_hud-racha" style="font-size:20px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">—</span>'+
+        '</div>'+
+        '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
+          '<div id="_hud-racha-bar" style="height:100%;width:25%;background:linear-gradient(90deg,#FB923C,#FCD34D);box-shadow:0 0 8px rgba(251,146,60,.5);border-radius:3px"></div>'+
+        '</div>'+
+      '</div>'
+    ) +
+    '<div style="height:10px"></div>';
 
-  var rightHTML =
-    // ── FINANCIERO ──
-    _sec('Financiero','#22D3EE','fa-chart-line') +
-    _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
-    _duo('_hud-fin-ing','Ingresos','#22C55E', '_hud-fin-egr','Egresos','#EF4444') +
-    _row('Ahorro %',  '_hud-fin-aho', '#FACC15','_hud-aho-bar',null) +
-    _row('Runway',    '_hud-runway',  '#22D3EE',null,'🛫') +
-    _row('Gasto/día', '_hud-gastoDia','#A78BFA',null,'📊') +
+  [{label:'Activity Check',icon:'fa-bolt',fn:'irAActivity',color:'#FB923C'},
+   {label:'Logros',icon:'fa-trophy',fn:'irALogros',color:'#FACC15'},
+   {label:'Nutrición',icon:'fa-leaf',fn:'irANutricion',color:'#4ADE80'},
+   {label:'Bitácora',icon:'fa-book-open',fn:'irABitacora',color:'#C084FC'},
+   {label:'RAW Sheet',icon:'fa-table',fn:'irASheets',color:'#A5B4FC'},
+   {label:'Actualizar',icon:'fa-rotate-right',fn:'refreshTodo',color:'#64748B'},
+  ].forEach(function(n){ _pRight.appendChild(_nav(n.label,n.icon,n.color,n.fn)); });
 
-    // ── ACTIVITY + LOGROS ──
-    _div('') +
-    _sec('Activity + Logros','#FB923C','fa-bolt') +
-    _duo('_hud-act-done','Hábitos hoy','#FB923C', '_hud-lgr-done','Logros','#FACC15') +
-    // Racha con barra
-    '<div style="padding:6px 18px 10px">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">' +
-        '<div style="display:flex;align-items:center;gap:6px">' +
-          '<i class="fas fa-fire" style="font-size:13px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>' +
-          '<span style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(200,208,230,0.35)">Racha</span>' +
-        '</div>' +
-        '<span id="_hud-racha" style="font-size:16px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">—</span>' +
-      '</div>' +
-      '<div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden">' +
-        '<div id="_hud-racha-bar" style="height:100%;width:25%;background:linear-gradient(90deg,#FB923C,#FCD34D);box-shadow:0 0 8px rgba(251,146,60,.5);border-radius:2px"></div>' +
-      '</div>' +
-    '</div>' +
-
-    // ── NAVEGACIÓN ──
-    _div('');
-
-  _pRight.innerHTML = rightHTML;
-
-  // Nav links
-  [
-    {label:'Activity Check', icon:'fa-bolt',        fn:'irAActivity',  color:'#FB923C'},
-    {label:'Logros',         icon:'fa-trophy',       fn:'irALogros',    color:'#FACC15'},
-    {label:'Nutrición',      icon:'fa-leaf',         fn:'irANutricion', color:'#4ADE80'},
-    {label:'Bitácora',       icon:'fa-book-open',    fn:'irABitacora',  color:'#C084FC'},
-    {label:'RAW Sheet',      icon:'fa-table',        fn:'irASheets',    color:'#A5B4FC'},
-    {label:'Actualizar',     icon:'fa-rotate-right', fn:'refreshTodo',  color:'#64748B'},
-  ].forEach(function(n){ _pRight.appendChild(_nav(n.label, n.icon, n.color, n.fn)); });
-
-  // Registrar ambos panels
   var _hudPanels = [{el:_pLeft},{el:_pRight}];
-
-  // Canvas al overlay, panels al body
   _dialOverlay.appendChild(_dialCanvas);
   document.body.appendChild(_dialOverlay);
   _hudPanels.forEach(function(hp){ document.body.appendChild(hp.el); });
 
-  window._hudPanels = _hudPanels;
+    window._hudPanels = _hudPanels;
   var _navPanel = _pRight;
 
   // ── Actualizar paneles con datos reales ──
