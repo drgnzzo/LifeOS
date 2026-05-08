@@ -723,6 +723,7 @@ function _crearDialOverlay(){
 
   // ── Panel 1: Patrimonio ──
   var _p1 = _mkFloatPanel('hud-patrimonio','#22C55E','rgba(34,197,94,0.15)');
+  document.body.appendChild(_p1); // temp — para acceder al inner
   document.getElementById('hud-patrimonio-inner').innerHTML =
     _pH('Patrimonio','#22C55E','fa-landmark') +
     _hero('_hud-saldo','#22C55E','Disponible hoy') +
@@ -743,6 +744,7 @@ function _crearDialOverlay(){
 
   // ── Panel 2: Necesidades ──
   var _p2 = _mkFloatPanel('hud-necesidades','#A855F7','rgba(168,85,247,0.15)');
+  document.body.appendChild(_p2); // temp — para acceder al inner
   document.getElementById('hud-necesidades-inner').innerHTML =
     _pH('Necesidades','#A855F7','fa-layer-group') +
     _maslow('Fisiológicas',   '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
@@ -754,6 +756,7 @@ function _crearDialOverlay(){
 
   // ── Panel 3: Bitácora ──
   var _p3 = _mkFloatPanel('hud-bitacora','#C084FC','rgba(192,132,252,0.15)');
+  document.body.appendChild(_p3); // temp — para acceder al inner
   document.getElementById('hud-bitacora-inner').innerHTML =
     _pH('Bitácora','#C084FC','fa-book-open') +
     _row('Pensamientos','_hud-pens','#C084FC',null,'💭') +
@@ -765,6 +768,7 @@ function _crearDialOverlay(){
 
   // ── Panel 4: Financiero ──
   var _p4 = _mkFloatPanel('hud-financiero','#22D3EE','rgba(34,211,238,0.15)');
+  document.body.appendChild(_p4); // temp — para acceder al inner
   document.getElementById('hud-financiero-inner').innerHTML =
     _pH('Financiero','#22D3EE','fa-chart-line') +
     _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
@@ -776,6 +780,7 @@ function _crearDialOverlay(){
 
   // ── Panel 5: Activity + Logros ──
   var _p5 = _mkFloatPanel('hud-activity','#FB923C','rgba(251,146,60,0.15)');
+  document.body.appendChild(_p5); // temp — para acceder al inner
   document.getElementById('hud-activity-inner').innerHTML =
     _pH('Activity + Logros','#FB923C','fa-bolt') +
     _duo('_hud-act-done','Hábitos hoy','#FB923C','_hud-lgr-done','Logros','#FACC15') +
@@ -796,6 +801,7 @@ function _crearDialOverlay(){
 
   // ── Panel 6: Navegación ──
   var _p6 = _mkFloatPanel('hud-nav','#A78BFA','rgba(167,139,250,0.12)');
+  document.body.appendChild(_p6); // temp — para acceder al inner
   document.getElementById('hud-nav-inner').innerHTML =
     _pH('Navegación','#A78BFA','fa-compass');
   [
