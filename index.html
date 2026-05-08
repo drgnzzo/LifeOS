@@ -222,75 +222,193 @@
     <!-- PANEL LOGROS — montado por raw-logros.js -->
     <div class="board-face panel-logros" id="board-logros" style="overflow:hidden;display:flex;flex-direction:column;background:#020810"></div>
 
-    <!-- PANEL BITÁCORA -->
-    <div class="board-face panel-bitacora" id="board-bitacora" style="overflow-y:auto;overflow-x:hidden">
-      <div class="reverso-header">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:32px;height:32px;border-radius:0;background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(139,92,246,.08));border:1px solid rgba(139,92,246,.3);display:flex;align-items:center;justify-content:center"><i class="fas fa-book-open" style="color:#C4B5FD;font-size:14px"></i></div>
+    <!-- PANEL BITÁCORA — layout estilo Activity Check -->
+    <div class="board-face panel-bitacora" id="board-bitacora" style="overflow:hidden;display:flex;flex-direction:column;background:rgba(4,4,14,0.97)">
+
+      <!-- HEADER full-width estilo Activity Check -->
+      <div id="bit-header">
+        <button class="bit-back-btn" onclick="volverAlAnverso()" title="Volver"><i class="fas fa-arrow-left"></i></button>
+        <div class="bit-title-wrap">
+          <div class="bit-title">BITÁCORA</div>
+          <div class="bit-subtitle">Tu registro personal</div>
+        </div>
+        <div class="bit-stats-inline">
+          <div class="bit-stat-item" data-acc="fuchsia"><i class="fas fa-brain"></i><div class="bit-stat-body"><div class="bit-stat-lbl">PENSAMIENTOS</div><div class="bit-stat-val"><span id="bit-stat-pens-d">0</span><span class="bit-stat-sep"> / </span><span id="bit-stat-pens-t">0</span></div></div></div>
+          <div class="bit-stat-item" data-acc="blue"><i class="fas fa-users"></i><div class="bit-stat-body"><div class="bit-stat-lbl">RELACIONES</div><div class="bit-stat-val"><span id="bit-stat-rels-d">0</span><span class="bit-stat-sep"> / </span><span id="bit-stat-rels-t">0</span></div></div></div>
+          <div class="bit-stat-item" data-acc="rose"><i class="fas fa-heart-pulse"></i><div class="bit-stat-body"><div class="bit-stat-lbl">SALUD</div><div class="bit-stat-val"><span id="bit-stat-sal-d">0</span><span class="bit-stat-sep"> / </span><span id="bit-stat-sal-t">0</span></div></div></div>
+          <div class="bit-stat-item" data-acc="mint"><i class="fas fa-leaf"></i><div class="bit-stat-body"><div class="bit-stat-lbl">NUTRICIÓN</div><div class="bit-stat-val"><span id="bit-stat-nut-d">0</span><span class="bit-stat-sep"> / </span><span id="bit-stat-nut-t">0</span></div></div></div>
+          <div class="bit-stat-item" data-acc="orange"><i class="fas fa-dumbbell"></i><div class="bit-stat-body"><div class="bit-stat-lbl">ENTRENAMIENTO</div><div class="bit-stat-val"><span id="bit-stat-ent-d">0</span><span class="bit-stat-sep"> / </span><span id="bit-stat-ent-t">0</span></div></div></div>
+        </div>
+        <div class="bit-progreso-wrap">
+          <svg width="64" height="64" viewBox="0 0 64 64" class="bit-ring">
+            <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(140,100,220,0.14)" stroke-width="4"/>
+            <circle cx="32" cy="32" r="28" fill="none" stroke="#A855F7" stroke-width="4" stroke-linecap="round" transform="rotate(-90 32 32)" id="bit-ring-fill" stroke-dasharray="175.93" stroke-dashoffset="175.93" style="filter:drop-shadow(0 0 6px rgba(168,85,247,0.6));transition:stroke-dashoffset .8s"/>
+            <text x="32" y="37" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" id="bit-ring-pct">0%</text>
+          </svg>
+          <div class="bit-progreso-body">
+            <div class="bit-progreso-lbl">PROGRESO SEMANAL</div>
+            <div class="bit-progreso-val"><span id="bit-prog-d">0</span><span class="bit-stat-sep"> / </span><span id="bit-prog-t">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BODY: 5 columnas trello + sidebar -->
+      <div id="bit-body">
+        <div id="bit-cols">
+          <!-- col Pensamientos -->
+          <div class="bit-col" data-tipo="pensamientos">
+            <div class="bit-col-hdr">
+              <i class="fas fa-brain"></i>
+              <span>PENSAMIENTOS</span>
+              <button class="bit-col-add" onclick="setModoEntrada('pensamiento');volverAlAnverso();toggleEntradaDropdown()" title="Agregar pensamiento"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="bit-col-body" id="bit-col-pensamientos">
+              <div class="bit-empty">
+                <i class="fas fa-brain bit-empty-ico"></i>
+                <div class="bit-empty-msg">Sin pensamientos</div>
+                <div class="bit-empty-sub">Usa el dial para registrar uno</div>
+              </div>
+            </div>
+          </div>
+          <!-- col Relaciones -->
+          <div class="bit-col" data-tipo="relaciones">
+            <div class="bit-col-hdr">
+              <i class="fas fa-users"></i>
+              <span>RELACIONES</span>
+              <button class="bit-col-add" onclick="setModoEntrada('persona');volverAlAnverso();toggleEntradaDropdown()" title="Agregar interacción"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="bit-col-body" id="bit-col-relaciones">
+              <div class="bit-empty">
+                <i class="fas fa-users bit-empty-ico"></i>
+                <div class="bit-empty-msg">Sin relaciones</div>
+                <div class="bit-empty-sub">Usa el dial para registrar una</div>
+              </div>
+            </div>
+          </div>
+          <!-- col Salud -->
+          <div class="bit-col" data-tipo="salud">
+            <div class="bit-col-hdr">
+              <i class="fas fa-heart-pulse"></i>
+              <span>SALUD</span>
+              <button class="bit-col-add" onclick="setModoEntrada('salud');volverAlAnverso();toggleEntradaDropdown()" title="Agregar registro de salud"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="bit-col-body" id="bit-col-salud">
+              <div class="bit-empty">
+                <i class="fas fa-heart-pulse bit-empty-ico"></i>
+                <div class="bit-empty-msg">Sin registros</div>
+                <div class="bit-empty-sub">Usa el dial para registrar uno</div>
+              </div>
+            </div>
+          </div>
+          <!-- col Nutrición -->
+          <div class="bit-col" data-tipo="nutricion">
+            <div class="bit-col-hdr">
+              <i class="fas fa-leaf"></i>
+              <span>NUTRICIÓN</span>
+              <button class="bit-col-add" onclick="setModoEntrada('nutricion');volverAlAnverso();toggleEntradaDropdown()" title="Agregar registro de nutrición"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="bit-col-body" id="bit-col-nutricion">
+              <div class="bit-empty">
+                <i class="fas fa-leaf bit-empty-ico"></i>
+                <div class="bit-empty-msg">Sin registros</div>
+                <div class="bit-empty-sub">Usa el dial para registrar uno</div>
+              </div>
+            </div>
+          </div>
+          <!-- col Entrenamiento -->
+          <div class="bit-col" data-tipo="entrenamiento">
+            <div class="bit-col-hdr">
+              <i class="fas fa-dumbbell"></i>
+              <span>ENTRENAMIENTO</span>
+              <button class="bit-col-add" onclick="setModoEntrada('entrenamiento');volverAlAnverso();toggleEntradaDropdown()" title="Agregar sesión"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="bit-col-body" id="bit-col-entrenamiento">
+              <div class="bit-empty">
+                <i class="fas fa-dumbbell bit-empty-ico"></i>
+                <div class="bit-empty-msg">Sin sesiones</div>
+                <div class="bit-empty-sub">Usa el dial para registrar una</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIDEBAR -->
+        <aside id="bit-sidebar">
+          <div class="bit-sb-card bit-sb-resumen">
+            <div class="bit-sb-hdr">
+              <i class="fas fa-chart-pie"></i>
+              <span>RESUMEN ACTUAL</span>
+            </div>
+            <div class="bit-sb-body">
+              <div class="bit-sb-resumen-num" id="bit-sb-total">0</div>
+              <div class="bit-sb-resumen-lbl">REGISTROS ESTA SEMANA</div>
+              <div class="bit-sb-resumen-bar"><div id="bit-sb-resumen-fill"></div></div>
+              <div class="bit-sb-resumen-meta">
+                <span><span id="bit-sb-dias">0</span> / 7 días con actividad</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bit-sb-card">
+            <div class="bit-sb-hdr">
+              <i class="fas fa-layer-group"></i>
+              <span>POR SECCIÓN</span>
+            </div>
+            <div class="bit-sb-body">
+              <div class="bit-sb-row" data-acc="fuchsia"><i class="fas fa-brain"></i><span class="bit-sb-row-lbl">Pensamientos</span><span class="bit-sb-row-cnt" id="bit-sb-pens">0</span><div class="bit-sb-row-bar"><div id="bit-sb-pens-bar"></div></div></div>
+              <div class="bit-sb-row" data-acc="blue"><i class="fas fa-users"></i><span class="bit-sb-row-lbl">Relaciones</span><span class="bit-sb-row-cnt" id="bit-sb-rels">0</span><div class="bit-sb-row-bar"><div id="bit-sb-rels-bar"></div></div></div>
+              <div class="bit-sb-row" data-acc="rose"><i class="fas fa-heart-pulse"></i><span class="bit-sb-row-lbl">Salud</span><span class="bit-sb-row-cnt" id="bit-sb-sal">0</span><div class="bit-sb-row-bar"><div id="bit-sb-sal-bar"></div></div></div>
+              <div class="bit-sb-row" data-acc="mint"><i class="fas fa-leaf"></i><span class="bit-sb-row-lbl">Nutrición</span><span class="bit-sb-row-cnt" id="bit-sb-nut">0</span><div class="bit-sb-row-bar"><div id="bit-sb-nut-bar"></div></div></div>
+              <div class="bit-sb-row" data-acc="orange"><i class="fas fa-dumbbell"></i><span class="bit-sb-row-lbl">Entrenamiento</span><span class="bit-sb-row-cnt" id="bit-sb-ent">0</span><div class="bit-sb-row-bar"><div id="bit-sb-ent-bar"></div></div></div>
+            </div>
+          </div>
+
+          <div class="bit-sb-card bit-sb-tip">
+            <div class="bit-sb-hdr">
+              <i class="fas fa-lightbulb"></i>
+              <span>SIGUE ASÍ</span>
+            </div>
+            <div class="bit-sb-body">
+              <div class="bit-sb-tip-msg" id="bit-sb-tip-msg">
+                Empieza pequeño. Un registro a la vez hace la diferencia.
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- FOOTER full-width -->
+      <div id="bit-footer">
+        <div class="bit-footer-cell">
+          <div class="bit-footer-badge" data-acc="purple"><i class="fas fa-book-open"></i></div>
           <div>
-            <div class="reverso-title">Bitácora</div>
-            <div style="font-size:10px;color:var(--m)">Tu registro personal</div>
+            <div class="bit-footer-lbl">DIARIO ACTIVO</div>
+            <div class="bit-footer-val"><span id="bit-foot-dias">0</span> / 7 <span class="bit-footer-sub">días</span></div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="display:flex;gap:3px;background:rgba(0,0,0,.4);border-radius:0;padding:3px;border:1px solid rgba(255,255,255,.06)">
-            <button id="nec-btn-piramide" onclick="switchVistaNec('piramide')" style="padding:4px 14px;border-radius:0;font-size:11px;font-weight:700;background:rgba(139,92,246,.25);border:1px solid rgba(139,92,246,.4);color:#C4B5FD;cursor:pointer;font-family:inherit">▲ Pirámide</button>
-            <button id="nec-btn-radar"    onclick="switchVistaNec('radar')"    style="padding:4px 14px;border-radius:0;font-size:11px;font-weight:500;background:none;border:none;color:var(--m);cursor:pointer;font-family:inherit">◈ Radar</button>
-          </div>
-          <div id="nec-filtros-mes" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
-          <button onclick="resetFiltrosMes()" class="rev-pill" style="font-size:9px">Todo</button>
-          <span id="nec-periodo" style="font-size:10px;color:var(--m);margin:0 4px"></span>
-          <button class="btn-flip active" onclick="volverAlAnverso()"><i class="fas fa-chevron-left" style="font-size:10px"></i> Volver</button>
-        </div>
-      </div>
-      <div class="maslow-cols" id="maslow-sections">
-        <div id="sims-needs-panel" style="grid-column:1/-1;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:0;margin-bottom:8px"></div>
-        <div id="mcol-1">
-          <div class="section" id="sec-pensamientos">
-            <div class="sec-hdr" onclick="togSec(this)" id="sec-pensamientos-hdr">
-              <div class="sec-hdr-left"><div class="sec-hdr-icon" style="background:rgba(236,72,153,.1);color:#F9A8D4"><i class="fas fa-thought-bubble"></i></div><span class="sec-hdr-title">Pensamientos</span></div>
-              <div class="sec-hdr-right"><button onclick="event.stopPropagation();setModoEntrada('pensamiento');volverAlAnverso()" class="sec-add-btn">＋</button><i class="fas fa-chevron-down sec-chevron"></i></div>
-            </div>
-            <div class="sec-body" id="sec-pensamientos-body"><div id="pensamientos-body" style="padding:16px;color:var(--m);text-align:center"><i class="fas fa-circle-notch fa-spin"></i></div></div>
+        <div class="bit-footer-cell">
+          <i class="fas fa-fire bit-footer-fire"></i>
+          <div>
+            <div class="bit-footer-lbl">RACHA</div>
+            <div class="bit-footer-val"><span id="bit-foot-racha">0</span> <span class="bit-footer-sub">días seguidos</span></div>
           </div>
         </div>
-        <div id="mcol-2">
-          <div class="section" id="sec-relaciones">
-            <div class="sec-hdr" onclick="togSec(this)" id="sec-relaciones-hdr">
-              <div class="sec-hdr-left"><div class="sec-hdr-icon" style="background:rgba(59,130,246,.1);color:#93C5FD"><i class="fas fa-users"></i></div><span class="sec-hdr-title">Relaciones</span></div>
-              <div class="sec-hdr-right"><button onclick="event.stopPropagation();setModoEntrada('persona');volverAlAnverso()" class="sec-add-btn">＋</button><i class="fas fa-chevron-down sec-chevron"></i></div>
-            </div>
-            <div class="sec-body" id="sec-relaciones-body"><div id="relaciones-body" style="padding:16px;color:var(--m);text-align:center"><i class="fas fa-circle-notch fa-spin"></i></div></div>
+        <div class="bit-footer-cell">
+          <div class="bit-footer-badge" data-acc="cyan"><i class="fas fa-calendar-check"></i></div>
+          <div>
+            <div class="bit-footer-lbl">ESTE MES</div>
+            <div class="bit-footer-val"><span id="bit-foot-mes">0</span> <span class="bit-footer-sub">registros totales</span></div>
           </div>
         </div>
-        <div id="mcol-3">
-          <div class="section" id="sec-salud">
-            <div class="sec-hdr" onclick="togSec(this)" id="sec-salud-hdr">
-              <div class="sec-hdr-left"><div class="sec-hdr-icon" style="background:rgba(239,68,68,.1);color:#FCA5A5"><i class="fas fa-heart-pulse"></i></div><span class="sec-hdr-title">Salud</span></div>
-              <div class="sec-hdr-right"><button onclick="event.stopPropagation();setModoEntrada('salud');volverAlAnverso()" class="sec-add-btn">＋</button><i class="fas fa-chevron-down sec-chevron"></i></div>
-            </div>
-            <div class="sec-body" id="sec-salud-body"><div id="salud-body" style="padding:16px;color:var(--m);text-align:center"><i class="fas fa-circle-notch fa-spin"></i></div></div>
-          </div>
-        </div>
-        <div id="mcol-4">
-          <div class="section" id="sec-nutricion">
-            <div class="sec-hdr" onclick="togSec(this)" id="sec-nutricion-hdr">
-              <div class="sec-hdr-left"><div class="sec-hdr-icon" style="background:rgba(0,196,132,.1);color:#4ADE80"><i class="fas fa-apple-whole"></i></div><span class="sec-hdr-title">Nutrición</span></div>
-              <div class="sec-hdr-right"><button onclick="event.stopPropagation();setModoEntrada('nutricion');volverAlAnverso()" class="sec-add-btn">＋</button><i class="fas fa-chevron-down sec-chevron"></i></div>
-            </div>
-            <div class="sec-body" id="sec-nutricion-body"><div id="nutricion-body" style="padding:16px;text-align:center;color:var(--m)"><i class="fas fa-circle-notch fa-spin"></i></div></div>
-          </div>
-        </div>
-        <div id="mcol-5">
-          <div class="section" id="sec-entrenamiento">
-            <div class="sec-hdr" onclick="togSec(this)" id="sec-entrenamiento-hdr">
-              <div class="sec-hdr-left"><div class="sec-hdr-icon" style="background:rgba(239,68,68,.1);color:#FCA5A5"><i class="fas fa-dumbbell"></i></div><span class="sec-hdr-title">Entrenamiento</span></div>
-              <div class="sec-hdr-right"><button onclick="event.stopPropagation();setModoEntrada('entrenamiento');volverAlAnverso()" class="sec-add-btn">＋</button><i class="fas fa-chevron-down sec-chevron"></i></div>
-            </div>
-            <div class="sec-body" id="sec-entrenamiento-body"><div id="entrenamiento-body" style="padding:16px;text-align:center;color:var(--m)"><i class="fas fa-circle-notch fa-spin"></i></div></div>
+        <div class="bit-footer-cell">
+          <div class="bit-footer-badge" data-acc="violet"><i class="fas fa-bullseye"></i></div>
+          <div>
+            <div class="bit-footer-lbl">META</div>
+            <div class="bit-footer-val"><span style="color:#A855F7">3+ secciones/día</span></div>
           </div>
         </div>
       </div>
+
     </div>
 
     <!-- PANEL ACTIVITY -->
@@ -499,5 +617,6 @@
 <script src="raw-core.js?v=5072"></script>
 <script src="raw-dashboard.js?v=5072"></script>
 <script src="raw-logros.js?v=5072"></script>
+<script src="raw-bitacora.js?v=5072"></script>
 </body>
 </html>
