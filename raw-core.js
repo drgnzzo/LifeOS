@@ -3423,17 +3423,17 @@ document.addEventListener('DOMContentLoaded', function(){
       // ── PANEL WRAPPER ──
       // Ancho por tipo: hábitos necesitan espacio para checks, listas para texto
       var colW = {
-        personal:    'flex:1 1 auto;min-width:230px;max-width:340px',
-        electronics: 'flex:1 1 auto;min-width:230px;max-width:340px',
-        libro:       'flex:1 1 auto;min-width:200px;max-width:280px',
-        movie:       'flex:1 1 auto;min-width:200px;max-width:280px',
-        norut:       'flex:1 1 auto;min-width:200px;max-width:280px',
+        personal:    'flex:2 1 0;min-width:240px',
+        electronics: 'flex:2 1 0;min-width:240px',
+        libro:       'flex:1 1 0;min-width:180px',
+        movie:       'flex:1 1 0;min-width:180px',
+        norut:       'flex:1 1 0;min-width:180px',
       };
       function panelCol(tipo, inner){
         var c = CAT[tipo];
         var wStyle = colW[tipo] || 'flex:1 1 auto;min-width:200px;max-width:300px';
         return '<div data-panel-tipo="'+tipo+'" style="'+wStyle+';background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
-               'display:flex;flex-direction:column;overflow:hidden;width:max-content;'+
+               'display:flex;flex-direction:column;overflow:hidden;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
           '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px">'+
             '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
