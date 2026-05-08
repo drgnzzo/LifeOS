@@ -549,21 +549,24 @@ function _crearDialOverlay(){
     s.textContent=[
       // Breathing con glow de color variable via --pc
       '@keyframes miniBreath{',
-        '0%,100%{box-shadow:0 0 0 1px var(--pc-dim,rgba(140,100,220,0.15)),0 8px 32px rgba(0,0,0,0.7),0 0 20px var(--pc-glow,rgba(139,92,246,0.05))}',
-        '50%{box-shadow:0 0 0 1px var(--pc-mid,rgba(140,100,220,0.40)),0 8px 40px rgba(0,0,0,0.85),0 0 50px var(--pc-glow,rgba(139,92,246,0.18))}',
+        '0%,100%{',
+          'border-color:var(--pc-dim,rgba(140,100,220,0.20));',
+          'box-shadow:',
+            '0 0 0 0px transparent,',
+            '0 8px 32px rgba(0,0,0,0.75),',
+            '0 0 18px var(--pc-glow,rgba(139,92,246,0.06)),',
+            '0 0 0 1px var(--pc-dim,rgba(140,100,220,0.15));',
+        '}',
+        '50%{',
+          'border-color:var(--pc-mid,rgba(140,100,220,0.55));',
+          'box-shadow:',
+            '0 0 0 0px transparent,',
+            '0 8px 40px rgba(0,0,0,0.85),',
+            '0 0 40px var(--pc-glow,rgba(139,92,246,0.22)),',
+            '0 0 0 1px var(--pc-mid,rgba(140,100,220,0.40));',
+        '}',
       '}',
-      // Scan line que recorre el perímetro (top→right→bottom→left)
-      '@keyframes perimScan{',
-        '0%  {clip-path:inset(0 100% 98% 0)}',     // top izq→der
-        '25% {clip-path:inset(0 0 98% 0)}',          // top completo
-        '26% {clip-path:inset(0 0 0 98%)}',          // right arriba
-        '50% {clip-path:inset(0 0 0 0%)}',            // right completo
-        '51% {clip-path:inset(98% 0 0 0)}',           // bottom der→izq
-        '75% {clip-path:inset(98% 100% 0 0)}',       // bottom completo
-        '76% {clip-path:inset(0 100% 0 0)}',          // left abajo
-        '99% {clip-path:inset(0 100% 0 100%)}',      // left completo
-        '100%{clip-path:inset(0 100% 98% 0)}',       // reinicio
-      '}',
+      // perimScan removido — se reemplaza por borde siempre visible + breathing
       // Pulso de la línea top de color
       '@keyframes topPulse{0%,100%{opacity:.5;filter:blur(0)}50%{opacity:1;filter:blur(1px)}}',
       // Valor entra
@@ -607,13 +610,12 @@ function _crearDialOverlay(){
       'animation:topPulse 3s ease-in-out infinite;z-index:2';
     p.appendChild(top);
 
-    // Scan perimetral — un div con borde completo que se recorta animado
-    var scan = document.createElement('div');
-    scan.style.cssText = 'position:absolute;inset:0;border-radius:14px;pointer-events:none;z-index:3;'+
-      'border:1.5px solid '+accentColor.replace(')',',0.6)').replace('rgb','rgba')+';'+
-      'box-shadow:inset 0 0 8px '+glowColor+';'+
-      'animation:perimScan 5s linear infinite';
-    p.appendChild(scan);
+    // Borde de color siempre visible — breathing via box-shadow del panel principal
+    var border = document.createElement('div');
+    border.style.cssText = 'position:absolute;inset:0;border-radius:14px;pointer-events:none;z-index:3;'+
+      'border:1.5px solid '+accentColor+'44;'+
+      'box-shadow:inset 0 0 12px '+glowColor+',inset 0 0 4px '+accentColor+'18';
+    p.appendChild(border);
 
     // Contenedor de contenido (para no interferir con el scan)
     var inner = document.createElement('div');
@@ -723,7 +725,8 @@ function _crearDialOverlay(){
 
   // ── Panel 1: Patrimonio ──
   var _p1 = _mkFloatPanel('hud-patrimonio','#22C55E','rgba(34,197,94,0.15)');
-  document.body.appendChild(_p1); // temp — para acceder al inner
+  document.body.appendChild(_p1); // temp
+  _p1.style.animationDelay = '0s';
   document.getElementById('hud-patrimonio-inner').innerHTML =
     _pH('Patrimonio','#22C55E','fa-landmark') +
     _hero('_hud-saldo','#22C55E','Disponible hoy') +
@@ -744,7 +747,8 @@ function _crearDialOverlay(){
 
   // ── Panel 2: Necesidades ──
   var _p2 = _mkFloatPanel('hud-necesidades','#A855F7','rgba(168,85,247,0.15)');
-  document.body.appendChild(_p2); // temp — para acceder al inner
+  document.body.appendChild(_p2); // temp
+  _p2.style.animationDelay = '1.3s';
   document.getElementById('hud-necesidades-inner').innerHTML =
     _pH('Necesidades','#A855F7','fa-layer-group') +
     _maslow('Fisiológicas',   '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
@@ -756,7 +760,8 @@ function _crearDialOverlay(){
 
   // ── Panel 3: Bitácora ──
   var _p3 = _mkFloatPanel('hud-bitacora','#C084FC','rgba(192,132,252,0.15)');
-  document.body.appendChild(_p3); // temp — para acceder al inner
+  document.body.appendChild(_p3); // temp
+  _p3.style.animationDelay = '2.6s';
   document.getElementById('hud-bitacora-inner').innerHTML =
     _pH('Bitácora','#C084FC','fa-book-open') +
     _row('Pensamientos','_hud-pens','#C084FC',null,'💭') +
@@ -768,7 +773,8 @@ function _crearDialOverlay(){
 
   // ── Panel 4: Financiero ──
   var _p4 = _mkFloatPanel('hud-financiero','#22D3EE','rgba(34,211,238,0.15)');
-  document.body.appendChild(_p4); // temp — para acceder al inner
+  document.body.appendChild(_p4); // temp
+  _p4.style.animationDelay = '0.6s';
   document.getElementById('hud-financiero-inner').innerHTML =
     _pH('Financiero','#22D3EE','fa-chart-line') +
     _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
@@ -780,7 +786,8 @@ function _crearDialOverlay(){
 
   // ── Panel 5: Activity + Logros ──
   var _p5 = _mkFloatPanel('hud-activity','#FB923C','rgba(251,146,60,0.15)');
-  document.body.appendChild(_p5); // temp — para acceder al inner
+  document.body.appendChild(_p5); // temp
+  _p5.style.animationDelay = '1.9s';
   document.getElementById('hud-activity-inner').innerHTML =
     _pH('Activity + Logros','#FB923C','fa-bolt') +
     _duo('_hud-act-done','Hábitos hoy','#FB923C','_hud-lgr-done','Logros','#FACC15') +
@@ -801,7 +808,8 @@ function _crearDialOverlay(){
 
   // ── Panel 6: Navegación ──
   var _p6 = _mkFloatPanel('hud-nav','#A78BFA','rgba(167,139,250,0.12)');
-  document.body.appendChild(_p6); // temp — para acceder al inner
+  document.body.appendChild(_p6); // temp
+  _p6.style.animationDelay = '3.2s';
   document.getElementById('hud-nav-inner').innerHTML =
     _pH('Navegación','#A78BFA','fa-compass');
   [
@@ -834,9 +842,9 @@ function _crearDialOverlay(){
     var vH  = window.innerHeight;
     var GAP = 14;
     var leftX  = GAP;
-    var leftW  = Math.max(220, r.left - GAP*2);
+    var leftW  = Math.min(Math.max(180, r.left - GAP*2), Math.floor((r.left - GAP*2) * 0.78));
     var rightX = r.right + GAP;
-    var rightW = Math.max(220, vW - r.right - GAP*2);
+    var rightW = Math.min(Math.max(180, vW - r.right - GAP*2), Math.floor((vW - r.right - GAP*2) * 0.78));
 
     // Recoger alturas reales de cada panel para distribuirlos sin solaparse
     var leftPanels  = window._hudPanels.filter(function(hp){ return hp.el._side==='left';  });
