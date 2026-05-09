@@ -2122,6 +2122,15 @@ window.volverAlAnverso = window.volverAlAnverso || function(){
   var anv = document.getElementById('board-anverso');
   if(anv) anv.classList.remove('slide-right','slide-left');
   document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){ f.classList.remove('active'); });
+  // Resetear estilos inline del board-activity (que se ponen a position:fixed al renderizar)
+  var bAct = document.getElementById('board-activity');
+  if(bAct){
+    bAct.style.position = '';
+    bAct.style.top = bAct.style.left = bAct.style.right = bAct.style.bottom = '';
+    bAct.style.zIndex = '';
+    bAct.style.height = bAct.style.maxHeight = '';
+    bAct.style.display = '';
+  }
   var bh = document.getElementById('btn-home'); if(bh) bh.classList.add('on');
   document.querySelectorAll('.btn-flip').forEach(function(b){ b.classList.remove('active'); });
   document.querySelectorAll('.mob-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab==='entrada'); });
@@ -3066,10 +3075,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
       function kpiPill(tipo, done, total){
         var c = CAT[tipo];
-        return '<div style="display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid rgba(140,100,220,0.14)">'+
-          '<i class="fas '+c.icon+'" style="font-size:16px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
-          '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45)">'+c.label+'</div>'+
-          '<div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">'+
+        return '<div style="display:flex;align-items:center;gap:7px;padding:0 16px;border-right:1px solid rgba(140,100,220,0.14)">'+
+          '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
+          '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);line-height:1">'+c.label+'</div>'+
+          '<div style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2">'+
             '<span style="color:'+c.color+'">'+done+'</span>'+
             '<span style="color:rgba(200,208,230,0.25)"> / '+total+'</span>'+
           '</div></div>'+
@@ -3079,42 +3088,42 @@ document.addEventListener('DOMContentLoaded', function(){
       // ── HEADER BAR ──
       var header =
         '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-bottom:1px solid rgba(140,100,220,0.14);'+
-             'height:72px;padding:0 20px;gap:0;flex-shrink:0;overflow:hidden">'+
+             'height:56px;padding:0 16px;gap:0;flex-shrink:0;overflow:hidden">'+
           '<div onclick="(typeof volverAlAnverso===\'function\'&&volverAlAnverso())"'+
-               ' style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;'+
+               ' style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;'+
                'background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:8px;cursor:pointer;'+
-               'margin-right:16px;flex-shrink:0;transition:all .15s">'+
-            '<i class="fas fa-arrow-left" style="color:#22D3EE;font-size:14px"></i>'+
+               'margin-right:14px;flex-shrink:0;transition:all .15s">'+
+            '<i class="fas fa-arrow-left" style="color:#22D3EE;font-size:13px"></i>'+
           '</div>'+
-          '<div style="margin-right:32px;flex-shrink:0">'+
-            '<div style="font-size:18px;font-weight:700;letter-spacing:.05em;color:#fff">ACTIVITY CHECK</div>'+
-            '<div style="font-size:11px;color:rgba(200,208,230,0.45);margin-top:1px">Tu progreso, tu recompensa</div>'+
+          '<div style="margin-right:24px;flex-shrink:0">'+
+            '<div style="font-size:15px;font-weight:700;letter-spacing:.05em;color:#fff;line-height:1.1">ACTIVITY CHECK</div>'+
+            '<div style="font-size:10px;color:rgba(200,208,230,0.45);margin-top:1px">Tu progreso, tu recompensa</div>'+
           '</div>'+
           '<div style="display:flex;align-items:center;flex:1;overflow:hidden">'+
             kpiPill('personal',    totales.doneP, totales.personal)+
             kpiPill('electronics', totales.doneE, totales.electronics)+
             kpiPill('libro',       totales.doneL, totales.libro)+
             kpiPill('movie',       totales.doneM, totales.movie)+
-            '<div style="display:flex;align-items:center;gap:8px;padding:0 20px">'+
-              '<i class="fas fa-star" style="font-size:16px;color:#EC4899;filter:drop-shadow(0 0 6px rgba(236,72,153,0.4))"></i>'+
-              '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45)">PENDIENTES</div>'+
-              '<div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">'+
+            '<div style="display:flex;align-items:center;gap:7px;padding:0 16px">'+
+              '<i class="fas fa-star" style="font-size:14px;color:#EC4899;filter:drop-shadow(0 0 6px rgba(236,72,153,0.4))"></i>'+
+              '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);line-height:1">PENDIENTES</div>'+
+              '<div style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2">'+
                 '<span style="color:#EC4899">'+totales.doneN+'</span>'+
                 '<span style="color:rgba(200,208,230,0.25)"> / '+totales.norut+'</span>'+
               '</div></div>'+
             '</div>'+
           '</div>'+
-          '<div style="display:flex;align-items:center;gap:14px;flex-shrink:0;padding-left:20px;border-left:1px solid rgba(140,100,220,0.14)">'+
-            '<svg width="64" height="64" viewBox="0 0 64 64">'+
+          '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;padding-left:16px;border-left:1px solid rgba(140,100,220,0.14)">'+
+            '<svg width="48" height="48" viewBox="0 0 64 64">'+
               '<circle cx="32" cy="32" r="28" fill="none" stroke="#26304A" stroke-width="4"/>'+
               '<circle cx="32" cy="32" r="28" fill="none" stroke="#3B82F6" stroke-width="4"'+
                 ' stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+(circ*(1-pctGeneral/100)).toFixed(1)+'"'+
                 ' stroke-linecap="round" transform="rotate(-90 32 32)"'+
                 ' style="filter:drop-shadow(0 0 6px rgba(59,130,246,0.6));transition:stroke-dashoffset .8s"/>'+
-              '<text x="32" y="37" text-anchor="middle" font-size="14" font-weight="700" fill="#fff" font-family="system-ui">'+pctGeneral+'%</text>'+
+              '<text x="32" y="38" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" font-family="system-ui">'+pctGeneral+'%</text>'+
             '</svg>'+
-            '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);margin-bottom:2px">PROGRESO GENERAL</div>'+
-            '<div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">'+
+            '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);margin-bottom:1px">PROGRESO</div>'+
+            '<div style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1">'+
               '<span style="color:#3B82F6">'+doneAll+'</span>'+
               '<span style="color:rgba(200,208,230,0.25)"> / '+totalAll+'</span>'+
             '</div></div>'+
@@ -3342,47 +3351,47 @@ document.addEventListener('DOMContentLoaded', function(){
 
       var footer =
         '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-top:1px solid rgba(140,100,220,0.14);'+
-             'height:64px;padding:0;flex-shrink:0">'+
-          '<div style="display:flex;align-items:center;gap:12px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
-            '<div style="width:36px;height:36px;border-radius:8px;background:rgba(6,4,14,0.95);border:1px solid rgba(140,100,220,0.18);'+
+             'height:48px;padding:0;flex-shrink:0">'+
+          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 18px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(6,4,14,0.95);border:1px solid rgba(140,100,220,0.18);'+
                  'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
-              '<span style="font-size:13px;font-weight:800;color:#A78BFA">'+nivel+'</span>'+
+              '<span style="font-size:12px;font-weight:800;color:#A78BFA">'+nivel+'</span>'+
             '</div>'+
-            '<div style="flex:1">'+
-              '<div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:3px">NIVEL '+nivel+
-                ' <span style="font-size:10px;color:rgba(200,208,230,0.45);font-weight:500;font-variant-numeric:tabular-nums">'+xpActual+' / '+xpMax+' XP</span></div>'+
-              '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;line-height:1">NIVEL '+nivel+
+                ' <span style="font-size:9px;color:rgba(200,208,230,0.45);font-weight:500;font-variant-numeric:tabular-nums">'+xpActual+' / '+xpMax+' XP</span></div>'+
+              '<div style="height:3px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
                 '<div style="height:100%;width:'+xpPct+'%;background:linear-gradient(90deg,#7C3AED,#A855F7);border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5)"></div>'+
               '</div>'+
             '</div>'+
           '</div>'+
-          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
-            '<i class="fas fa-fire" style="font-size:20px;color:#FB923C;filter:drop-shadow(0 0 8px rgba(251,146,60,0.6))"></i>'+
-            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">RACHA ACTUAL</div>'+
-            '<div style="font-size:16px;font-weight:700;color:#FB923C">'+doneAll+' actividades</div></div>'+
+          '<div style="display:flex;align-items:center;gap:9px;flex:1;padding:0 18px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<i class="fas fa-fire" style="font-size:17px;color:#FB923C;filter:drop-shadow(0 0 8px rgba(251,146,60,0.6))"></i>'+
+            '<div><div style="font-size:9px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);line-height:1">RACHA ACTUAL</div>'+
+            '<div style="font-size:13px;font-weight:700;color:#FB923C;line-height:1.1">'+doneAll+' actividades</div></div>'+
           '</div>'+
-          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
-            '<i class="fas fa-bullseye" style="font-size:16px;color:#A855F7"></i>'+
-            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">PROGRESO HOY</div>'+
-            '<div style="font-size:13px;font-weight:600;color:#fff;margin-top:1px">'+
-              doneAll+' / '+totalAll+' <span style="color:#A855F7;font-size:11px;font-weight:700">+50 XP</span>'+
+          '<div style="display:flex;align-items:center;gap:9px;flex:1;padding:0 18px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<i class="fas fa-bullseye" style="font-size:14px;color:#A855F7"></i>'+
+            '<div><div style="font-size:9px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);line-height:1">PROGRESO HOY</div>'+
+            '<div style="font-size:11px;font-weight:600;color:#fff;margin-top:1px;line-height:1.1">'+
+              doneAll+' / '+totalAll+' <span style="color:#A855F7;font-size:10px;font-weight:700">+50 XP</span>'+
             '</div></div>'+
           '</div>'+
-          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px">'+
-            '<div style="width:36px;height:36px;border-radius:8px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);'+
+          '<div style="display:flex;align-items:center;gap:9px;flex:1;padding:0 18px">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);'+
                  'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
-              '<span style="font-size:13px;font-weight:800;color:#A855F7">'+(nivel+1)+'</span>'+
+              '<span style="font-size:12px;font-weight:800;color:#A855F7">'+(nivel+1)+'</span>'+
             '</div>'+
-            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">PRÓXIMO NIVEL</div>'+
-            '<div style="font-size:12px;font-weight:600;color:rgba(220,220,240,0.85);margin-top:1px">'+
+            '<div><div style="font-size:9px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);line-height:1">PRÓXIMO NIVEL</div>'+
+            '<div style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.85);margin-top:1px;line-height:1.1">'+
               '<span style="color:#A855F7">+500 XP</span> <span style="color:rgba(200,208,230,0.25)">|</span> <span style="color:#22D3EE">+$250</span>'+
             '</div></div>'+
-            '<i class="fas fa-box" style="font-size:18px;color:rgba(200,208,230,0.45);margin-left:auto"></i>'+
+            '<i class="fas fa-box" style="font-size:15px;color:rgba(200,208,230,0.45);margin-left:auto"></i>'+
           '</div>'+
         '</div>';
 
-      // ── LAYOUT FIJO: 100vh con header+contenido+footer
-      // El board ocupa todo el viewport, así NO crece la página
+      // ── LAYOUT FIJO: usa el alto disponible del contenedor padre (no 100vh)
+      // así respeta nav superior que pueda tener la página
       var board = document.getElementById('board-activity');
       if(!board) return;
       board.style.display = 'flex';
@@ -3391,12 +3400,18 @@ document.addEventListener('DOMContentLoaded', function(){
       board.style.overflow = 'hidden';
       board.style.height = '100vh';
       board.style.maxHeight = '100vh';
+      board.style.position = 'fixed';
+      board.style.top = '0';
+      board.style.left = '0';
+      board.style.right = '0';
+      board.style.bottom = '0';
+      board.style.zIndex = '50';
 
       board.innerHTML =
         header +
         // Contenedor principal: flex:1 con min-height:0 para que sus hijos puedan scrollear
-        '<div style="display:flex;gap:12px;padding:12px;flex:1;min-height:0;overflow:hidden;align-items:stretch">'+
-          '<div style="display:flex;gap:10px;flex:1;min-width:0;align-items:stretch;height:100%">'+
+        '<div style="display:flex;gap:8px;padding:8px;flex:1;min-height:0;overflow:hidden;align-items:stretch">'+
+          '<div style="display:flex;gap:8px;flex:1;min-width:0;align-items:stretch;height:100%">'+
             panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
             panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+
             panelCol('libro',       itemList(d.libros||[],   'libro'))+
