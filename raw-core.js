@@ -599,8 +599,9 @@ function _crearDialOverlay(){
     '</div>'+
     '<div id="hud-sim-needs-grid" style="display:flex;gap:8px;padding:8px 16px 12px;align-items:flex-start;justify-content:space-between"></div>';
 
-  // Render INMEDIATO de las 9 barras con valores default (50)
-  setTimeout(function(){ renderSimsNeeds('hud-sim-needs-grid'); }, 0);
+  // Render SÍNCRONO inmediato de las 9 barras (con valores default 50)
+  // antes de que _reposicionarHUD calcule la altura del panel
+  if(typeof renderSimsNeeds === 'function') renderSimsNeeds('hud-sim-needs-grid');
 
   // ── Panel 1: Patrimonio ──
   var _p1 = _mkFloatPanel('hud-patrimonio','#22C55E','rgba(34,197,94,0.15)');
@@ -902,6 +903,20 @@ function _crearDialOverlay(){
     if(window._nutData){
       var nutItems = (window._nutData.items||[]).length || ((window._nutData.semana||[]).reduce(function(s,d){ return s+(d.items||[]).length; },0));
       set('_hud-nut', nutItems ? nutItems+' registros' : '—');
+    } else {
+      // Precargar datos de Nutrición si aún no existen — sin bloquear, en background
+      if(typeof api!=='undefined' && api.getNutricion && !window._nutLoading){
+        window._nutLoading = true;
+        api.getNutricion().then(function(d){
+          window._nutData = d;
+          window._nutLoading = false;
+          // Actualizar label inmediatamente
+          var n = (d && d.items||[]).length || (d && (d.semana||[]).reduce(function(s,x){ return s+(x.items||[]).length; },0)) || 0;
+          set('_hud-nut', n ? n+' registros' : '—');
+          // Actualizar también la banda Sim si tiene needs que dependen de nutrición
+          if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
+        }).catch(function(){ window._nutLoading = false; });
+      }
     }
     // Entrenamiento
     if(window._entData && window._entData.items){
@@ -1539,8 +1554,8 @@ function abrirDial(){
   });
   if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
   if(typeof window._refrescarEspejos==='function') setTimeout(function(){ window._refrescarEspejos(); }, 50);
-  // Render banda Sim ya construida
-  if(typeof renderSimsNeeds==='function') setTimeout(function(){ renderSimsNeeds('hud-sim-needs-grid'); }, 80);
+  // Render banda Sim ya construida — renderizamos AHORA y reposicionamos después
+  if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
   if(window._hudPanels && window.innerWidth>=900){
     window._hudPanels.forEach(function(hp, i){
       hp.el.style.opacity='0'; hp.el.style.visibility='hidden';
@@ -1549,6 +1564,19 @@ function abrirDial(){
         requestAnimationFrame(function(){ hp.el.style.opacity='1'; });
       }, i * 80);
     });
+    // Una vez todos visibles, re-render de barras + reposicionamiento
+    // para que la banda Sim recalcule altura con el contenido ya pintado
+    var totalDelay = window._hudPanels.length * 80 + 60;
+    setTimeout(function(){
+      if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
+      if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+    }, totalDelay);
+  } else {
+    // Modo compacto / mobile: aun así forzar render+reposicionamiento
+    setTimeout(function(){
+      if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
+      if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+    }, 100);
   }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.add('active');
@@ -3554,22 +3582,24 @@ document.addEventListener('DOMContentLoaded', function(){
           '</div>'+
         '</div>';
 
-      // ── LAYOUT FIJO: usa el alto disponible del contenedor padre (no 100vh)
-      // así respeta nav superior que pueda tener la página
+      // ── LAYOUT: respeta el hero/header superior de la página
+      // Calcula la altura disponible restando el offsetTop real del board
       var board = document.getElementById('board-activity');
       if(!board) return;
       board.style.display = 'flex';
       board.style.flexDirection = 'column';
       board.style.background = 'rgba(4,4,14,0.97)';
       board.style.overflow = 'hidden';
-      board.style.height = '100vh';
-      board.style.maxHeight = '100vh';
-      board.style.position = 'fixed';
-      board.style.top = '0';
-      board.style.left = '0';
-      board.style.right = '0';
-      board.style.bottom = '0';
-      board.style.zIndex = '50';
+      // Limpiar estilos previos que pudiéramos tener
+      board.style.position = '';
+      board.style.top = board.style.left = board.style.right = board.style.bottom = '';
+      board.style.zIndex = '';
+      // Forzar altura disponible: la ventana menos lo que ocupa el hero arriba
+      var topOffset = board.getBoundingClientRect().top + window.scrollY;
+      // Si el board está oculto temporalmente, usamos 0 como fallback seguro
+      if(topOffset < 0 || isNaN(topOffset)) topOffset = 0;
+      board.style.height = 'calc(100vh - '+topOffset+'px)';
+      board.style.maxHeight = 'calc(100vh - '+topOffset+'px)';
 
       board.innerHTML =
         header +
