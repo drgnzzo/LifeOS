@@ -1,5 +1,17 @@
-/* RAW Entry — Overlay v.5.098
-   Cambios mayores:
+/* RAW Entry — Overlay v.5.099
+   Cambios:
+   - SECUENCIA de apertura del overlay reordenada:
+     · t=0–600ms: BREATHING ambiental visible primero (boost del _glowEl
+       con brightness 2.2 + saturate 1.4 que vuelve a normal en ~800ms).
+     · t=600–2400ms: CASCADA de paneles (BREATH_LEAD_MS = 600).
+     · t=2600ms: DIAL aparece con su animación.
+     · t=4000ms: limpieza y aplicar vida (breathings/scans).
+   - Fechas en checks de Activity: setActivityCheck del backend ahora
+     guarda fecha de check como NOTA de la celda (sin nuevas columnas).
+     getActivityCheck lee las notas y expone checksFechas/fechaCompletado.
+     itemList en raw-core.js muestra la fecha al lado del nombre con
+     formato "dd/mes HH:mm".
+
    - CASCADA RETROFUTURISTA: todos los paneles (incluido USER) entran con
      fade-in + slide + filter brightness(0.4)blur(2px)→normal, en ~820ms
      de transición y delays distribuidos 200–2000ms con shuffle aleatorio.
@@ -3776,14 +3788,31 @@ function abrirDial(){
   _dialOverlay.style.pointerEvents = 'auto';
   _dialVisible = true;
 
-  // ── OCULTAR DIAL al inicio: aparecerá después de la cascada de cards ──
+  // ── OCULTAR DIAL al inicio: aparece DESPUÉS de la cascada de cards ──
   if(_dialCanvas){
     _dialCanvas.style.opacity = '0';
     _dialCanvas.style.transform = 'scale(0.85)';
     _dialCanvas.style.transition = 'none';
   }
 
-  // ── OCULTAR TODOS LOS PANELES de inmediato (antes de cualquier reposicionamiento) ──
+  // ── Boost del breathing ambiental durante la primera fase ──
+  // El _glowEl (radial gradient con animation:dialBreath) ya existe en el
+  // overlay. Le subimos opacity/scale temporalmente para que sea LO PRIMERO
+  // que se note antes de que aparezcan los paneles.
+  var glowEl = document.getElementById('dial-ambient');
+  if(glowEl){
+    glowEl.style.transition = 'none';
+    glowEl.style.opacity = '0';
+    glowEl.style.filter = 'brightness(2.2) saturate(1.4)';
+    requestAnimationFrame(function(){
+      glowEl.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1),filter 1800ms ease-out';
+      glowEl.style.opacity = '1';
+      // Después de 1.5s baja a su brightness normal
+      setTimeout(function(){ glowEl.style.filter = ''; }, 800);
+    });
+  }
+
+  // ── OCULTAR TODOS LOS PANELES de inmediato ──
   if(window._hudPanels){
     window._hudPanels.forEach(function(hp){
       if(!hp.el) return;
@@ -3806,8 +3835,13 @@ function abrirDial(){
   if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
 
   if(window._hudPanels && window.innerWidth>=900){
-    // Cascada retrofuturista: panels van "encendiéndose" uno a uno con
-    // delays distribuidos en una ventana más amplia para sensación de boot.
+    // Delay base: 600ms para que el breathing del glow tenga "tiempo de aire"
+    // antes de que aparezcan los paneles. Esto crea el orden:
+    //   1) Breathing visible (0–600ms)
+    //   2) Cascada de paneles (600–2400ms)
+    //   3) Dial aparece (2600ms)
+    var BREATH_LEAD_MS = 600;
+
     function _slideOrigin(side){
       switch(side){
         case 'top-left':       return 'translate(-22px,-16px)';
@@ -3829,13 +3863,13 @@ function abrirDial(){
       hp.el.style.filter = 'brightness(0.4) blur(2px)';
     });
 
-    // Generar delays aleatorios distribuidos en ventana 200-2000ms.
-    // Distribución más natural: shuffle del array y asignar slots con jitter.
+    // Generar delays. Empiezan en BREATH_LEAD_MS (600ms) para que el breathing
+    // del glow sea visible solo antes de la cascada.
     var nPanels = window._hudPanels.length;
-    var slotSize = 1800 / Math.max(1, nPanels - 1); // ~140ms entre slots
+    var slotSize = 1800 / Math.max(1, nPanels - 1);
     var delays = [];
     for(var i=0;i<nPanels;i++){
-      var base = 200 + i * slotSize;
+      var base = BREATH_LEAD_MS + i * slotSize;
       var jitter = (Math.random() - 0.5) * slotSize * 0.8;
       delays.push(Math.round(base + jitter));
     }
@@ -3846,12 +3880,11 @@ function abrirDial(){
       var tmp = shuffledIdx[s]; shuffledIdx[s] = shuffledIdx[r]; shuffledIdx[r] = tmp;
     }
 
-    // Forzar primer frame para que las propiedades iniciales se apliquen
     requestAnimationFrame(function(){
       window._hudPanels.forEach(function(hp, idx){
         var delay = delays[shuffledIdx.indexOf(idx)];
         setTimeout(function(){
-          if(!hp.el._animatingEntry) return; // si cerraron el overlay antes
+          if(!hp.el._animatingEntry) return;
           hp.el.style.visibility = 'visible';
           requestAnimationFrame(function(){
             hp.el.style.opacity = '1';
@@ -3862,9 +3895,8 @@ function abrirDial(){
       });
     });
 
-    // El último panel termina ~2000+920ms = ~2920ms.
-    // El DIAL aparece DESPUÉS de que todos los paneles estén visibles.
-    var dialAppearDelay = 2200;
+    // Dial aparece después de la cascada de paneles
+    var dialAppearDelay = BREATH_LEAD_MS + 2000; // ~2600ms
     setTimeout(function(){
       if(_dialCanvas){
         _dialCanvas.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1),transform 800ms cubic-bezier(.16,1,.3,1)';
@@ -3873,7 +3905,7 @@ function abrirDial(){
       }
     }, dialAppearDelay);
 
-    // Una vez todos los paneles + dial están visibles, limpiar transitions
+    // Limpiar transitions cuando todo está visible
     setTimeout(function(){
       if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
       if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
@@ -3886,7 +3918,7 @@ function abrirDial(){
       }
       if(_dialCanvas) _dialCanvas.style.transition = '';
       _aplicarVidaPaneles();
-    }, 3400);
+    }, 4000);
   } else {
     // Modo compacto: todo visible de inmediato
     if(window._hudPanels){
