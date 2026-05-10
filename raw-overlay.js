@@ -1,5 +1,45 @@
-/* RAW Entry — Overlay v.5.096
-   Cambios desde v5.095:
+/* RAW Entry — Overlay v.5.098
+   Cambios mayores:
+   - CASCADA RETROFUTURISTA: todos los paneles (incluido USER) entran con
+     fade-in + slide + filter brightness(0.4)blur(2px)→normal, en ~820ms
+     de transición y delays distribuidos 200–2000ms con shuffle aleatorio.
+     Sensación de "sistema cargando después de años de no usarse".
+   - DIAL APARECE DESPUÉS: ahora oculto al inicio (opacity:0 + scale 0.85)
+     y aparece a los ~2200ms con su propia animación de 700ms.
+   - 4 COLUMNAS (2 izq + 2 der) sin achicar el dial. Distribución:
+     · left-1: Patrimonio + Bitácora
+     · left-2: Necesidades + Fijos
+     · right-1: Financiero + Variables
+     · right-2: Activity+Logros
+     Se aprovechan los costados disponibles.
+   - SLOTS PUNTEADOS más visibles: opacity 0.85 (antes 1 invisible),
+     borde 0.55 (antes 0.35), background 0.08 (antes 0.04), shadow inset
+     + outer glow, hover, icono más grande con drop-shadow.
+   - DnD soporta 4 columnas: layout v2 con keys left-1/left-2/right-1/
+     right-2/bottom. STORAGE_KEY igual; al cargar layouts viejos hay
+     fallback a los lados nuevos por id.
+   - SLOTS VACÍOS aparecen en columnas vacías (right-2 si solo tiene
+     Activity, etc.) usando window._hudColPositions exportadas desde
+     _reposicionarHUD.
+   - cerrarDial limpia opacity del dial canvas y _animatingEntry para
+     que la próxima apertura arranque limpia.
+   - _hudCollapse limpia también height y transform de bottom panels
+     para evitar amontonamiento residual.
+
+   - Antes: panel expandido tenía altura FIJA de 55vh y se anclaba al
+     topRowBottom, quedando pegado arriba. Si el contenido era más alto
+     que 55vh, scroll vertical interno (caso Necesidades).
+   - Ahora: _hudAjustarTamañoExpandido mide el scrollHeight del contenido
+     después del hydrate (con reintentos para esperar SVG/sparklines).
+     · Si contenido cabe en la zona disponible → altura = contenido,
+       centrado verticalmente entre fila top y fila bottom, sin scroll.
+     · Si no cabe → altura = zona disponible completa, scroll interno.
+   - Zona disponible = vH − topRowBottom − bottomRow − dialMiniReserva.
+   - El ancho subió a min(1100px, vW-480) para que Patrimonio expandido
+     no se vea apretado.
+   - _hudCollapse limpia _zonaY/_zonaH y los inline-styles del wrapper.
+   - Se llama post-hydrate en _hudExpand con setTimeout 60ms.
+
    - NECESIDADES expandido: BUG de datos en blanco arreglado. Las keys
      de los niveles son '1'..'5' (numéricos como string), NO los nombres
      como 'fisiologicas'. _hudRenderNecesidadesEn ahora usa NIVELES_CFG
@@ -1154,13 +1194,14 @@ function _crearDialOverlay(){
   _pUser._side='top-left';     _pUser._order=0;
   _pSim._side='top-center';    _pSim._order=0;
   _pStats._side='top-right';   _pStats._order=0;
-  _p1._side='left';    _p1._order=0;
-  _p2._side='left';    _p2._order=1;
-  _p3._side='left';    _p3._order=2;
-  _p7._side='left';    _p7._order=3;
-  _p4._side='right';   _p4._order=0;
-  _p5._side='right';   _p5._order=1;
-  _p8._side='right';   _p8._order=2;
+  // Distribución 2 columnas izq + 2 columnas der (4 columnas laterales)
+  _p1._side='left-1';   _p1._order=0;   // Patrimonio
+  _p3._side='left-1';   _p3._order=1;   // Bitácora
+  _p2._side='left-2';   _p2._order=0;   // Necesidades
+  _p7._side='left-2';   _p7._order=1;   // Fijos
+  _p4._side='right-1';  _p4._order=0;   // Financiero
+  _p8._side='right-1';  _p8._order=1;   // Variables
+  _p5._side='right-2';  _p5._order=0;   // Activity+Logros
   _pTrack._side='bottom-track';   _pTrack._order=0;
   _pMision._side='bottom-left';   _pMision._order=0;
   _pLogro._side='bottom-center';  _pLogro._order=0;
@@ -1197,23 +1238,30 @@ function _crearDialOverlay(){
     //  MODO EXPANDIDO — un panel ocupa el centro, dial achicado abajo
     // ══════════════════════════════════════════════════════════════════════
     if(expandedEl){
-      // Calcular dimensiones del centro: el área que ocupaba el dial
-      // Lo ampliamos para aprovechar también un poco más arriba/abajo
-      var centerW = Math.min(900, vW - 480);    // ancho central deja columnas laterales
-      var centerH = Math.round(vH * 0.55);       // alto central ~55% del viewport
+      // Zona disponible verticalmente: entre la fila top (USER/Sim/Stats)
+      // y la fila bottom (Misión/Logro/Nivel). El panel se centra ahí.
       var topRowBottom = parseFloat(_pUser.style.top || 0) +
                          (_pUser.offsetHeight || 100) + GAP*2;
-      var centerY = topRowBottom;
+      var botYAvail = vH - 90 - GAP;
+      var dialMiniReserva = 80 + GAP*2;
+      var zonaH = Math.max(280, botYAvail - dialMiniReserva - topRowBottom);
+
+      var centerW = Math.min(1100, vW - 480);
       var centerX = Math.round((vW - centerW) / 2);
 
-      // Posicionar el panel expandido en el centro
+      // Provisional: asignar zona completa centrada (sin medir contenido aún).
+      // _hudAjustarTamañoExpandido (llamado por _hudExpand post-hydrate) hará
+      // el ajuste fino de altura según el contenido real.
       expandedEl.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)';
-      expandedEl.style.left   = centerX + 'px';
-      expandedEl.style.top    = centerY + 'px';
-      expandedEl.style.width  = centerW + 'px';
-      expandedEl.style.height = centerH + 'px';
-      expandedEl.style.minHeight = centerH + 'px';
-      expandedEl.style.clipPath = chamferRect;
+      expandedEl.style.left      = centerX + 'px';
+      expandedEl.style.width     = centerW + 'px';
+      expandedEl.style.top       = topRowBottom + 'px';
+      expandedEl.style.height    = zonaH + 'px';
+      expandedEl.style.minHeight = '280px';
+      expandedEl.style.clipPath  = chamferRect;
+      // Guardar la zona disponible para el ajuste post-hydrate
+      expandedEl._zonaY = topRowBottom;
+      expandedEl._zonaH = zonaH;
 
       // Dial achicado abajo (donde estaba el track)
       var dialMini = 80;
@@ -1233,17 +1281,25 @@ function _crearDialOverlay(){
       _dialCanvas.style.borderRadius = '50%';
 
       // Posicionar el resto de paneles laterales (NO el expandido)
+      // En modo expandido colapsamos en 2 columnas (izq/der) por simplicidad,
+      // independientemente de si normalmente serían 4.
       var leftPanels  = window._hudPanels.filter(function(hp){
-        return hp.el._side==='left' && hp.el !== expandedEl;
+        return /^left/.test(hp.el._side || '') && hp.el !== expandedEl;
       });
       var rightPanels = window._hudPanels.filter(function(hp){
-        return hp.el._side==='right' && hp.el !== expandedEl;
+        return /^right/.test(hp.el._side || '') && hp.el !== expandedEl;
       });
 
       var leftX  = GAP;
       var rightX = vW - 240 - GAP;
       function placeColExpanded(panels, x){
-        panels.sort(function(a,b){ return a.el._order - b.el._order; });
+        // En modo expandido: ordenar dando preferencia a left-1/right-1 sobre left-2/right-2
+        panels.sort(function(a,b){
+          var sa = a.el._side==='left-1'||a.el._side==='right-1' ? 0 : 1;
+          var sb = b.el._side==='left-1'||b.el._side==='right-1' ? 0 : 1;
+          if(sa !== sb) return sa - sb;
+          return a.el._order - b.el._order;
+        });
         var y = topRowBottom;
         panels.forEach(function(hp){
           hp.el.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1)';
@@ -1333,17 +1389,42 @@ function _crearDialOverlay(){
     });
 
     // ══════════════════════════════════════════
-    //  CÁLCULO DE COLUMNAS LATERALES — se hace primero porque la zona top
-    //  necesita conocer leftX, rightX, leftW, rightW para alinearse al ancho.
+    //  CÁLCULO DE 4 COLUMNAS LATERALES (2 izq + 2 der)
+    //  Se hace primero porque la zona top necesita conocer X y W para alinearse.
+    //  Layout: [col-A] [col-B] [dial] [col-C] [col-D]
     // ══════════════════════════════════════════
-    var leftSpace  = r.left;
-    var rightSpace = vW - r.right;
-    var leftW  = Math.min(Math.max(180, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.85));
-    var rightW = Math.min(Math.max(180, rightSpace - GAP*2), Math.floor(rightSpace * 0.85));
-    leftW  = Math.min(leftW, 260);
-    rightW = Math.min(rightW, 260);
-    var leftX  = Math.floor((leftSpace  - leftW)  / 2);
-    var rightX = r.right + Math.floor((rightSpace - rightW) / 2);
+    var leftSpace  = r.left;          // espacio total a la izquierda del dial
+    var rightSpace = vW - r.right;    // espacio total a la derecha del dial
+    var COL_W = 240;                  // ancho fijo de cada columna
+    var COL_GAP = GAP;                // gap entre columnas dentro del mismo lado
+
+    // Si hay espacio para 2 columnas + gap a cada lado, usar 4 columnas.
+    // Si no, fallback a 1 columna (modo compacto).
+    var fourCols = (leftSpace  >= (COL_W * 2 + COL_GAP * 3)) &&
+                   (rightSpace >= (COL_W * 2 + COL_GAP * 3));
+
+    var colA_X, colB_X, colC_X, colD_X, leftW, rightW, leftX, rightX;
+    if(fourCols){
+      // Izquierda: [GAP][col-A][GAP][col-B][GAP] hasta el borde del dial
+      colA_X = GAP;
+      colB_X = GAP + COL_W + COL_GAP;
+      // Derecha: empieza después del dial, [GAP][col-C][GAP][col-D][GAP]
+      colC_X = r.right + GAP;
+      colD_X = r.right + GAP + COL_W + COL_GAP;
+      // Para el cálculo de la barra top, leftX..leftX+leftW abarca col-A + col-B
+      leftX = colA_X;
+      leftW = (colB_X + COL_W) - colA_X;
+      rightX = colC_X;
+      rightW = (colD_X + COL_W) - colC_X;
+    } else {
+      // Fallback: 1 columna por lado (comportamiento anterior)
+      leftW  = Math.min(Math.max(180, leftSpace  - GAP*2), 260);
+      rightW = Math.min(Math.max(180, rightSpace - GAP*2), 260);
+      leftX  = Math.floor((leftSpace  - leftW)  / 2);
+      rightX = r.right + Math.floor((rightSpace - rightW) / 2);
+      colA_X = leftX; colB_X = null;
+      colC_X = rightX; colD_X = null;
+    }
 
     // ══════════════════════════════════════════
     //  ZONA SUPERIOR — fila continua, ancho = desde leftX hasta (rightX+rightW)
@@ -1497,10 +1578,37 @@ function _crearDialOverlay(){
     var colBotY    = trackY - 8;
     var colVAvail  = Math.max(200, colBotY - colTopY);
 
-    var leftPanels  = window._hudPanels.filter(function(hp){ return hp.el._side==='left';  });
-    var rightPanels = window._hudPanels.filter(function(hp){ return hp.el._side==='right'; });
+    // Exportar posiciones de columnas para que DnD pueda dibujar slots
+    // en columnas vacías (sin paneles).
+    window._hudColPositions = {
+      'left-1_X':  fourCols ? colA_X : null,
+      'left-2_X':  fourCols ? colB_X : null,
+      'right-1_X': fourCols ? colC_X : null,
+      'right-2_X': fourCols ? colD_X : null,
+      COL_W:       fourCols ? COL_W  : null,
+      colTopY:     colTopY,
+    };
+
+    // Filtrar paneles por columna (4 columnas si fourCols; 2 si fallback)
+    var pColA, pColB, pColC, pColD;
+    if(fourCols){
+      pColA = window._hudPanels.filter(function(hp){ return hp.el._side==='left-1';  });
+      pColB = window._hudPanels.filter(function(hp){ return hp.el._side==='left-2';  });
+      pColC = window._hudPanels.filter(function(hp){ return hp.el._side==='right-1'; });
+      pColD = window._hudPanels.filter(function(hp){ return hp.el._side==='right-2'; });
+    } else {
+      // Fallback: combinar left-1+left-2 → izq, right-1+right-2 → der
+      pColA = window._hudPanels.filter(function(hp){
+        return hp.el._side==='left-1' || hp.el._side==='left-2' || hp.el._side==='left';
+      });
+      pColC = window._hudPanels.filter(function(hp){
+        return hp.el._side==='right-1' || hp.el._side==='right-2' || hp.el._side==='right';
+      });
+      pColB = []; pColD = [];
+    }
 
     function positionCol(panels, x, w, isLeft){
+      if(!panels || !panels.length) return;
       panels.sort(function(a,b){ return a.el._order - b.el._order; });
       panels.forEach(function(hp){
         hp.el.style.width = w + 'px';
@@ -1517,11 +1625,9 @@ function _crearDialOverlay(){
 
       var startY, gapBetween;
       if(totalH <= colVAvail){
-        // Cabe holgado: arrancar PEGADO arriba (no centrar) para minimizar aire
         startY = colTopY;
         gapBetween = GAP;
       } else {
-        // No cabe: arrancar pegado arriba y reducir gap (mínimo 6px)
         startY = colTopY;
         var extra = totalH - colVAvail;
         var gapsCount = panels.length - 1;
@@ -1543,8 +1649,16 @@ function _crearDialOverlay(){
       });
     }
 
-    positionCol(leftPanels,  leftX,  leftW,  true);
-    positionCol(rightPanels, rightX, rightW, false);
+    // Posicionar las 4 columnas con su ancho fijo (o las 2 del fallback)
+    if(fourCols){
+      positionCol(pColA, colA_X, COL_W, true);
+      positionCol(pColB, colB_X, COL_W, true);
+      positionCol(pColC, colC_X, COL_W, false);
+      positionCol(pColD, colD_X, COL_W, false);
+    } else {
+      positionCol(pColA, leftX,  leftW,  true);
+      positionCol(pColC, rightX, rightW, false);
+    }
 
     // ══════════════════════════════════════════
     //  TRACK STOPS — render dinámico de los hexes del track
@@ -2460,6 +2574,68 @@ function _crearDialOverlay(){
   };
   window._EXPAND_CONFIG = _EXPAND_CONFIG;
 
+  // Ajusta el tamaño del panel expandido según el contenido real.
+  function _hudAjustarTamañoExpandido(intentos){
+    intentos = intentos || 0;
+    var panel = window._hudExpanded;
+    if(!panel) return;
+    var zonaY = panel._zonaY;
+    var zonaH = panel._zonaH;
+    if(zonaY === undefined || zonaH === undefined) return;
+
+    var inner = panel.querySelector(':scope > [id$="-inner"]');
+    if(!inner) return;
+    var expContent = inner.querySelector(':scope > .hud-expanded-content');
+    if(!expContent) return;
+
+    // Sumar altura del header (children collapsed visibles tras display:none) +
+    // altura natural del wrapper expandido.
+    // Estrategia: temporalmente quitar height fijo del panel y dejar que mida
+    // su altura natural, luego restaurar.
+    panel.style.height = 'auto';
+    panel.style.minHeight = '0';
+    expContent.style.overflow = 'visible';
+    expContent.style.justifyContent = 'flex-start';
+    expContent.style.height = 'auto';
+    expContent.style.flex = 'none'; // sacar de flex:1 para que mida natural
+
+    // Forzar reflow
+    var contentNaturalH = panel.scrollHeight;
+
+    // Restaurar flex
+    expContent.style.flex = '';
+    expContent.style.height = '';
+
+    // Si la medición fue muy chica, contenido aún no listo — reintentar
+    if(contentNaturalH < 100 && intentos < 8){
+      panel.style.height = zonaH + 'px';
+      panel.style.minHeight = '280px';
+      setTimeout(function(){ _hudAjustarTamañoExpandido(intentos+1); }, 100);
+      return;
+    }
+
+    // Buffer de seguridad por sombras y bordes
+    contentNaturalH = Math.max(280, contentNaturalH);
+
+    var finalH = Math.min(contentNaturalH, zonaH);
+    var finalY = zonaY + Math.max(0, Math.round((zonaH - finalH)/2));
+
+    panel.style.height = finalH + 'px';
+    panel.style.minHeight = finalH + 'px';
+    panel.style.top = finalY + 'px';
+
+    if(contentNaturalH <= zonaH){
+      // Cabe entero: sin scroll
+      expContent.style.overflow = 'visible';
+      expContent.style.justifyContent = 'center';
+    } else {
+      // No cabe: scroll vertical
+      expContent.style.overflow = 'auto';
+      expContent.style.justifyContent = 'flex-start';
+    }
+  }
+  window._hudAjustarTamañoExpandido = _hudAjustarTamañoExpandido;
+
   function _hudExpand(panelEl){
     if(!panelEl) return;
     if(window._hudExpanded === panelEl){
@@ -2501,6 +2677,11 @@ function _crearDialOverlay(){
         expContent.innerHTML = cfg.html();
         requestAnimationFrame(function(){
           try { cfg.hydrate(); } catch(e){ console.warn('hydrate '+panelEl.id, e); }
+          // Después del hydrate, esperar unos ms para que el DOM termine
+          // de reflowed (sparklines SVG, donut, etc.) y luego ajustar tamaño.
+          setTimeout(function(){
+            if(typeof _hudAjustarTamañoExpandido === 'function') _hudAjustarTamañoExpandido();
+          }, 60);
         });
       } else {
         expContent.innerHTML = ''+
@@ -2511,6 +2692,9 @@ function _crearDialOverlay(){
             '<i class="fas fa-layer-group" style="font-size:24px;opacity:.5"></i>'+
             '<span>Vista expandida — pendiente</span>'+
           '</div>';
+        setTimeout(function(){
+          if(typeof _hudAjustarTamañoExpandido === 'function') _hudAjustarTamañoExpandido();
+        }, 60);
       }
     }
     panelEl.classList.add('hud-expanded');
@@ -2545,8 +2729,18 @@ function _crearDialOverlay(){
     panelEl.style.height = '';
     panelEl.style.minHeight = '';
     panelEl.style.clipPath = '';
+    panelEl._zonaY = undefined;
+    panelEl._zonaH = undefined;
     var innerCol = panelEl.querySelector(':scope > [id$="-inner"]');
     if(innerCol){ innerCol.style.minHeight = ''; }
+
+    // Limpiar inline-styles del wrapper expandido (overflow/justify-content)
+    // que la función _hudAjustarTamañoExpandido aplicó.
+    var expWrap = panelEl.querySelector(':scope > [id$="-inner"] > .hud-expanded-content');
+    if(expWrap){
+      expWrap.style.overflow = '';
+      expWrap.style.justifyContent = '';
+    }
 
     // Limpiar inline-styles que la rama expandida deja en bottom panels
     // (Misión, Logro, Nivel, Track) — son los que se amontonan al volver.
@@ -2555,9 +2749,14 @@ function _crearDialOverlay(){
         if(!hp.el) return;
         var side = hp.el._side || '';
         if(side.indexOf('bottom') === 0){
-          hp.el.style.width = '';        // ← clave: el width forzado del expandido
+          hp.el.style.width = '';
           hp.el.style.opacity = '';
           hp.el.style.pointerEvents = '';
+          // El flujo normal reasigna left/top, pero los limpiamos por seguridad
+          // para que el reposicionamiento comience desde cero (los inline-styles
+          // de la rama expandida pueden interferir con cálculos).
+          hp.el.style.height = '';
+          hp.el.style.transform = '';
         }
       });
     }
@@ -3576,57 +3775,105 @@ function abrirDial(){
   _dialOverlay.style.display = 'flex';
   _dialOverlay.style.pointerEvents = 'auto';
   _dialVisible = true;
+
+  // ── OCULTAR DIAL al inicio: aparecerá después de la cascada de cards ──
+  if(_dialCanvas){
+    _dialCanvas.style.opacity = '0';
+    _dialCanvas.style.transform = 'scale(0.85)';
+    _dialCanvas.style.transition = 'none';
+  }
+
+  // ── OCULTAR TODOS LOS PANELES de inmediato (antes de cualquier reposicionamiento) ──
+  if(window._hudPanels){
+    window._hudPanels.forEach(function(hp){
+      if(!hp.el) return;
+      hp.el._animatingEntry = true;
+      hp.el.style.opacity = '0';
+      hp.el.style.visibility = 'hidden';
+      hp.el.style.transition = 'none';
+    });
+  }
+
+  // Fade del backdrop
   requestAnimationFrame(function(){
     _dialOverlay.style.transition = 'opacity 480ms cubic-bezier(.16,1,.3,1)';
     _dialOverlay.style.opacity = '1';
   });
+
   if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
   if(typeof window._refrescarEspejos==='function') setTimeout(function(){ window._refrescarEspejos(); }, 50);
-  // Render banda Sim ya construida — renderizamos AHORA y reposicionamos después
-  if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+  if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
+  if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+
   if(window._hudPanels && window.innerWidth>=900){
-    // P-1b: aparición ALEATORIA con fade-in + slide desde su zona de origen.
+    // Cascada retrofuturista: panels van "encendiéndose" uno a uno con
+    // delays distribuidos en una ventana más amplia para sensación de boot.
     function _slideOrigin(side){
       switch(side){
-        case 'top-left':       return 'translate(-18px,-12px)';
-        case 'top-center':     return 'translate(0,-16px)';
-        case 'top-right':      return 'translate(18px,-12px)';
-        case 'left':           return 'translate(-22px,0)';
-        case 'right':          return 'translate(22px,0)';
-        case 'bottom-track':   return 'translate(0,18px)';
-        case 'bottom-left':    return 'translate(-18px,14px)';
-        case 'bottom-center':  return 'translate(0,18px)';
-        case 'bottom-right':   return 'translate(18px,14px)';
-        default:               return 'translate(0,12px) scale(0.96)';
+        case 'top-left':       return 'translate(-22px,-16px)';
+        case 'top-center':     return 'translate(0,-20px)';
+        case 'top-right':      return 'translate(22px,-16px)';
+        case 'left':           return 'translate(-28px,0)';
+        case 'right':          return 'translate(28px,0)';
+        case 'bottom-track':   return 'translate(0,22px)';
+        case 'bottom-left':    return 'translate(-22px,18px)';
+        case 'bottom-center':  return 'translate(0,22px)';
+        case 'bottom-right':   return 'translate(22px,18px)';
+        default:               return 'translate(0,16px) scale(0.94)';
       }
     }
-    // Marcar todos como ocultos y con slide aplicado
+    // Aplicar transform inicial de slide a todos los paneles (siguen ocultos)
     window._hudPanels.forEach(function(hp){
-      hp.el._animatingEntry = true;
-      hp.el.style.opacity='0';
-      hp.el.style.visibility='hidden';
       hp.el.style.transform = _slideOrigin(hp.el._side);
-      hp.el.style.transition = 'opacity 520ms cubic-bezier(.16,1,.3,1),transform 580ms cubic-bezier(.16,1,.3,1)';
+      hp.el.style.transition = 'opacity 820ms cubic-bezier(.16,1,.3,1),transform 920ms cubic-bezier(.16,1,.3,1),filter 820ms ease';
+      hp.el.style.filter = 'brightness(0.4) blur(2px)';
     });
-    // Forzar reposicionamiento DESPUÉS de aplicar el transform inicial
+
+    // Generar delays aleatorios distribuidos en ventana 200-2000ms.
+    // Distribución más natural: shuffle del array y asignar slots con jitter.
+    var nPanels = window._hudPanels.length;
+    var slotSize = 1800 / Math.max(1, nPanels - 1); // ~140ms entre slots
+    var delays = [];
+    for(var i=0;i<nPanels;i++){
+      var base = 200 + i * slotSize;
+      var jitter = (Math.random() - 0.5) * slotSize * 0.8;
+      delays.push(Math.round(base + jitter));
+    }
+    // Shuffle el ORDEN de paneles para que no entren predeciblemente por posición
+    var shuffledIdx = window._hudPanels.map(function(_,i){return i;});
+    for(var s=shuffledIdx.length-1;s>0;s--){
+      var r = Math.floor(Math.random()*(s+1));
+      var tmp = shuffledIdx[s]; shuffledIdx[s] = shuffledIdx[r]; shuffledIdx[r] = tmp;
+    }
+
+    // Forzar primer frame para que las propiedades iniciales se apliquen
     requestAnimationFrame(function(){
-      window._hudPanels.forEach(function(hp){
-        // Re-aplicar transform por si _reposicionarHUD lo limpió
-        if(hp.el._animatingEntry){
-          hp.el.style.transform = _slideOrigin(hp.el._side);
-        }
-        // Delay aleatorio entre 0 y 800ms
-        var delay = Math.round(Math.random() * 800);
+      window._hudPanels.forEach(function(hp, idx){
+        var delay = delays[shuffledIdx.indexOf(idx)];
         setTimeout(function(){
-          hp.el.style.visibility='visible';
+          if(!hp.el._animatingEntry) return; // si cerraron el overlay antes
+          hp.el.style.visibility = 'visible';
           requestAnimationFrame(function(){
-            hp.el.style.opacity='1';
-            hp.el.style.transform='';
+            hp.el.style.opacity = '1';
+            hp.el.style.transform = '';
+            hp.el.style.filter = '';
           });
         }, delay);
       });
     });
-    // Una vez todos visibles, limpiar transitions inline y flag de animación
+
+    // El último panel termina ~2000+920ms = ~2920ms.
+    // El DIAL aparece DESPUÉS de que todos los paneles estén visibles.
+    var dialAppearDelay = 2200;
+    setTimeout(function(){
+      if(_dialCanvas){
+        _dialCanvas.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1),transform 800ms cubic-bezier(.16,1,.3,1)';
+        _dialCanvas.style.opacity = '1';
+        _dialCanvas.style.transform = '';
+      }
+    }, dialAppearDelay);
+
+    // Una vez todos los paneles + dial están visibles, limpiar transitions
     setTimeout(function(){
       if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
       if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
@@ -3637,16 +3884,27 @@ function abrirDial(){
           hp.el._animatingEntry = false;
         });
       }
-      // P-D: aplicar al azar breathings + perimeter scans a 3-4 cards
+      if(_dialCanvas) _dialCanvas.style.transition = '';
       _aplicarVidaPaneles();
-    }, 1500);
+    }, 3400);
   } else {
-    // Modo compacto / mobile
+    // Modo compacto: todo visible de inmediato
+    if(window._hudPanels){
+      window._hudPanels.forEach(function(hp){
+        hp.el.style.opacity = '1';
+        hp.el.style.visibility = 'visible';
+        hp.el.style.transform = '';
+        hp.el.style.filter = '';
+        hp.el._animatingEntry = false;
+      });
+    }
+    if(_dialCanvas){ _dialCanvas.style.opacity = '1'; _dialCanvas.style.transform = ''; }
     setTimeout(function(){
       if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
       if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
       if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
     }, 100);
+
   }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.add('active');
@@ -3661,7 +3919,6 @@ function cerrarDial(){
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
-  // Fade-out simultáneo de los paneles + quitar animaciones de vida
   if(window._hudPanels){
     window._hudPanels.forEach(function(hp){
       if(!hp.el) return;
@@ -3670,13 +3927,23 @@ function cerrarDial(){
       hp.el.style.opacity = '0';
     });
   }
+  // Fade-out del dial canvas también
+  if(_dialCanvas){
+    _dialCanvas.style.transition = 'opacity 240ms ease';
+    _dialCanvas.style.opacity = '0';
+  }
   setTimeout(function(){
     if(_dialOverlay && !_dialVisible) _dialOverlay.style.display='none';
     if(window._hudPanels){ window._hudPanels.forEach(function(hp){
       hp.el.style.opacity='0';
       hp.el.style.visibility='hidden';
       hp.el.style.transition = '';
+      hp.el._animatingEntry = false;
     }); }
+    // Limpiar también el dial para próxima apertura
+    if(_dialCanvas){
+      _dialCanvas.style.transition = '';
+    }
   }, 290);
 }
 
