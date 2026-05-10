@@ -1,4 +1,37 @@
-/* RAW Entry — Overlay v.5.102
+/* RAW Entry — Overlay v.5.103
+   Cambios desde v5.102:
+   - FIX BUG "columnas encimadas al regresar de modo expandido":
+     Cuando se daba click en el dial mini para colapsar, las columnas
+     laterales regresaban a posiciones encimadas sobre el dial central.
+     CAUSA: _reposicionarHUD() leía `r = _dialCanvas.getBoundingClientRect()`
+     al inicio, pero en ese momento el dial todavía estaba animándose desde
+     la posición mini (80px abajo, position:fixed) hacia el tamaño grande
+     centrado, así que `r` reflejaba un rect intermedio chiquito. Los
+     cálculos de `colA_X..colD_X` que dependen de `r.left`/`r.right`
+     terminaban pegando las columnas contra el centro.
+     FIX: introducimos bandera `window._hudReturningFromExpand` durante
+     toda la ventana de animación (.42s). Mientras está activa,
+     _reposicionarHUD calcula el rect FINAL del dial manualmente
+     (min(836,57vw) centrado) en lugar de leer el rect animándose.
+
+   - FIX BUG "todo aparece simultáneamente al inicio (animación de apertura)":
+     El listener DOMContentLoaded tenía su PROPIA versión de la animación
+     de apertura, sin timeline ordenado: hacía aparecer el dial con fade
+     de 2000ms y los paneles con setTimeout(1100 + i*200) lineal, todos
+     a la vez al inicio. NO ejecutaba la secuencia ring→cascada→slots→dial.
+     FIX: el listener DOMContentLoaded ahora llama directamente a abrirDial(),
+     que ya tiene el timeline correcto:
+       t=0      backdrop fade-in
+       t=300    aro circular pulsante (P-1b)
+       t=1100   cascada de paneles
+       t=2900   slots vacíos punteados (P-2b)
+       t=3300   dial canvas (P-3)
+       t=4800   cleanup + vida (breathing/scan al azar)
+     Bonus: agregamos override de `r` también durante la apertura inicial
+     (cuando el dial tiene transform:scale(0.85) que descalibraría
+     boundingClientRect).
+
+   ── Heredado v5.102 ──
    Fix: slots vacíos punteados se ocultan al expandir un card y se
    reconstruyen al colapsar (regresar al dial central).
    - _hudExpand llama window._overlayDnd.clear() al inicio para borrar
@@ -1325,6 +1358,44 @@ function _crearDialOverlay(){
     var vH  = window.innerHeight;
     var GAP = 14;
 
+    // Override de r en dos casos donde getBoundingClientRect no refleja la
+    // geometría FINAL del dial (con tamaño y posición normales):
+    //  1) Regreso de modo expandido: el dial está animándose de mini → grande.
+    //  2) Apertura inicial: el dial tiene transform:scale(0.85) y opacity:0,
+    //     antes de la fase 3 del timeline. boundingClientRect devuelve el
+    //     rect transformado (más chico), descalibrando las columnas.
+    // Para detectar caso 2 miramos si _dialCanvas tiene transform inline o si
+    // hay paneles con _animatingEntry (apertura en curso). En ambos casos
+    // calculamos el rect final del dial centrado en el viewport.
+    var _hayApertura = !window._hudExpanded && window._hudPanels.some(function(hp){ return hp.el && hp.el._animatingEntry; });
+    if(window._hudReturningFromExpand && !window._hudExpanded){
+      var _fSize = Math.min(836, vW * 0.57);
+      var _fLeft = Math.round((vW - _fSize) / 2);
+      var _fTop  = Math.round((vH - _fSize) / 2);
+      r = {
+        left:   _fLeft,
+        top:    _fTop,
+        right:  _fLeft + _fSize,
+        bottom: _fTop  + _fSize,
+        width:  _fSize,
+        height: _fSize,
+      };
+    } else if(_hayApertura){
+      // Durante la apertura inicial el dial tiene scale(0.85) y boundingClientRect
+      // devuelve un rect chico. Usar el rect final del dial al tamaño normal.
+      var _fSize2 = Math.min(836, vW * 0.57);
+      var _fLeft2 = Math.round((vW - _fSize2) / 2);
+      var _fTop2  = Math.round((vH - _fSize2) / 2);
+      r = {
+        left:   _fLeft2,
+        top:    _fTop2,
+        right:  _fLeft2 + _fSize2,
+        bottom: _fTop2  + _fSize2,
+        width:  _fSize2,
+        height: _fSize2,
+      };
+    }
+
     // Chamfers por posición
     var chamferRect = 'polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)';
     var chamferLeft  = 'polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))';
@@ -1463,6 +1534,9 @@ function _crearDialOverlay(){
     //  rama expandida aplicó. NO TOCAMOS transition aquí porque _hudCollapse
     //  acaba de setearla para animar suavemente el regreso; se limpiará
     //  después de 500ms desde _hudCollapse.
+    //  NOTA: r ya fue overrideada al inicio de _reposicionarHUD si la
+    //  bandera _hudReturningFromExpand está activa, así que aquí los
+    //  cálculos siguientes ya usan la geometría final correcta del dial.
     // ══════════════════════════════════════════════════════════════════════
     // Restaurar el dial canvas (mantener transition activa para animar)
     _dialCanvas.style.position    = 'relative';
@@ -2854,6 +2928,11 @@ function _crearDialOverlay(){
     panelEl.classList.remove('hud-expanded');
     window._hudExpanded = null;
 
+    // Bandera para que _reposicionarHUD use coords FINALES del dial grande
+    // durante toda la ventana de animación (.42s) — protege contra resize/DnD
+    // que disparen reposicionamiento mientras el dial todavía es mini animándose.
+    window._hudReturningFromExpand = true;
+
     // Revertir display inline aplicado al expandir
     var innerCol2 = panelEl.querySelector(':scope > [id$="-inner"]');
     if(innerCol2){
@@ -2922,6 +3001,8 @@ function _crearDialOverlay(){
     // el flujo normal subsiguiente no anime cambios de layout (resize, DnD, etc.).
     setTimeout(function(){
       if(window._hudExpanded) return;
+      // Limpiar bandera del regreso — ahora ya se puede medir el dial normal
+      window._hudReturningFromExpand = false;
       if(typeof window._hudPanels !== 'undefined'){
         window._hudPanels.forEach(function(hp){
           if(!hp.el) return;
@@ -4309,42 +4390,25 @@ window.addEventListener('DOMContentLoaded',()=>{
 
   var _dialLandingUsed = false;
 
-  _crearDialOverlay();
-  _dialOverlay.style.pointerEvents = 'none';
+  // ── APERTURA INICIAL: usar el mismo timeline de abrirDial ──
+  // (antes este bloque tenía su propia animación rota — todo aparecía a la vez).
+  // abrirDial() ya tiene la secuencia correcta:
+  //   t=0      backdrop fade-in
+  //   t=300    aro circular pulsante
+  //   t=1100   cascada de paneles
+  //   t=2900   slots vacíos
+  //   t=3300   dial canvas
+  //   t=4800   cleanup + vida
+  abrirDial();
 
-  _dialCanvas.style.opacity = '0';
-  _dialCanvas.style.transition = 'opacity 2000ms ease-out';
-
-  _dialOverlay.style.display = 'flex';
-  _dialOverlay.style.opacity = '1';
-  _dialVisible = true;
-  _dialOverlay.style.pointerEvents = 'auto';
-
-  if(!_dialBreathRAF){
-    (function _breathLoopLanding(){
-      _dialBreathT++;
-      _dialDraw();
-      _dialBreathRAF = requestAnimationFrame(_breathLoopLanding);
-    })();
-  }
-
+  // Limpiar el splash de fondo (#splash-dial) y el render-block tan pronto el
+  // overlay esté visible. Hacerlo antes de empezar la animación para que el
+  // backdrop fade-in del dial se vea bien.
   requestAnimationFrame(function(){
     var rb = document.getElementById('render-block');
-    if(rb) rb.parentNode.removeChild(rb);
-    setTimeout(function(){
-      if(typeof _reposicionarHUD==='function') _reposicionarHUD();
-      _dialCanvas.style.opacity = '1';
-      if(window._hudPanels && window.innerWidth >= 900){
-        var shuffledPanels = window._hudPanels.slice().sort(function(){ return Math.random()-0.5; });
-        shuffledPanels.forEach(function(hp, i){
-          var delay = 1100 + i * 200 + Math.round(Math.random() * 150);
-          setTimeout(function(){
-            hp.el.style.visibility = 'visible';
-            requestAnimationFrame(function(){ hp.el.style.opacity = '1'; });
-          }, delay);
-        });
-      }
-    }, 50);
+    if(rb && rb.parentNode) rb.parentNode.removeChild(rb);
+    var splash = document.getElementById('splash-dial');
+    if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
   });
 
   _dialOverlay.addEventListener('click', function(e){
@@ -4358,25 +4422,16 @@ window.addEventListener('DOMContentLoaded',()=>{
   cerrarDial = function(){
     if(!_dialLandingUsed){
       _dialLandingUsed = true;
-      _dialOverlay.style.display = 'none';
-      _dialVisible = false;
-      _dialActiveSub = -1; _dialCentroHov = false; _detenerPulsoCentro();
-      var btn = document.getElementById('btn-nueva-entrada');
-      if(btn) btn.classList.remove('active');
-      _dialCanvas.style.opacity = '';
-      _dialCanvas.style.transition = '';
+      // El primer cierre desde el landing usa el mismo fade-out del cerrarDial
+      // estándar para que se vea suave. Antes era un cierre instantáneo (display:none)
+      // y se veía corte. Llamamos a la implementación original.
       var anv = document.getElementById('board-anverso');
       if(anv){
         anv.style.display = '';
         anv.style.visibility = '';
         anv.style.opacity = '1';
       }
-      if(window._hudPanels){ window._hudPanels.forEach(function(hp){
-        hp.el.style.opacity='0';
-        hp.el.style.visibility='hidden';
-      }); }
-      var splash = document.getElementById('splash-dial');
-      if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
+      _origCerrarDial();
     } else {
       _origCerrarDial();
     }
