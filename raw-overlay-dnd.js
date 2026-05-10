@@ -1,16 +1,18 @@
-/* RAW Entry — Overlay Drag & Drop v.5.086
+/* RAW Entry — Overlay Drag & Drop v.5.087
 
-   Drag-and-drop específico para el OVERLAY DEL DIAL — completamente
-   independiente de raw-drag.js (que maneja el reordenamiento del board HOME).
+   Cambios desde v5.086:
+   - Slots vacíos: z-index 9001 (antes 8995, debajo del overlay y por eso
+     no se veían). Border 2px dashed @35 (antes @22), fondo @04 (antes @025).
+   - Hook a window._reposicionarHUD: cada vez que se llama, los slots se
+     reconstruyen con las nuevas posiciones (antes solo en abrirDial/resize).
+   - DnD DESACTIVADO cuando window._hudExpanded está seteado (Fase 1
+     del expansor). Tampoco se pintan slots en modo expandido.
 
-   Funcionalidad:
-   - Cada panel del overlay (excepto USER, Sim, Stats, Track) tiene un handle
-     en su header con icono fa-grip-vertical para arrastrarlo.
-   - Reordenamiento dentro de su zona (left, right, bottom-*). Los paneles top
-     (USER, Estado del Sim, Stats) NO se reordenan — son únicos.
-   - Slots vacíos PUNTEADOS siempre visibles (configurable en SLOTS_CONFIG).
-   - Persistencia en localStorage: 'lifeos_overlay_layout_v1'.
-   - Drop indicator (línea horizontal con glow) durante drag.
+   ── Funcionalidad heredada v5.086 ──
+   Drag-and-drop específico del overlay del dial, independiente de raw-drag.js
+   (que maneja HOME). Cada panel tiene handle ≡ en el header. Reordenamiento
+   dentro de su zona o a slots vacíos. Persistencia en localStorage
+   ('lifeos_overlay_layout_v1'). Drop indicator durante drag.
 
    ORDEN DE CARGA: después de raw-overlay.js. */
 
@@ -47,17 +49,17 @@
       '.hud-dnd-handle i{font-size:10px;color:rgba(220,224,235,0.55)}',
       '.hud-dragging{opacity:.35;cursor:grabbing!important;z-index:9100!important}',
       '.hud-dragging *{pointer-events:none}',
-      '.hud-empty-slot{position:fixed;z-index:8995;border-radius:14px;'+
-        'border:2px dashed rgba(167,139,250,0.22);background:rgba(167,139,250,0.025);'+
+      '.hud-empty-slot{position:fixed;z-index:9001;border-radius:14px;'+
+        'border:2px dashed rgba(167,139,250,0.35);background:rgba(167,139,250,0.04);'+
         'display:flex;align-items:center;justify-content:center;'+
         'opacity:0;transition:opacity .35s ease,border-color .2s,background .2s;'+
         'pointer-events:none}',
       '.hud-empty-slot.visible{opacity:1;pointer-events:auto}',
-      '.hud-empty-slot.drop-target{border-color:rgba(167,139,250,0.65);'+
-        'background:rgba(167,139,250,0.10);'+
-        'box-shadow:0 0 24px rgba(167,139,250,0.25),inset 0 0 16px rgba(167,139,250,0.12)}',
+      '.hud-empty-slot.drop-target{border-color:rgba(167,139,250,0.75);'+
+        'background:rgba(167,139,250,0.12);'+
+        'box-shadow:0 0 24px rgba(167,139,250,0.35),inset 0 0 16px rgba(167,139,250,0.18)}',
       '.hud-empty-slot-inner{display:flex;flex-direction:column;align-items:center;'+
-        'gap:6px;color:rgba(167,139,250,0.45);text-align:center}',
+        'gap:6px;color:rgba(167,139,250,0.55);text-align:center}',
       '.hud-empty-slot-inner i{font-size:18px}',
       '.hud-empty-slot-inner span{font-size:9px;font-weight:800;letter-spacing:.14em;'+
         'text-transform:uppercase}',
@@ -117,6 +119,8 @@
     clearGhostSlots();
     if(!window._hudPanels) return;
     if(!window._dialVisible && !document.getElementById('dial-overlay')) return;
+    // P6: Sin slots cuando hay un panel expandido
+    if(window._hudExpanded) return;
 
     function lastPanelInfo(side){
       var ps = window._hudPanels.filter(function(hp){ return hp.el._side === side; });
@@ -250,6 +254,8 @@
   // ═══ Drag con mouse ═══
   function startDrag(panelEl, downEvt){
     if(_state.dragEl) return;
+    // P6: Drag desactivado mientras hay un panel expandido
+    if(window._hudExpanded) return;
     _state.dragEl    = panelEl;
     _state.dragSide  = panelEl._side;
     _state.dragOrder = panelEl._order;
@@ -365,6 +371,21 @@
     requestAnimationFrame(function(){
       requestAnimationFrame(buildGhostSlots);
     });
+
+    // Hook _reposicionarHUD para que rebuild slots cada vez que se reposiciona
+    if(typeof window._reposicionarHUD === 'function' && !window._reposicionarHUD._dndHooked){
+      var origRepos = window._reposicionarHUD;
+      window._reposicionarHUD = function(){
+        var r = origRepos.apply(this, arguments);
+        // Esperar al next frame para que las posiciones estén aplicadas
+        requestAnimationFrame(function(){
+          // Solo rebuild si no estamos en mitad de un drag
+          if(!_state.dragEl) buildGhostSlots();
+        });
+        return r;
+      };
+      window._reposicionarHUD._dndHooked = true;
+    }
 
     var resizeT;
     window.addEventListener('resize', function(){
