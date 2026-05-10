@@ -1,31 +1,27 @@
-/* RAW Entry — Overlay v.5.087
-   Cambios desde v5.086 (FASE 1 del expansor estilo carrusel):
-   - ELIMINADO panel _p6 Navegación (sus acciones siguen disponibles
-     en los botones del Hero del header).
-   - NUEVO botón ⛶ (expandir) en el header de cada panel, junto al "···".
-   - NUEVA mecánica del expansor:
-     · Click en ⛶ o en el CTA del pie → el panel crece al CENTRO ocupando
-       el área que tenía el dial.
-     · El dial se ACHICA y baja a la zona inferior (mini circular ~80px
-       arriba de las cards Misión/Nivel).
-     · Misión y Nivel se mueven a los lados (Logro y Track desaparecen
-       temporalmente con opacity:0).
-     · Click en el dial mini → todo regresa al estado normal con animación.
-   - Los demás paneles laterales se ACHICAN a 240px y siguen visibles
-     (P3a confirmado).
-   - Si ya hay un panel expandido y se hace click en otro → INTERCAMBIO
-     directo (P-Ca confirmado).
-   - DnD DESACTIVADO mientras hay panel expandido (P6 confirmado).
-   - Easing: cubic-bezier(.4,1.4,.5,1) — mismo de los anillos del dial (P7).
+/* RAW Entry — Overlay v.5.088
+   Cambios desde v5.087 (REESTRUCTURACIÓN ZONA SUPERIOR):
+   - MEGA-CARD TOP de borde a borde sin huecos: USER + Sim + Stats
+     pegados horizontalmente (antes había gaps entre ellos).
+   - Sim ahora ocupa TODO el ancho disponible entre USER y Stats
+     (antes era r.width*1.15 → dejaba huecos a los lados).
+   - Sim con DOS RENGLONES:
+     · Renglón 1: TABS horizontales (botones del Hero como pills):
+       Estado del Sim (activo) · Home · Logros · Bitácora · Activity
+       · SOS · Nutrición · RAW · Actualizar.
+       Click en tab que NO sea SIM → ejecuta su acción (irABitacora,
+       refreshTodo, etc.) — P-A2 confirmado.
+     · Renglón 2: contenido del tab activo. Por defecto las 9 needs
+       del Sim en UNA SOLA fila horizontal (9 columnas, layout vertical
+       compacto: ico+label arriba, valor+barra abajo).
+   - Banda Sim: grid de 9 cols (antes 3×3); cada need vertical compacta.
+   - Dial 10% MÁS GRANDE: min(836px, 57vw) (antes 760/52).
+   - ELIMINADO panel _p6 Navegación (heredado v5.087).
 
-   Vista expandida (Fase 1): por ahora muestra placeholder con spinner.
-   En Fase 2+ traeremos el contenido de Home (Patrimonio expandido,
-   Financiero con Identidad, Fijos y Variables con tabla+gráfico,
-   Necesidades con radar+distribución).
-
-   ── Heredado v5.086 ──
-   Sims needs en 0 si no hay datos, banda Sim en grid 3×3, ancho dial 760px,
-   dial centrado, cards inferiores juntas centradas (P1b).
+   Pendiente para próximas fases:
+   - Patrimonio expandido con datos de Home (Fase 2)
+   - Financiero expandido (Fase 3)
+   - Paneles Fijos y Variables nuevos (Fase 4)
+   - Necesidades expandido = card de Necesidades de Home (Fase 5)
 */
 
 var _dialOverlay   = null;
@@ -284,17 +280,20 @@ function renderSimsBandSimsStyle(targetId){
     var v = needs[s.key];
     if(v === undefined || v === null) v = 0;
     var col = s.color;
-    // Color barra: rojo crítico (<30), amarillo medio (30-55), color del need (>55), gris si =0
     var barCol = v === 0 ? 'rgba(120,120,130,0.45)' : (v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col));
     var valCol = v === 0 ? 'rgba(180,184,200,0.50)' : barCol;
     return ''+
       '<div class="hud-need">'+
-        '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
-        '<span class="hud-need-l">'+s.label+'</span>'+
-        '<div class="hud-need-bar-wrap">'+
-          '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'aa,'+barCol+');box-shadow:0 0 6px '+barCol+'88"></div>'+
+        '<div class="hud-need-top">'+
+          '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
+          '<span class="hud-need-l">'+s.label+'</span>'+
         '</div>'+
-        '<span class="hud-need-v" style="color:'+valCol+'">'+v+'<span class="max">/100</span></span>'+
+        '<div class="hud-need-bot">'+
+          '<span class="hud-need-v" style="color:'+valCol+'">'+v+'<span class="max">/100</span></span>'+
+          '<div class="hud-need-bar-wrap">'+
+            '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'aa,'+barCol+');box-shadow:0 0 6px '+barCol+'88"></div>'+
+          '</div>'+
+        '</div>'+
       '</div>';
   }).join('');
 }
@@ -309,7 +308,7 @@ function _crearDialOverlay(){
   _dialCanvas = document.createElement('canvas');
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
-  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(760px,52vw);height:min(760px,52vw);position:relative;pointer-events:auto;z-index:1';
+  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(836px,57vw);height:min(836px,57vw);position:relative;pointer-events:auto;z-index:1';
   _dialCtx = _dialCanvas.getContext('2d');
 
   _dialOverlay.style.cssText = [
@@ -489,15 +488,17 @@ function _crearDialOverlay(){
       '.hud-mas-v{font-size:12px;font-weight:700;letter-spacing:0;text-align:right;font-family:JetBrains Mono,monospace}',
       '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-left:15px}',
       '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
-      // need (sims) - layout horizontal: ico + label + barra + valor
-      '.hud-need{display:flex;align-items:center;gap:9px;min-width:0;padding:0}',
-      '.hud-need-ico{font-size:14px;flex-shrink:0;width:16px;display:flex;align-items:center;justify-content:center;line-height:1}',
-      '.hud-need-l{flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.65);width:62px}',
-      '.hud-need-bar-wrap{flex:1;height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:30px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.45)}',
+      // need (sims) - layout VERTICAL compacto para 9 columnas en una fila
+      '.hud-need{display:flex;flex-direction:column;gap:4px;min-width:0;padding:0}',
+      '.hud-need-top{display:flex;align-items:center;gap:5px;min-width:0}',
+      '.hud-need-bot{display:flex;align-items:center;gap:6px;min-width:0}',
+      '.hud-need-ico{font-size:13px;flex-shrink:0;width:14px;display:flex;align-items:center;justify-content:center;line-height:1}',
+      '.hud-need-l{flex:1;font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.65);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.hud-need-bar-wrap{flex:1;height:5px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:20px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.45)}',
       '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative;min-width:1px}',
-      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:2px;background:rgba(255,255,255,0.45);border-radius:999px;filter:blur(0.6px)}',
-      '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;text-align:right;line-height:1;min-width:42px}',
-      '.hud-need-v .max{opacity:.40;font-weight:700;font-size:8px}',
+      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:1.5px;background:rgba(255,255,255,0.45);border-radius:999px;filter:blur(0.6px)}',
+      '.hud-need-v{font-size:9px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;line-height:1;white-space:nowrap}',
+      '.hud-need-v .max{opacity:.40;font-weight:700;font-size:7.5px}',
       // CTA pie
       '.hud-cta{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;border-top:1px solid var(--ac-15);transition:padding .15s,background .15s}',
       '.hud-cta:hover{background:var(--ac-08);padding-left:20px}',
@@ -536,12 +537,32 @@ function _crearDialOverlay(){
       '.hud-user-bar > div{height:100%;border-radius:999px;transition:width .8s ease}',
       '.hud-user-xp{font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);text-align:right;font-family:JetBrains Mono,monospace}',
       // sim panel band
+      // ── MEGA-CARD TOP: tabs + contenido ──
+      '.hud-megatabs{display:flex;align-items:stretch;gap:6px;padding:10px 14px 0;border-bottom:1px solid rgba(255,255,255,0.06)}',
+      '.hud-megatab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;'+
+        'padding:9px 10px;border-radius:10px 10px 0 0;background:transparent;border:1px solid transparent;border-bottom:0;'+
+        'cursor:pointer;font-family:inherit;font-weight:800;font-size:9px;letter-spacing:.10em;text-transform:uppercase;'+
+        'color:rgba(220,224,235,0.55);transition:all .18s;flex:1;min-width:0;position:relative;top:1px}',
+      '.hud-megatab i{font-size:14px;color:rgba(220,224,235,0.65);transition:color .18s}',
+      '.hud-megatab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
+      '.hud-megatab:hover{background:rgba(255,255,255,0.04);color:rgba(220,224,235,0.85)}',
+      '.hud-megatab:hover i{color:var(--tc)}',
+      '.hud-megatab.active{background:var(--tc-bg);border-color:var(--tc-bd);'+
+        'box-shadow:0 -2px 12px var(--tc-glow),inset 0 -2px 0 var(--tc);color:var(--tc);text-shadow:0 0 6px var(--tc-glow)}',
+      '.hud-megatab.active i{color:var(--tc);filter:drop-shadow(0 0 4px var(--tc))}',
+      '.hud-sim-content{padding:0}',
+      '.hud-sim-h-inline{display:flex;align-items:center;gap:10px;padding:11px 18px 7px}',
+      '.hud-sim-h-inline i{font-size:14px;flex-shrink:0}',
+      '.hud-sim-h-txt{display:flex;flex-direction:column;gap:1px;min-width:0}',
+      '.hud-sim-h-txt .t{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;text-shadow:0 0 8px rgba(167,139,250,0.40)}',
+      '.hud-sim-h-txt .meta{font-size:8.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
+      // ── BANDA SIM: 9 columnas en UNA SOLA fila horizontal ──
       '.hud-sim-h{display:flex;align-items:center;gap:10px;padding:13px 18px 8px}',
       '.hud-sim-h .ico{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
       '.hud-sim-h .ico i{font-size:11px}',
       '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
-      '.hud-sim-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 24px;padding:6px 18px 14px}',
+      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 12px;padding:4px 18px 12px}',
       // stats panel
       '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:6px;padding:12px 14px;height:100%;box-sizing:border-box}',
       '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:10px;min-width:0;padding:0 4px}',
@@ -711,22 +732,73 @@ function _crearDialOverlay(){
       '</div>'+
     '</div>';
 
-  // ── _pSim (top-center): banda Sims, 9 needs en grid 2 cols ──
-  var _pSim = _mkFloatPanel('hud-sim-band','#FBBF24','rgba(251,191,36,0.15)');
+  // ── _pSim (top-center): MEGA-CARD con 2 renglones ──
+  // Renglón 1: tabs/pills horizontales (botones del Hero como tabs).
+  // Renglón 2: contenido del tab activo (por defecto: 9 needs Sim en una fila).
+  // Click en tab que NO sea SIM → expande el panel correspondiente del overlay.
+  var _pSim = _mkFloatPanel('hud-sim-band','#A78BFA','rgba(167,139,250,0.18)');
   document.body.appendChild(_pSim);
   _pSim.classList.add('hud-pnl');
   _pSim.style.animationDelay = '0.4s';
   _pSim.style.borderRadius = '14px';
+
+  // Definición de tabs (botones del Hero + ESTADO DEL SIM como tab activo por defecto)
+  var _SIM_TABS = [
+    {id:'sim',       label:'Estado del Sim', icon:'fa-heart-pulse',  color:'#A78BFA', target:null},
+    {id:'home',      label:'Home',           icon:'fa-house',        color:'#94A3B8', target:'volverAlAnverso'},
+    {id:'logros',    label:'Logros',         icon:'fa-trophy',       color:'#FACC15', target:'irALogros'},
+    {id:'bitacora',  label:'Bitácora',       icon:'fa-book-open',    color:'#C084FC', target:'irABitacora'},
+    {id:'activity',  label:'Activity',       icon:'fa-bolt',         color:'#FB923C', target:'irAActivity'},
+    {id:'sos',       label:'SOS',            icon:'fa-circle-exclamation', color:'#EF4444', target:'activarSOS'},
+    {id:'nutricion', label:'Nutrición',      icon:'fa-leaf',         color:'#4ADE80', target:'irANutricion'},
+    {id:'raw',       label:'RAW',            icon:'fa-table',        color:'#A5B4FC', target:'irASheets'},
+    {id:'refresh',   label:'Actualizar',     icon:'fa-rotate-right', color:'#94A3B8', target:'refreshTodo'},
+  ];
+
   document.getElementById('hud-sim-band-inner').innerHTML =
-    '<div class="hud-sim-h">'+
-      '<div class="ico" style="background:'+_rgba('#FBBF24',0.16)+';border:1px solid '+_rgba('#FBBF24',0.45)+';box-shadow:0 0 12px '+_rgba('#FBBF24',0.30)+'">'+
-        '<i class="fas fa-heart-pulse" style="color:#FBBF24"></i>'+
-      '</div>'+
-      '<span class="t" style="color:#FBBF24;text-shadow:0 0 10px '+_rgba('#FBBF24',0.50)+'">Estado del Sim</span>'+
-      '<span class="meta">9 needs</span>'+
+    // Renglón 1: tabs horizontales
+    '<div class="hud-megatabs" id="hud-megatabs">'+
+      _SIM_TABS.map(function(t, idx){
+        var active = (t.id === 'sim') ? ' active' : '';
+        return '<button class="hud-megatab'+active+'" '+
+          'data-tab-id="'+t.id+'" '+
+          'data-tab-target="'+(t.target||'')+'" '+
+          'style="--tc:'+t.color+';--tc-bg:'+_rgba(t.color,0.12)+';--tc-bd:'+_rgba(t.color,0.40)+';--tc-glow:'+_rgba(t.color,0.30)+'">'+
+            '<i class="fas '+t.icon+'"></i>'+
+            '<span>'+t.label+'</span>'+
+        '</button>';
+      }).join('')+
     '</div>'+
-    '<div id="hud-sim-band-grid" class="hud-sim-grid"></div>';
+    // Renglón 2: contenido del tab activo (por defecto Sim)
+    '<div class="hud-sim-content">'+
+      '<div class="hud-sim-h-inline">'+
+        '<i class="fas fa-heart-pulse" style="color:#A78BFA;filter:drop-shadow(0 0 4px '+_rgba('#A78BFA',0.55)+')"></i>'+
+        '<div class="hud-sim-h-txt">'+
+          '<span class="t" style="color:#A78BFA">Estado del Sim</span>'+
+          '<span class="meta">9 needs activos</span>'+
+        '</div>'+
+      '</div>'+
+      '<div id="hud-sim-band-grid" class="hud-sim-grid"></div>'+
+    '</div>';
   if(typeof renderSimsBandSimsStyle === 'function') renderSimsBandSimsStyle('hud-sim-band-grid');
+
+  // Listeners de los tabs
+  document.getElementById('hud-megatabs').addEventListener('click', function(e){
+    var tab = e.target.closest('.hud-megatab');
+    if(!tab) return;
+    var id = tab.dataset.tabId;
+    var target = tab.dataset.tabTarget;
+    if(id === 'sim'){
+      // Tab SIM: re-marcar como activo (no hace nada más, ya muestra el contenido Sim)
+      document.querySelectorAll('.hud-megatab').forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+      return;
+    }
+    // Otros tabs: cerrar dial y navegar a la sección correspondiente (P-A2 + P-B2)
+    if(target && typeof window[target] === 'function'){
+      window[target]();
+    }
+  });
 
   // ── _pStats (top-right): Energía / Racha / Créditos en 3 cells ──
   var _pStats = _mkFloatPanel('hud-stats','#FBBF24','rgba(251,191,36,0.15)');
@@ -1132,8 +1204,8 @@ function _crearDialOverlay(){
     _dialCanvas.style.cursor     = 'pointer';
     _dialCanvas.style.boxShadow  = '';
     _dialCanvas.style.borderRadius = '';
-    _dialCanvas.style.width      = 'min(760px,52vw)';
-    _dialCanvas.style.height     = 'min(760px,52vw)';
+    _dialCanvas.style.width      = 'min(836px,57vw)';
+    _dialCanvas.style.height     = 'min(836px,57vw)';
     _dialCanvas.title            = '';
     // Limpiar tamaño/posición forzados de paneles laterales (volverán al flujo)
     window._hudPanels.forEach(function(hp){
@@ -1144,32 +1216,37 @@ function _crearDialOverlay(){
     });
 
     // ══════════════════════════════════════════
-    //  ZONA SUPERIOR — anchos compactos, Sim alineado al ancho del dial
+    //  ZONA SUPERIOR — fila continua de borde a borde, SIN HUECOS
+    //  USER + Sim (mega-card con tabs) + Stats forman UNA barra horizontal
+    //  pegados entre sí, ocupando TODO el ancho del viewport.
     // ══════════════════════════════════════════
     var topPad  = GAP;
-    var topGap  = 14;
     var pUser  = getTop('top-left')[0];
     var pSim   = getTop('top-center')[0];
     var pStats = getTop('top-right')[0];
 
-    // Anchos FIJOS y compactos (no porcentaje del viewport)
+    // Anchos fijos para USER y Stats; Sim toma el resto del viewport.
     var wUser  = 220;
     var wStats = 340;
-    // Sim un poco más ancho que el dial (+15%) para que los labels respiren
-    var wSim   = Math.round(r.width * 1.15);
-    // Si el viewport es muy estrecho, fallback: solo Sim centrado
-    if(vW < (wUser + wStats + wSim + topGap*4 + topPad*2)){
+    var wSim   = vW - wUser - wStats - topPad*2;
+    // En viewports muy estrechos, fallback compacto
+    if(wSim < 400){
+      wUser = 180; wStats = 280;
+      wSim = vW - wUser - wStats - topPad*2;
+    }
+    if(wSim < 300){
       wUser = 0; wStats = 0;
-      wSim = Math.min(Math.round(r.width * 1.15), vW - topPad*2);
+      wSim = vW - topPad*2;
     }
 
-    if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; }
+    if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; pUser.el.style.opacity=''; }
     else if(pUser){ pUser.el.style.width='0px'; pUser.el.style.opacity='0'; pUser.el.style.visibility='hidden'; }
     if(pSim){ pSim.el.style.width = wSim+'px'; }
-    if(pStats && wStats>0){ pStats.el.style.width = wStats+'px'; pStats.el.style.visibility='visible'; }
+    if(pStats && wStats>0){ pStats.el.style.width = wStats+'px'; pStats.el.style.visibility='visible'; pStats.el.style.opacity=''; }
     else if(pStats){ pStats.el.style.width='0px'; pStats.el.style.opacity='0'; pStats.el.style.visibility='hidden'; }
 
-    // Altura uniforme entre USER, Sim y Stats
+    // Medir altura natural de cada uno (Sim será la más alta porque tiene
+    // 2 renglones: tabs + barra Sim)
     var topMaxH = 0;
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
@@ -1178,7 +1255,8 @@ function _crearDialOverlay(){
         if(h>topMaxH) topMaxH = h;
       }
     });
-    if(topMaxH===0) topMaxH = 100;
+    if(topMaxH===0) topMaxH = 130;
+    // Forzar altura uniforme para que se vean alineadas como UNA barra
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
         hp.el.style.minHeight = topMaxH+'px';
@@ -1191,20 +1269,17 @@ function _crearDialOverlay(){
     });
 
     var topY = topPad;
-    // Sim CENTRADO en X igual que el dial
-    var simX = Math.round((vW - wSim) / 2);
-    if(pSim){
-      pSim.el.style.left = simX + 'px';
-      pSim.el.style.top  = topY + 'px';
-      pSim.el.style.clipPath = chamferRect;
-    }
-    // USER pegado a la izquierda
+    // PEGADAS sin gaps entre ellas: User-Sim-Stats consecutivos
     if(pUser && wUser>0){
       pUser.el.style.left = topPad + 'px';
       pUser.el.style.top  = topY + 'px';
       pUser.el.style.clipPath = chamferRect;
     }
-    // Stats pegado a la derecha
+    if(pSim){
+      pSim.el.style.left = (topPad + wUser) + 'px';
+      pSim.el.style.top  = topY + 'px';
+      pSim.el.style.clipPath = chamferRect;
+    }
     if(pStats && wStats>0){
       pStats.el.style.left = (vW - topPad - wStats) + 'px';
       pStats.el.style.top  = topY + 'px';
