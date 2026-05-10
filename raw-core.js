@@ -1,33 +1,35 @@
-/* RAW Entry — Core v.5.081
-   REDISEÑO COMPLETO de los 13 paneles del overlay aplicando sistema de diseño
-   coherente con la imagen objetivo:
+/* RAW Entry — Core v.5.082
+   AJUSTES DE CARGA VISUAL para igualar la imagen objetivo:
 
-   SISTEMA DE DISEÑO (inyectado una sola vez en hud-design-css):
-   - Fuentes: Manrope (UI) + JetBrains Mono (números/valores)
-   - Tokens tipográficos jerárquicos: hero 30px / row 13px / lbl 11px / micro 9px
-   - Centavos atenuados (.cents { opacity:.45 }): "$ 14,027.<dim>00</dim>"
-   - Barras gruesas redondeadas (8px need bars, 5px hero, 3px row)
-   - Iconos FontAwesome sólidos en cajas con border y glow del color
-   - Numeración en monospace con tabular-nums
+   FIX CRÍTICO en _mkFloatPanel:
+   - Antes: border:1px solid rgba(140,100,220,0.22) (genérico violeta para TODOS)
+     y --pc-dim/mid se calculaban con .replace() que FALLABA en hex (#RRGGBB),
+     resultando en variables undefined → fallback violeta. Por eso TODOS los
+     paneles parecían "del mismo color gris-violeta".
+   - Ahora: helper interno _ax(alpha) convierte el hex del panel a rgba con
+     alpha variable, y aplica:
+       - Border principal: 1.5px solid <accent>@45
+       - --pc-dim: <accent>@30, --pc-mid: <accent>@65, --pc-glow: <accent>@22
+       - Box-shadow exterior con glow del accent + sombra
+       - Inner glow radial desde arriba con accent@8
+   - Cada panel ahora tiene su propio borde luminoso del color del tema.
 
-   PANELES REDISEÑADOS:
-   - _pUser: avatar hexagonal, nombre USER + Nivel + badge escudo + barra XP
-   - _pSim: banda Sims con barras horizontales largas (icono + label + barra + valor)
-   - _pStats: 3 cells (Energía/Racha/Créditos) con iconos grandes
-   - _p1 Patrimonio: hero con chip opcional + miniBar fondo + 4 rows con icono FA
-   - _p2 Necesidades: 5 maslow rows con dot pulsante
-   - _p3 Bitácora: 5 rows con icono FA (no emojis) + CTA Abrir Bitácora
-   - _p4 Financiero: hero + grid 2x1 (Ingresos/Egresos en cells) + miniBar Ahorro + 2 rows
-   - _p5 Activity+Logros: trio cells (Hábitos/Logros/Racha) + fila de fuegos
-   - _p6 Navegación: GRID 2x3 con cada item en caja con borde (no lista vertical)
-   - _pTrack: hexágono nivel actual + info + stops + trofeo
-   - _pMision/_pLogro: cards horizontales con icono + label + sub + barra
-   - _pNivel: hexágono nivel siguiente + XP + bonus + caja regalo
+   miniBreath sin fallback genérico — usa solo --pc-* del panel.
+   topPulse simplificado (sin filter:blur que costaba performance).
 
-   CTAs unificados (_pCTA): link sutil al pie con label + chevron, hover effect.
-   Iconos de fuego con clase .on (en vez de styles inline).
-   setMoney() formatea $X,XXX.<dim>00</dim> en hero y excedente.
-   Banda Sims (renderSimsBandSimsStyle) usa CSS clases .hud-need*.
+   BARRAS MÁS VISIBLES:
+   - Need bars (Sims): height 9px (antes 8), track rgba(255,255,255,0.08)
+     con inset shadow oscuro, shine highlight más opaco (0.40 vs 0.30).
+   - Row bars y maslow bars: track 0.08 (antes 0.05/0.06).
+
+   DENSIDAD:
+   - Sims grid: gap 7px×22px (antes 9×28) → más apretado y compacto.
+   - Row padding: 8px (antes 9), Maslow padding: 8px (antes 9).
+
+   CHIP "vs ayer" en Patrimonio:
+   - Compara saldo actual contra snapshot guardado en localStorage del día
+     anterior. Verde si subió, rojo si bajó. Se oculta si no hay snapshot
+     comparable (primer día).
 */
 window._apartadosData = window._apartadosData || [];
 window._fijosData     = window._fijosData     || [];
@@ -614,10 +616,10 @@ function _crearDialOverlay(){
     var s=document.createElement('style'); s.id='hud-mini-kf';
     s.textContent=[
       '@keyframes miniBreath{',
-        '0%,100%{border-color:var(--pc-dim,rgba(140,100,220,0.20));box-shadow:0 0 0 0px transparent,0 8px 32px rgba(0,0,0,0.75),0 0 18px var(--pc-glow,rgba(139,92,246,0.06)),0 0 0 1px var(--pc-dim,rgba(140,100,220,0.15));}',
-        '50%{border-color:var(--pc-mid,rgba(140,100,220,0.55));box-shadow:0 0 0 0px transparent,0 8px 40px rgba(0,0,0,0.85),0 0 40px var(--pc-glow,rgba(139,92,246,0.22)),0 0 0 1px var(--pc-mid,rgba(140,100,220,0.40));}',
+        '0%,100%{border-color:var(--pc-dim);box-shadow:0 8px 32px rgba(0,0,0,0.65),0 0 24px var(--pc-glow),inset 0 1px 0 var(--pc-dim);}',
+        '50%{border-color:var(--pc-mid);box-shadow:0 8px 40px rgba(0,0,0,0.75),0 0 48px var(--pc-glow),inset 0 1px 0 var(--pc-mid);}',
       '}',
-      '@keyframes topPulse{0%,100%{opacity:.5;filter:blur(0)}50%{opacity:1;filter:blur(1px)}}',
+      '@keyframes topPulse{0%,100%{opacity:.6}50%{opacity:1}}',
       '@keyframes hudValIn{0%{opacity:0;transform:translateY(3px)}100%{opacity:1;transform:none}}',
       '@keyframes hudDotPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.5);opacity:1}}',
     ].join('');
@@ -625,41 +627,53 @@ function _crearDialOverlay(){
   })();
 
   // ── Crear panel flotante ──
+  // accentColor: hex (#22C55E). glowColor: rgba string (compat).
   function _mkFloatPanel(id, accentColor, glowColor){
+    // Computar versiones rgba del accent (hex → rgba con alpha variable)
+    function _ax(a){
+      var h = accentColor.replace('#','');
+      if(h.length===3) h = h.split('').map(function(c){return c+c;}).join('');
+      var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+      return 'rgba('+r+','+g+','+b+','+a+')';
+    }
     var p = document.createElement('div');
     p.id  = id;
     p.style.cssText = [
       'position:fixed','z-index:9001',
-      'background:rgba(10,7,22,0.88)',
-      'border:1px solid rgba(140,100,220,0.22)',
+      'background:rgba(10,7,22,0.92)',
+      // Borde principal del COLOR del panel (no genérico violeta)
+      'border:1.5px solid '+_ax(0.45),
       'backdrop-filter:blur(22px) saturate(170%)',
       '-webkit-backdrop-filter:blur(22px) saturate(170%)',
       'border-radius:14px',
       'opacity:0','visibility:hidden',
       'transition:opacity 500ms ease-out',
       'overflow:hidden',
-      'font-family:-apple-system,BlinkMacSystemFont,sans-serif',
+      'font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif',
       'animation:miniBreath 4s ease-in-out infinite',
-      'background-image:linear-gradient(rgba(120,80,200,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.018) 1px,transparent 1px)',
-      'background-size:28px 28px',
+      // Glow exterior y sombra base
+      'box-shadow:0 8px 32px rgba(0,0,0,0.65),0 0 32px '+_ax(0.18)+',inset 0 1px 0 '+_ax(0.20),
     ].join(';');
-    p.style.setProperty('--pc-dim',  accentColor.replace(')',',0.18)').replace('rgb','rgba'));
-    p.style.setProperty('--pc-mid',  accentColor.replace(')',',0.45)').replace('rgb','rgba'));
-    p.style.setProperty('--pc-glow', glowColor);
+    // Variables CSS del color del panel para uso en animación (miniBreath)
+    p.style.setProperty('--pc-dim',  _ax(0.30));
+    p.style.setProperty('--pc-mid',  _ax(0.65));
+    p.style.setProperty('--pc-glow', _ax(0.22));
     p._accent = accentColor;
 
+    // Banda superior luminosa (top accent line)
     var top = document.createElement('div');
     top.style.cssText = 'position:absolute;top:0;left:0;right:0;height:2px;'+
-      'background:'+accentColor+';'+
-      'box-shadow:0 0 10px '+accentColor+',0 0 20px '+glowColor+';'+
-      'animation:topPulse 3s ease-in-out infinite;z-index:2';
+      'background:linear-gradient(90deg,transparent 0%,'+accentColor+' 20%,'+accentColor+' 80%,transparent 100%);'+
+      'box-shadow:0 0 12px '+accentColor+',0 0 24px '+_ax(0.50)+';'+
+      'animation:topPulse 3s ease-in-out infinite;z-index:2;pointer-events:none';
     p.appendChild(top);
 
-    var border = document.createElement('div');
-    border.style.cssText = 'position:absolute;inset:0;border-radius:14px;pointer-events:none;z-index:3;'+
-      'border:1.5px solid '+accentColor+'44;'+
-      'box-shadow:inset 0 0 12px '+glowColor+',inset 0 0 4px '+accentColor+'18';
-    p.appendChild(border);
+    // Glow interno sutil del color del panel
+    var inner_glow = document.createElement('div');
+    inner_glow.style.cssText = 'position:absolute;inset:0;border-radius:14px;pointer-events:none;z-index:0;'+
+      'box-shadow:inset 0 0 24px '+_ax(0.06)+';'+
+      'background:radial-gradient(ellipse at top,'+_ax(0.08)+' 0%,transparent 50%)';
+    p.appendChild(inner_glow);
 
     var inner = document.createElement('div');
     inner.style.cssText = 'position:relative;z-index:1;display:flex;flex-direction:column';
@@ -717,29 +731,29 @@ function _crearDialOverlay(){
       '.hud-mini-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.04)}',
       '.hud-mini-fill{height:100%;border-radius:999px;transition:width .8s ease}',
       // row
-      '.hud-row{display:flex;align-items:center;gap:10px;padding:9px 16px}',
+      '.hud-row{display:flex;align-items:center;gap:10px;padding:8px 16px}',
       '.hud-row + .hud-row{border-top:1px solid rgba(255,255,255,0.04)}',
       '.hud-row-ico{width:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px}',
       '.hud-row-l{flex:1;min-width:0;font-size:13px;font-weight:600;color:rgba(220,224,235,0.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.hud-row-bar{width:60px;height:3px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;flex-shrink:0}',
+      '.hud-row-bar{width:60px;height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;flex-shrink:0}',
       '.hud-row-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease}',
       '.hud-row-v{font-size:13px;font-weight:700;letter-spacing:0;flex-shrink:0;text-align:right;min-width:78px;font-family:JetBrains Mono,monospace}',
       // maslow
-      '.hud-mas{padding:9px 16px}',
+      '.hud-mas{padding:8px 16px}',
       '.hud-mas + .hud-mas{border-top:1px solid rgba(255,255,255,0.04)}',
       '.hud-mas-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}',
       '.hud-mas-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite}',
       '.hud-mas-l{flex:1;font-size:13px;font-weight:600;color:rgba(220,224,235,0.78);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.hud-mas-v{font-size:12px;font-weight:700;letter-spacing:0;text-align:right;font-family:JetBrains Mono,monospace}',
-      '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;margin-left:15px}',
+      '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-left:15px}',
       '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
       // need (sims) - barras gruesas
       '.hud-need{display:flex;align-items:center;gap:10px;min-width:0}',
       '.hud-need-ico{font-size:14px;flex-shrink:0;width:18px;display:flex;align-items:center;justify-content:center}',
       '.hud-need-l{flex:1;font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.62);min-width:0}',
-      '.hud-need-bar-wrap{flex:2;height:8px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);position:relative;min-width:60px}',
+      '.hud-need-bar-wrap{flex:2;height:9px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:60px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4)}',
       '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative}',
-      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:6px;right:6px;height:2px;background:rgba(255,255,255,0.30);border-radius:999px;filter:blur(1px)}',
+      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:6px;right:6px;height:2px;background:rgba(255,255,255,0.40);border-radius:999px;filter:blur(0.8px)}',
       '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;min-width:38px;text-align:right}',
       '.hud-need-v .max{opacity:.40;font-weight:700;font-size:9px}',
       // CTA pie
@@ -785,7 +799,7 @@ function _crearDialOverlay(){
       '.hud-sim-h .ico i{font-size:11px}',
       '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
-      '.hud-sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 28px;padding:6px 18px 14px}',
+      '.hud-sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px 22px;padding:4px 18px 14px}',
       // stats panel
       '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:6px;padding:12px 14px;height:100%;box-sizing:border-box}',
       '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:10px;min-width:0;padding:0 4px}',
@@ -1612,6 +1626,40 @@ function _crearDialOverlay(){
       var num = parseFloat(raw);
       if(!isNaN(num)) setMoney('_hud-saldo', num);
     }
+
+    // Chip "+/- X% vs ayer" — compara contra saldo guardado en localStorage
+    (function(){
+      var chip = document.getElementById('_hud-saldo-chip');
+      if(!chip) return;
+      var saldoActual = totalDisp - totalApD;
+      try{
+        var hoy = new Date().toISOString().slice(0,10);
+        var prev = JSON.parse(localStorage.getItem('hud:saldoSnap')||'null');
+        // Guardar snapshot de hoy si no existe (para comparar mañana)
+        if(!prev || prev.fecha !== hoy){
+          if(prev && prev.fecha !== hoy){
+            // Tenemos snapshot de un día anterior → calcular delta
+            var delta = saldoActual - prev.saldo;
+            var pct = prev.saldo!==0 ? Math.round((delta/Math.abs(prev.saldo))*100) : 0;
+            var pos = delta >= 0;
+            var col = pos ? '#22C55E' : '#EF4444';
+            chip.style.display = 'flex';
+            chip.style.background = pos ? 'rgba(34,197,94,0.14)' : 'rgba(239,68,68,0.14)';
+            chip.style.border = '1px solid '+(pos ? 'rgba(34,197,94,0.40)' : 'rgba(239,68,68,0.40)');
+            chip.style.color = col;
+            chip.style.boxShadow = '0 0 10px '+(pos ? 'rgba(34,197,94,0.20)' : 'rgba(239,68,68,0.20)');
+            chip.innerHTML = '<span style="font-family:JetBrains Mono,monospace">'+(pos?'+':'')+pct+'%</span>'+
+              '<span class="chip-sub">vs ayer</span>';
+          } else {
+            chip.style.display = 'none';
+          }
+          // Actualizar snapshot
+          localStorage.setItem('hud:saldoSnap', JSON.stringify({fecha:hoy, saldo:saldoActual}));
+        } else {
+          chip.style.display = 'none';
+        }
+      } catch(e){ chip.style.display = 'none'; }
+    })();
 
     var fijos = window._fijosData || [];
     var maxMonto = fijos.reduce(function(m,f){ return f.nombre!=='P'?Math.max(m,Math.abs(f.monto||0)):m; },1);
