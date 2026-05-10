@@ -1,26 +1,28 @@
-/* RAW Entry — Overlay v.5.089
-   Cambios desde v5.088:
-   FIX-1 — Mega-card top alineada al ancho de columnas laterales:
-           USER ocupa exactamente el ancho de la col izquierda;
-           Stats ocupa exactamente el ancho de la col derecha;
-           Sim toma el resto. Los cálculos de leftX/rightX/leftW/rightW
-           se hicieron MOVER ARRIBA en _reposicionarHUD para usarlos
-           en la zona top.
-   FIX-2 — Quitados los "···" del header de cada panel (no hacían nada).
-   FIX-3 — Apretadas proporciones de USER, Sim y Stats:
-           paddings reducidos, fonts un punto más chicos, gaps menores.
-           Resultado: barra top más compacta verticalmente.
-   FIX-4 — Bug de paneles encimados al regresar de vista expandida:
-           limpieza robusta de TODOS los estilos inline (transition,
-           transform, height, minHeight, opacity, pointer-events,
-           position) en cada panel + dial canvas, antes de re-posicionar.
+/* RAW Entry — Overlay v.5.090
+   Cambios desde v5.089:
+   - NUEVOS paneles _p7 (Fijos, cyan) y _p8 (Variables, índigo) en columnas
+     laterales. Distribución actualizada:
+     · Izquierda: Patrimonio + Necesidades + Bitácora + Fijos (4 paneles)
+     · Derecha:   Financiero + Activity+Logros + Variables (3 paneles)
+   - Estado colapsado: solo header + mensaje "Tabla y gráfico al expandir"
+     + CTA al pie. Sin contenido pesado en el panel chico.
+   - Estado EXPANDIDO con contenido REAL:
+     · Patrimonio expandido = renderPatrimonio(data, container) de Home.
+     · Financiero expandido = _renderCFO + renderFlujoMensual de Home.
+     · Fijos expandido = renderAnualidad + initGraficaFijos lado a lado
+       (tabla flex 1.1 izq, gráfico flex 0.9 der).
+     · Variables expandido = renderGastos + initGraficas lado a lado.
+   - Reusa funciones de raw-dashboard.js sin duplicar lógica:
+     las funciones aceptan un containerId opcional. Los gráficos Chart.js
+     se identifican por suffix para no chocar entre Home y overlay.
+   - CSS para tablas dentro del panel expandido con scroll horizontal,
+     sticky header, sticky primera columna.
+   - .hud-pnl.hud-expanded ahora es flex column para que el wrapper
+     interno crezca correctamente y los canvas tengan altura real.
 
-   Pendiente para próximas fases:
-   - Patrimonio expandido con datos de Home (Fase 2)
-   - Financiero expandido (Fase 3)
-   - Paneles Fijos y Variables NUEVOS en columnas extremas
-     (5 columnas total: 2 izq + dial + 2 der) — Fase 4
-   - Necesidades expandido = card de Necesidades de Home (Fase 5)
+   Pendiente:
+   - Bitácora, Activity+Logros, Necesidades, Misión, Logro, Nivel
+     todavía muestran placeholder al expandir.
 */
 
 var _dialOverlay   = null;
@@ -448,14 +450,27 @@ function _crearDialOverlay(){
       '.hud-h-expand:hover{opacity:1;background:rgba(255,255,255,0.06);transform:scale(1.1)}',
       '.hud-h-expand i{font-size:11px;line-height:1}',
       // Panel expandido: ocupa la zona central donde estaba el dial
-      '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)!important;z-index:9050!important}',
+      '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)!important;z-index:9050!important;display:flex;flex-direction:column}',
+      '.hud-pnl.hud-expanded > [id$="-inner"]{display:flex;flex-direction:column;flex:1;min-height:0}',
       // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
       '.hud-expanded-content{display:none;flex:1;min-height:0;overflow:auto;padding:14px 18px}',
       '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px}',
       '.hud-expanded .hud-collapsed-content{display:none}',
+      // Tablas dentro del panel expandido: scroll horizontal mantenido
+      '.hud-expanded-content .tbl-wrap{overflow-x:auto;overflow-y:auto;border-radius:8px;border:1px solid rgba(255,255,255,0.06);max-height:100%}',
+      '.hud-expanded-content .tbl{width:100%;border-collapse:collapse;font-size:11px;font-family:JetBrains Mono,monospace}',
+      '.hud-expanded-content .tbl th{padding:8px 10px;background:rgba(255,255,255,0.03);font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.65);border-bottom:1px solid rgba(255,255,255,0.08);position:sticky;top:0;white-space:nowrap}',
+      '.hud-expanded-content .tbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.04);white-space:nowrap}',
+      '.hud-expanded-content .tbl td:first-child,.hud-expanded-content .tbl th:first-child{position:sticky;left:0;background:rgba(15,23,42,0.95);z-index:1}',
+      '.hud-expanded-content .tbl .pos{color:#4ADE80}',
+      '.hud-expanded-content .tbl .neg{color:#EF4444}',
+      '.hud-expanded-content .tbl .mes-actual{background:rgba(99,102,241,0.10)}',
       // Botón expandir cambia de icono cuando ya está expandido
       '.hud-expanded .hud-h-expand i{transform:rotate(180deg)}',
       '.hud-h-bar{height:1px;margin:0 16px;background:linear-gradient(90deg,var(--ac-50),transparent)}',
+      // Mensaje placeholder para paneles que solo muestran info al expandir
+      '.hud-empty-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px 16px;color:rgba(220,224,235,0.45)}',
+      '.hud-empty-msg span{font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;text-align:center}',
       // hero
       '.hud-hero{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}',
       '.hud-hero-l{flex:1;min-width:0}',
@@ -943,6 +958,34 @@ function _crearDialOverlay(){
   // ya están disponibles en los botones del Hero del header. Quitar el panel
   // libera espacio en la columna derecha y simplifica el overlay.
 
+  // ── Panel 7: Fijos (col izq, último) — solo header, contenido al expandir ──
+  var _p7 = _mkFloatPanel('hud-fijos','#67E8F9','rgba(103,232,249,0.15)');
+  document.body.appendChild(_p7);
+  _p7.classList.add('hud-pnl');
+  _p7.style.animationDelay = '2.6s';
+  _p7.style.borderRadius = '14px';
+  document.getElementById('hud-fijos-inner').innerHTML =
+    _pH('Fijos','#67E8F9','fa-thumbtack')+
+    '<div class="hud-empty-msg">'+
+      '<i class="fas fa-table-cells" style="color:'+_rgba('#67E8F9',0.40)+';font-size:22px"></i>'+
+      '<span>Tabla y gráfico al expandir</span>'+
+    '</div>'+
+    _pCTA('Ver detalle completo','#67E8F9','irAFijos');
+
+  // ── Panel 8: Variables (col der, último) — solo header, contenido al expandir ──
+  var _p8 = _mkFloatPanel('hud-variables','#A5B4FC','rgba(165,180,252,0.15)');
+  document.body.appendChild(_p8);
+  _p8.classList.add('hud-pnl');
+  _p8.style.animationDelay = '2.9s';
+  _p8.style.borderRadius = '14px';
+  document.getElementById('hud-variables-inner').innerHTML =
+    _pH('Variables','#A5B4FC','fa-calendar-days')+
+    '<div class="hud-empty-msg">'+
+      '<i class="fas fa-chart-line" style="color:'+_rgba('#A5B4FC',0.40)+';font-size:22px"></i>'+
+      '<span>Tabla y gráfico al expandir</span>'+
+    '</div>'+
+    _pCTA('Ver detalle completo','#A5B4FC','irAVariables');
+
   // ══════════════════════════════════════
   //  ZONA INFERIOR — track + 3 cards
   // ══════════════════════════════════════
@@ -1043,8 +1086,10 @@ function _crearDialOverlay(){
   _p1._side='left';    _p1._order=0;
   _p2._side='left';    _p2._order=1;
   _p3._side='left';    _p3._order=2;
+  _p7._side='left';    _p7._order=3;
   _p4._side='right';   _p4._order=0;
   _p5._side='right';   _p5._order=1;
+  _p8._side='right';   _p8._order=2;
   _pTrack._side='bottom-track';   _pTrack._order=0;
   _pMision._side='bottom-left';   _pMision._order=0;
   _pLogro._side='bottom-center';  _pLogro._order=0;
@@ -1052,8 +1097,8 @@ function _crearDialOverlay(){
 
   var _hudPanels = [
     {el:_pUser},{el:_pSim},{el:_pStats},
-    {el:_p1},{el:_p2},{el:_p3},
-    {el:_p4},{el:_p5},
+    {el:_p1},{el:_p2},{el:_p3},{el:_p7},
+    {el:_p4},{el:_p5},{el:_p8},
     {el:_pTrack},
     {el:_pMision},{el:_pLogro},{el:_pNivel},
   ];
@@ -1490,49 +1535,157 @@ function _crearDialOverlay(){
     Object.keys(props).forEach(function(k){ el.style[k] = props[k]; });
   }
 
+  // Configuración por panel: estructura HTML del wrapper expandido + función
+  // de hidratación que rellena los datos. Se ejecuta cada vez que se expande
+  // (no solo la primera) para que los datos siempre reflejen lo último.
+  var _EXPAND_CONFIG = {
+    // ── PATRIMONIO ──
+    'hud-patrimonio': {
+      html: function(){
+        return '<div id="hud-pat-expanded-body" style="padding:0"></div>';
+      },
+      hydrate: function(){
+        if(typeof renderPatrimonio === 'function' && window._patrimonioData){
+          renderPatrimonio(window._patrimonioData, 'hud-pat-expanded-body');
+        } else {
+          var el = document.getElementById('hud-pat-expanded-body');
+          if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Cargando patrimonio...</div>';
+        }
+      },
+    },
+    // ── FINANCIERO ──
+    'hud-financiero': {
+      html: function(){
+        return ''+
+          '<div id="fin-avanzado-body-overlay" style="padding:8px"></div>'+
+          '<div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:8px"></div>'+
+          '<div id="flujo-mensual-body-overlay" style="padding:8px 0"></div>';
+      },
+      hydrate: function(){
+        if(typeof _renderCFO === 'function'){
+          _renderCFO('fin-avanzado-body-overlay');
+        }
+        if(typeof renderFlujoMensual === 'function' && window._flujoMensualData){
+          renderFlujoMensual(window._flujoMensualData, 'flujo-mensual-body-overlay');
+        } else if(typeof api !== 'undefined' && api.getFlujoPorMes){
+          api.getFlujoPorMes().then(function(d){
+            window._flujoMensualData = d;
+            renderFlujoMensual(d, 'flujo-mensual-body-overlay');
+          }).catch(function(){});
+        }
+      },
+    },
+    // ── FIJOS ──
+    'hud-fijos': {
+      html: function(){
+        return ''+
+          '<div style="display:flex;gap:14px;height:100%;min-height:0">'+
+            '<div id="hud-fijos-tabla" style="flex:1.1;min-width:0;overflow:auto"></div>'+
+            '<div id="hud-fijos-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0">'+
+              '<div id="graf-fijos-loading-hud-fijos-tabla" style="text-align:center;padding:24px;color:rgba(220,224,235,0.40)">Cargando gráfica…</div>'+
+              '<canvas id="graf-fijos-canvas-hud-fijos-tabla" style="display:none;flex:1;min-height:0"></canvas>'+
+              '<div id="graf-fijos-leyenda-hud-fijos-tabla" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0"></div>'+
+            '</div>'+
+          '</div>';
+      },
+      hydrate: function(){
+        if(typeof renderAnualidad === 'function' && window._fijosAnualidadData){
+          renderAnualidad(window._fijosAnualidadData, 'hud-fijos-tabla');
+        } else if(typeof api !== 'undefined' && api.getGastos){
+          api.getGastos().then(function(d){
+            window._fijosAnualidadData = d;
+            renderAnualidad(d, 'hud-fijos-tabla');
+          }).catch(function(){});
+        } else {
+          var el = document.getElementById('hud-fijos-tabla');
+          if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
+        }
+      },
+    },
+    // ── VARIABLES ──
+    'hud-variables': {
+      html: function(){
+        return ''+
+          '<div style="display:flex;gap:14px;height:100%;min-height:0">'+
+            '<div id="hud-var-tabla" style="flex:1.1;min-width:0;overflow:auto"></div>'+
+            '<div id="hud-var-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0">'+
+              '<div id="graf-loading-hud-var-tabla" style="text-align:center;padding:24px;color:rgba(220,224,235,0.40)">Cargando gráfica…</div>'+
+              '<canvas id="graf-canvas-hud-var-tabla" style="display:none;flex:1;min-height:0"></canvas>'+
+              '<div id="graf-leyenda-hud-var-tabla" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0"></div>'+
+            '</div>'+
+          '</div>';
+      },
+      hydrate: function(){
+        if(typeof renderGastos === 'function' && typeof datosMes !== 'undefined' && datosMes && datosMes.meses){
+          renderGastos('hud-var-tabla');
+          if(typeof initGraficas === 'function') initGraficas(datosMes, '-hud-var-tabla');
+        } else if(typeof api !== 'undefined' && api.getDatosMes){
+          api.getDatosMes().then(function(d){
+            window.datosMes = d;
+            renderGastos('hud-var-tabla');
+            if(typeof initGraficas === 'function') initGraficas(d, '-hud-var-tabla');
+          }).catch(function(){});
+        } else {
+          var el = document.getElementById('hud-var-tabla');
+          if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
+        }
+      },
+    },
+    // ── BITÁCORA, ACTIVITY, NECESIDADES, MISIÓN, LOGRO, NIVEL ──
+    // Para estos, mostramos un placeholder con info básica hasta migrar las
+    // funciones de Home (siguiente turno).
+  };
+
   function _hudExpand(panelEl){
     if(!panelEl) return;
     if(window._hudExpanded === panelEl){
-      // Click sobre el ya expandido → contraer
       _hudCollapse();
       return;
     }
-    // Si ya hay otro expandido, contraerlo primero (sin animación, porque vamos
-    // a expandir el nuevo y la transición se ejecuta junto).
     if(window._hudExpanded){
       _hudCollapse(/*sinReposicionar=*/true);
     }
-    // Asegurar que existe el wrapper de contenido expandido dentro del panel
     var inner = panelEl.querySelector(':scope > [id$="-inner"]');
-    if(inner && !inner.querySelector(':scope > .hud-expanded-content')){
-      var expContent = document.createElement('div');
-      expContent.className = 'hud-expanded-content';
-      // Marcador placeholder: se reemplaza cuando lleguen los renders de Fase 2+
-      var pid = panelEl.id.replace('hud-','');
-      expContent.id = 'hud-' + pid + '-expanded';
-      expContent.innerHTML = ''+
-        '<div style="display:flex;align-items:center;justify-content:center;'+
-          'min-height:200px;color:rgba(220,224,235,0.45);font-size:12px;'+
-          'letter-spacing:.10em;text-transform:uppercase;text-align:center;'+
-          'flex-direction:column;gap:8px">'+
-          '<i class="fas fa-circle-notch fa-spin" style="font-size:18px;opacity:.7"></i>'+
-          '<span>Vista expandida — pendiente de cargar contenido</span>'+
-        '</div>';
-      // Marcar el contenido original como collapsed para que se oculte cuando expandido
-      Array.from(inner.children).forEach(function(child){
-        if(!child.classList.contains('hud-expanded-content')){
-          child.classList.add('hud-collapsed-content');
-        }
-      });
-      inner.appendChild(expContent);
+    if(inner){
+      // Crear o reusar el wrapper expandido
+      var expContent = inner.querySelector(':scope > .hud-expanded-content');
+      if(!expContent){
+        expContent = document.createElement('div');
+        expContent.className = 'hud-expanded-content';
+        var pid = panelEl.id.replace('hud-','');
+        expContent.id = 'hud-' + pid + '-expanded';
+        // Marcar el contenido original como collapsed para ocultarlo cuando expandido
+        Array.from(inner.children).forEach(function(child){
+          if(!child.classList.contains('hud-expanded-content')){
+            child.classList.add('hud-collapsed-content');
+          }
+        });
+        inner.appendChild(expContent);
+      }
+      // Inyectar/refrescar contenido según el panel
+      var cfg = _EXPAND_CONFIG[panelEl.id];
+      if(cfg){
+        expContent.innerHTML = cfg.html();
+        // hydrate después del próximo frame para que el DOM esté listo
+        requestAnimationFrame(function(){
+          try { cfg.hydrate(); } catch(e){ console.warn('hydrate '+panelEl.id, e); }
+        });
+      } else {
+        // Sin config: placeholder genérico (paneles aún no migrados)
+        expContent.innerHTML = ''+
+          '<div style="display:flex;align-items:center;justify-content:center;'+
+            'min-height:200px;color:rgba(220,224,235,0.40);font-size:11px;'+
+            'letter-spacing:.10em;text-transform:uppercase;text-align:center;'+
+            'flex-direction:column;gap:10px">'+
+            '<i class="fas fa-layer-group" style="font-size:24px;opacity:.5"></i>'+
+            '<span>Vista expandida — pendiente</span>'+
+          '</div>';
+      }
     }
-    // Marcar el panel como expandido
     panelEl.classList.add('hud-expanded');
     panelEl._wasSide = panelEl._side;
     panelEl._wasOrder = panelEl._order;
     window._hudExpanded = panelEl;
-
-    // Reposicionar todo (el reposicionador detecta hud-expanded y mueve los paneles)
     if(typeof _reposicionarHUD === 'function') _reposicionarHUD();
   }
 
