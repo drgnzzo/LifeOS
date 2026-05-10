@@ -1,5 +1,15 @@
-/* RAW Entry — Overlay v.5.092
-   Cambios desde v5.091 (transiciones de aparición y cierre):
+/* RAW Entry — Overlay v.5.093
+   FIX — Números monetarios partidos en 2 líneas:
+   - Ingresos/Egresos del panel Financiero: cambiado de grid 1fr 1fr
+     a flex 1 1 0 con min-width:0; agregado white-space:nowrap +
+     overflow:hidden + text-overflow:ellipsis. Font bajado de 18px a 16px.
+   - Agregado white-space:nowrap a TODAS las clases de montos:
+     .hud-hero-v, .hud-stats-v, .hud-card-r, .hud-card-end,
+     .hud-track-cur-v, .hud-trio-cell .v, .hud-row-v, .hud-mas-v,
+     .hud-mini-row .v
+   - .hud-hero-v ahora también tiene overflow:hidden + ellipsis para
+     que números muy grandes no rompan el layout sino se trunquen.
+
    - APARICIÓN ALEATORIA de cards (P-1b): cada panel del overlay obtiene
      un delay random entre 0 y 800ms. Anima fade-in + slide pequeño desde
      su zona de origen (top-left entra desde top-left, right entra desde
@@ -466,14 +476,14 @@ function _crearDialOverlay(){
       '.hud-hero{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}',
       '.hud-hero-l{flex:1;min-width:0}',
       '.hud-hero-lbl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(200,208,230,0.40);margin-bottom:6px}',
-      '.hud-hero-v{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-family:JetBrains Mono,ui-monospace,monospace}',
+      '.hud-hero-v{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-family:JetBrains Mono,ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.hud-hero-v .cents{font-size:18px;opacity:.45;font-weight:700}',
       '.hud-hero-chip{padding:5px 9px;border-radius:7px;font-size:10px;font-weight:800;letter-spacing:.06em;display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.1;flex-shrink:0}',
       '.hud-hero-chip .chip-sub{font-size:8px;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:.10em}',
       // mini-bar (fondo emergencia)
       '.hud-mini{padding:0 16px 14px}',
       '.hud-mini-row{display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(200,208,230,0.50);margin-bottom:6px}',
-      '.hud-mini-row .v{font-size:11px;font-weight:800;color:var(--ac);letter-spacing:0;text-transform:none;font-family:JetBrains Mono,monospace}',
+      '.hud-mini-row .v{font-size:11px;font-weight:800;color:var(--ac);letter-spacing:0;text-transform:none;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       '.hud-mini-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.04)}',
       '.hud-mini-fill{height:100%;border-radius:999px;transition:width .8s ease}',
       // row
@@ -483,14 +493,14 @@ function _crearDialOverlay(){
       '.hud-row-l{flex:1;min-width:0;font-size:13px;font-weight:600;color:rgba(220,224,235,0.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.hud-row-bar{width:60px;height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;flex-shrink:0}',
       '.hud-row-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease}',
-      '.hud-row-v{font-size:13px;font-weight:700;letter-spacing:0;flex-shrink:0;text-align:right;min-width:78px;font-family:JetBrains Mono,monospace}',
+      '.hud-row-v{font-size:13px;font-weight:700;letter-spacing:0;flex-shrink:0;text-align:right;min-width:78px;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       // maslow
       '.hud-mas{padding:8px 16px}',
       '.hud-mas + .hud-mas{border-top:1px solid rgba(255,255,255,0.04)}',
       '.hud-mas-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}',
       '.hud-mas-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite}',
       '.hud-mas-l{flex:1;font-size:13px;font-weight:600;color:rgba(220,224,235,0.78);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.hud-mas-v{font-size:12px;font-weight:700;letter-spacing:0;text-align:right;font-family:JetBrains Mono,monospace}',
+      '.hud-mas-v{font-size:12px;font-weight:700;letter-spacing:0;text-align:right;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-left:15px}',
       '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
       // need (sims) - layout VERTICAL compacto para 9 columnas en una fila
@@ -514,7 +524,7 @@ function _crearDialOverlay(){
       '.hud-trio-cell{padding:10px 8px;border-radius:9px;border:1px solid;text-align:left;position:relative;overflow:hidden;background:rgba(255,255,255,0.02)}',
       '.hud-trio-cell .top{position:absolute;top:0;left:0;right:0;height:2px}',
       '.hud-trio-cell .lbl{font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;margin-bottom:5px;opacity:.85}',
-      '.hud-trio-cell .v{font-size:18px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace}',
+      '.hud-trio-cell .v{font-size:18px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       // racha fires
       '.hud-fires-row{display:flex;align-items:center;gap:10px;padding:11px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:rgba(251,146,60,0.05)}',
       '.hud-fires-row > i.lead{font-size:15px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)}',
@@ -575,7 +585,7 @@ function _crearDialOverlay(){
       '.hud-stats-ico{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
       '.hud-stats-ico i{font-size:13px}',
       '.hud-stats-txt{display:flex;flex-direction:column;gap:1px;min-width:0}',
-      '.hud-stats-v{font-size:16px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace}',
+      '.hud-stats-v{font-size:16px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       '.hud-stats-v .max{opacity:.40;font-weight:700;font-size:9px;margin-left:2px}',
       '.hud-stats-l{font-size:7.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
       // bottom cards (mision, logro, nivel)
@@ -587,11 +597,11 @@ function _crearDialOverlay(){
       '.hud-card-c{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}',
       '.hud-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px}',
       '.hud-card-l{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}',
-      '.hud-card-r{font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace}',
+      '.hud-card-r{font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       '.hud-card-sub{font-size:11px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.hud-card-bar{height:6px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 1px 2px rgba(0,0,0,0.40)}',
       '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease;min-width:1px}',
-      '.hud-card-end{font-size:10px;font-weight:800;letter-spacing:.06em;flex-shrink:0;font-family:JetBrains Mono,monospace}',
+      '.hud-card-end{font-size:10px;font-weight:800;letter-spacing:.06em;flex-shrink:0;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       // track
       '.hud-track{display:flex;align-items:center;gap:18px;padding:14px 20px;height:100%;box-sizing:border-box}',
       '.hud-track-cur{display:flex;align-items:center;gap:10px;flex-shrink:0}',
@@ -599,7 +609,7 @@ function _crearDialOverlay(){
       '.hud-track-hex span{font-size:14px;font-weight:800;color:#fff}',
       '.hud-track-cur-info{display:flex;flex-direction:column;gap:2px}',
       '.hud-track-cur-l{font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
-      '.hud-track-cur-v{font-size:13px;font-weight:800;font-family:JetBrains Mono,monospace}',
+      '.hud-track-cur-v{font-size:13px;font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       '.hud-track-mid{display:flex;align-items:center;gap:8px;flex:1;justify-content:center;flex-wrap:nowrap}',
     ].join('\n');
     document.head.appendChild(ds);
@@ -907,17 +917,18 @@ function _crearDialOverlay(){
   document.getElementById('hud-financiero-inner').innerHTML =
     _pH('Financiero','#22D3EE','fa-chart-line') +
     _hero('_hud-fin-exc','#22D3EE','Excedente del mes',null) +
-    // Ingresos / Egresos lado a lado
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px 12px">'+
-      '<div style="padding:10px 12px;background:'+_rgba('#22C55E',0.07)+';border:1px solid '+_rgba('#22C55E',0.28)+';border-radius:9px;position:relative;overflow:hidden">'+
+    // Ingresos / Egresos lado a lado — flex auto-fit (no 50/50 forzado)
+    // y con white-space:nowrap para que el monto NUNCA se parta a 2 líneas.
+    '<div style="display:flex;gap:8px;padding:0 16px 12px;flex-wrap:wrap">'+
+      '<div style="flex:1 1 0;min-width:0;padding:9px 11px;background:'+_rgba('#22C55E',0.07)+';border:1px solid '+_rgba('#22C55E',0.28)+';border-radius:9px;position:relative;overflow:hidden">'+
         '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:#22C55E;box-shadow:0 0 8px #22C55E;opacity:.7"></div>'+
         '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#22C55E;margin-bottom:6px;opacity:.85">Ingresos</div>'+
-        '<div id="_hud-fin-ing" style="font-size:18px;font-weight:800;color:#22C55E;font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 12px '+_rgba('#22C55E',0.40)+'">—</div>'+
+        '<div id="_hud-fin-ing" style="font-size:16px;font-weight:800;color:#22C55E;font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 12px '+_rgba('#22C55E',0.40)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>'+
       '</div>'+
-      '<div style="padding:10px 12px;background:'+_rgba('#EF4444',0.07)+';border:1px solid '+_rgba('#EF4444',0.28)+';border-radius:9px;position:relative;overflow:hidden">'+
+      '<div style="flex:1 1 0;min-width:0;padding:9px 11px;background:'+_rgba('#EF4444',0.07)+';border:1px solid '+_rgba('#EF4444',0.28)+';border-radius:9px;position:relative;overflow:hidden">'+
         '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:#EF4444;box-shadow:0 0 8px #EF4444;opacity:.7"></div>'+
         '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#EF4444;margin-bottom:6px;opacity:.85">Egresos</div>'+
-        '<div id="_hud-fin-egr" style="font-size:18px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 12px '+_rgba('#EF4444',0.40)+'">—</div>'+
+        '<div id="_hud-fin-egr" style="font-size:16px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 12px '+_rgba('#EF4444',0.40)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>'+
       '</div>'+
     '</div>'+
     _miniBar('Ahorro %','_hud-fin-aho','_hud-aho-bar','#FACC15') +
