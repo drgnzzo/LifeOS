@@ -1,6 +1,16 @@
-/* RAW Entry — Dashboard v.5.080
-   Fix: radar + distribución + detalle en una sola fila horizontal
-   Fix: Encom toggle — añade/quita clase y dispara EncomManager correctamente
+/* RAW Entry — Dashboard v.5.091
+   Cambios desde v5.090:
+   - REVERTIDO renderSimsPanel() del DASHBOARD: la banda Sim ya no vive ahí.
+     Ahora es un STUB que reenvía al renderer del overlay del dial
+     (renderSimsBandSimsStyle de raw-core.js, contenedor #hud-sim-band-grid).
+   - Eliminadas _SIM_NEEDS_DEF y _calcSimNeedsPanel (la lógica vive en raw-core).
+   - Eliminado el listener DOMContentLoaded que pintaba la banda en el dashboard.
+   - Si el index.html viejo deja #sim-needs-grid en el DOM, el stub lo vacía una vez.
+   - Alias retrocompat: window.renderSimsNeeds = renderSimsPanel.
+   ── (heredado de v5.090) ──
+   - ELIMINADA renderSimsNeeds() original rota (buscaba #sims-needs-panel inexistente).
+   - Las llamadas a renderSimsPanel() en handlers de carga siguen vivas: ahora
+     refrescan la banda del overlay si está montada (no-op si no).
 */
 
 // ══════════════════════════════════════════
@@ -377,12 +387,17 @@ function refreshTodo(){
     if(d&&d.necesidades){renderNecesidades(d.necesidades);if(typeof renderNecesidadesInline==='function')renderNecesidadesInline(d.necesidades);}
     if(d&&d.flujoPorMes)renderFlujoMensual(d.flujoPorMes);
     if(d&&d.financieroAvanzado)renderFinancieroAvanzado(d.financieroAvanzado);
-    api.getPensamientos().then(r=>{window._pensamientosData=r;renderPensamientos(r);renderSimsNeeds();}).catch(()=>{});
-    api.getRelaciones().then(r=>{window._relacionesData=r;renderRelaciones(r);renderSimsNeeds();}).catch(()=>{});
+    if(d&&d.activityCheck){window._actData=d.activityCheck;}
+    if(d&&d.nutricion)   { window._nutData=d.nutricion;        if(typeof renderNutricion==='function') renderNutricion(d.nutricion); }
+    if(d&&d.entrenamiento){ window._entData=d.entrenamiento; }
+    api.getPensamientos().then(r=>{window._pensamientosData=r;renderPensamientos(r);renderSimsPanel();}).catch(()=>{});
+    api.getRelaciones().then(r=>{window._relacionesData=r;renderRelaciones(r);renderSimsPanel();}).catch(()=>{});
     api.getSalud().then(renderSalud).catch(()=>{});
     api.getPatrimonio().then(renderPatrimonio).catch(()=>{});
     if(typeof cargarScore==='function')cargarScore();
     cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
+    // Refrescar la banda Sim del dashboard
+    renderSimsPanel();
     if(btn){btn.classList.remove('spinning');btn.disabled=false;}progDone();showToast('Datos actualizados');
   }).catch(()=>{if(btn){btn.classList.remove('spinning');btn.disabled=false;}progDone();showToast('Error al actualizar',false);});
 }
@@ -659,25 +674,29 @@ function renderNecesidadesInline(data){
 
 function _dataNivelInline(key,arr){return(arr||[]).find(function(n){return n.key===key;})||{key:key,total:0,conceptos:[]};}
 
-// ══════════════════════════════════════════
-//  SIMS NEEDS
-// ══════════════════════════════════════════
-function renderSimsNeeds(){
-  var el=document.getElementById('sims-needs-panel');if(!el)return;
-  var hoyIso=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
-  var semana=(function(){var d=new Date();var jan1=new Date(d.getFullYear(),0,1);var w=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);return d.getFullYear()+'-W'+String(w).padStart(2,'0');})();
-  function simsScore(cat){var h=(_actData&&_actData.habitosPersonal||[]).filter(function(h){return h.sims===cat;});if(!h.length)return 0;var m=h.filter(function(h){var k=h.nombre+'_'+semana+'_'+hoyIso;return!!_actChecks[k];}).length;return Math.round(m/h.length*100);}
-  function trabajoScore(){var h=(_actData&&_actData.habitosElectronics||[]).filter(function(h){return h.bw==='trabajo';});if(!h.length)return 0;var m=h.filter(function(h){var k=h.nombre+'_'+semana+'_'+hoyIso;return!!_actChecks[k];}).length;return Math.round(m/h.length*100);}
-  function socialScore(){if(!window._relacionesData)return 0;var hoy=new Date();hoy.setHours(0,0,0,0);var hace7=new Date(hoy);hace7.setDate(hoy.getDate()-7);var rec=(_relacionesData.items||[]).filter(function(p){return p.ultimaVez&&new Date(p.ultimaVez)>=hace7;});if(!rec.length)return 0;var pos=rec.filter(function(p){return(p.energia||0)>0;}).length;return Math.min(100,rec.length*20+pos*5);}
-  function disfruteScore(){var h=(_actData&&_actData.habitosPersonal||[]).filter(function(h){return h.sims==='disfrute';});if(h.length)return simsScore('disfrute');var mComp=((_actData&&_actData.libros||[]).filter(function(l){return l.completado;}).length+(_actData&&_actData.movies||[]).filter(function(m){return m.completado;}).length);var nComp=(_actData&&_actData.noRutinarias||[]).filter(function(n){return n.completado;}).length;var tot=((_actData&&_actData.libros||[]).length+(_actData&&_actData.movies||[]).length+(_actData&&_actData.noRutinarias||[]).length);return tot>0?Math.round((mComp+nComp)/tot*100):0;}
-  function mentalScore(){var s=simsScore('mental');if(s>0)return s;if(window._logrosData){var it=window._logrosData.items||[];var c=it.filter(function(l){return l.completado==='Sí'||l.completado==='Si';}).length;return it.length>0?Math.round(c/it.length*100):0;}return 0;}
-  function entornoScore(){var s=simsScore('entorno');if(s>0)return s;if(window._pensamientosData){var p=(_pensamientosData.items||[]).slice(0,5);if(!p.length)return 0;return Math.round(p.reduce(function(s,p){return s+(p.energia||3);},0)/p.length/5*100);}return 0;}
-  var needs=[{icon:'🍽️',label:'Hambre',score:simsScore('hambre'),color:'#4ADE80'},{icon:'⚡',label:'Energía',score:simsScore('energia'),color:'#FBBF24'},{icon:'💪',label:'Cuerpo',score:simsScore('cuerpo'),color:'#F97316'},{icon:'🚿',label:'Higiene',score:simsScore('higiene'),color:'#06B6D4'},{icon:'🧠',label:'Mental',score:mentalScore(),color:'#A78BFA'},{icon:'🎮',label:'Disfrute',score:disfruteScore(),color:'#EC4899'},{icon:'🌿',label:'Entorno',score:entornoScore(),color:'#8B5CF6'},{icon:'👥',label:'Social',score:socialScore(),color:'#3B82F6'},{icon:'💼',label:'Trabajo',score:trabajoScore(),color:'#22D3EE'}];
-  var html='<div style="padding:12px 16px 14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4)">Estado del Sim</div><div style="font-size:9px;color:rgba(255,255,255,.25)">checks de hoy</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px">';
-  needs.forEach(function(n){var pct=Math.max(0,Math.min(100,n.score));var barColor=pct>=70?n.color:pct>=40?'#F59E0B':pct>0?'#EF4444':'rgba(255,255,255,.1)';var statusTxt=pct>=70?'OK':pct>=40?'Bajo':pct>0?'Crítico':'—';var statusColor=pct>=70?'#4ADE80':pct>=40?'#F59E0B':pct>0?'#EF4444':'rgba(255,255,255,.2)';html+='<div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:5px"><span style="font-size:13px;line-height:1">'+n.icon+'</span><span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.75)">'+n.label+'</span></div><span style="font-size:9px;color:'+statusColor+';font-weight:700">'+statusTxt+(pct>0?' '+pct:'')+'</span></div><div style="class="sims-bar-wrap"><div class="sims-bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div>';});
-  html+='</div></div>';
-  el.innerHTML=html;
+// ════════════════════════════════════════════════════════════
+//  SIM NEEDS — Stub que reenvía al render del OVERLAY del dial
+//  (la banda Sim ya NO vive en el dashboard; se eliminaron sec-sim/sec-nav
+//   del index.html. La banda vive en _pSim del dial overlay y la pinta
+//   renderSimsBandSimsStyle() de raw-core.js.)
+// ════════════════════════════════════════════════════════════
+function renderSimsPanel(){
+  // Si el overlay del dial está montado y abierto, reenviar al renderer del overlay.
+  if(typeof window.renderSimsBandSimsStyle === 'function'
+     && document.getElementById('hud-sim-band-grid')){
+    try { window.renderSimsBandSimsStyle('hud-sim-band-grid'); } catch(_){}
+  }
+  // Si hubiera quedado el contenedor viejo en el dashboard, lo dejamos vacío.
+  var legacy = document.getElementById('sim-needs-grid');
+  if(legacy && !legacy._cleared){
+    legacy.innerHTML = '';
+    legacy._cleared = true;
+  }
 }
+
+window.renderSimsPanel = renderSimsPanel;
+// Alias retrocompat: cualquier código viejo que aún llame renderSimsNeeds()
+window.renderSimsNeeds = renderSimsPanel;
 
 // ══════════════════════════════════════════
 //  PATRIMONIO
@@ -729,7 +748,7 @@ function renderPatrimonio(data){
     (window._apartadosData||[]).forEach(function(ap){
       var usado=ap.estado&&ap.estado.toLowerCase()==='usado';var metaStr='';
       if(ap.meta){var diff=Math.floor((new Date(ap.meta)-hoy)/86400000);metaStr=diff<0?'Vencido':diff===0?'Hoy':'en '+diff+' días';}
-      html+='<div class="apartado-item '+(usado?'usado':'')+'"><div class="apartado-icon">💰</div><div class="apartado-info"><div class="apartado-nombre">'+ap.nombre+'</div><div class="apartado-meta">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+(metaStr?' · '+metaStr:'')+'</div></div><div><div class="apartado-monto">'+fmt(ap.monto)+'</div>'+(!'usado'?'<button onclick="_marcarApartadoUsado('+ap.fila+')" style="font-size:10px;padding:3px 10px;border-radius:var(--rad-pill);border:1px solid rgba(74,222,128,.25);background:rgba(74,222,128,.08);color:#4ADE80;cursor:pointer;font-family:inherit;margin-top:5px;display:block">Usar ✓</button>':'<div style="font-size:10px;color:var(--m);margin-top:4px">Usado</div>')+'</div></div>';
+      html+='<div class="apartado-item '+(usado?'usado':'')+'"><div class="apartado-icon">💰</div><div class="apartado-info"><div class="apartado-nombre">'+ap.nombre+'</div><div class="apartado-meta">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+(metaStr?' · '+metaStr:'')+'</div></div><div><div class="apartado-monto">'+fmt(ap.monto)+'</div>'+(!usado?'<button onclick="_marcarApartadoUsado('+ap.fila+')" style="font-size:10px;padding:3px 10px;border-radius:var(--rad-pill);border:1px solid rgba(74,222,128,.25);background:rgba(74,222,128,.08);color:#4ADE80;cursor:pointer;font-family:inherit;margin-top:5px;display:block">Usar ✓</button>':'<div style="font-size:10px;color:var(--m);margin-top:4px">Usado</div>')+'</div></div>';
     });
   }
   html+='</div>';
