@@ -1,27 +1,21 @@
-/* RAW Entry — Overlay v.5.084
-   Archivo extraído de raw-core.js v5.083. Contiene TODO el dial overlay
-   y los paneles HUD flotantes:
-   - Variables del dial (_dialOverlay, _dialCanvas, _dialCtx, etc.) y _DC
-   - _crearDialOverlay (mega-función) con sistema de diseño + 13 paneles
-   - _reposicionarHUD (cálculo de posiciones top/left/right/bottom)
-   - Drawing del dial (_dialDraw, _dialDrawSector, _dialDrawCentro, _dialHitTest)
-   - Animaciones (_animarSubRing, _iniciarPulsoCentro, _detenerPulsoCentro)
-   - abrirDial / cerrarDial / abrirFormulario / _aplicarDialPreset / cerrarEntrada
-   - Overlay editar ID (_abrirEditarOverlay, _confirmarEditarId)
-
-   DEPENDENCIAS desde raw-core.js (que se carga ANTES):
-   - _DIAL_ITEMS, _SIMS_NEEDS, _calcSimsNeeds, renderSimsBandSimsStyle,
-     renderSimsNeeds (legacy), _calcXPNivel, _calcRachaCreditos,
-     _calcMisionDiaria, _calcLogroReciente, _calcNivelSiguiente,
-     window._dialPreset, window._fijosData, window._apartadosData,
-     window._patrimonioData, window._finData, window._actData, window._logrosData,
-     setModoEntrada, _renderTabEntrada, _mostrarCamposBase
-
-   ORDEN DE CARGA EN index.html (CRÍTICO):
-   1. raw-core.js
-   2. raw-overlay.js  ← este archivo
-   3. raw-dashboard.js
-   4. raw-logros.js, raw-bitacora.js
+/* RAW Entry — Overlay v.5.086
+   Cambios desde v5.085:
+   FIX-A — Espacio fila top→columnas: paneles ya NO se centran verticalmente,
+            arrancan PEGADOS arriba (eliminado el aire de ~80px de centrado).
+   FIX-B — Banda Sim REDISEÑADA:
+     · Layout: grid 3 columnas × 3 filas (antes 9 cols × 1 fila → texto truncado)
+     · Cada need horizontal: ico + label (62px fijo) + barra (flex) + valor
+     · Labels ya NO se cortan ("ENTORNO", "TRABAJO" se leen completos)
+     · Sims values: TODOS empiezan en 0 si no hay datos (antes 50/40 inventados)
+       — _calcSimsNeeds reescrito para sumar SOLO cuando hay datos reales.
+     · Barra en gris translúcido si valor = 0 (visualmente "apagada")
+   FIX-C — Track más prominente: padding 14px (antes 11px), glow @18 (antes @12).
+   FIX-D — Fila de fuegos: label "RACHA" en color naranja con drop-shadow,
+            icono lead con drop-shadow propio (antes plano blanco).
+   FIX-E — Misión Diaria: barra +1px (6px), inset shadow para profundidad,
+            min-width:1px en fill para que algo asome cuando >0%.
+   FIX-F — Cards inferiores juntas centradas (P1b — heredado v5.085 confirmado).
+   DIAL — De vuelta a tamaño cómodo: min(760px, 52vw) (antes 720/50, target 850).
 */
 
 var _dialOverlay   = null;
@@ -65,44 +59,46 @@ var _SIMS_NEEDS = [
 ];
 
 function _calcSimsNeeds(){
-  // Cada need: 0-100. Mezcla de actividad reciente + datos.
-  var n = { hambre:50, energia:50, cuerpo:50, higiene:50, mental:50, disfrute:50, entorno:50, social:50, trabajo:50 };
+  // Cada need: 0-100. Empieza en 0 y SUMA según datos reales.
+  // Si no hay datos definidos para un need → queda en 0.
+  // (Los thresholds y fórmulas reales se definirán cuando exista la lógica de scoring.)
+  var n = { hambre:0, energia:0, cuerpo:0, higiene:0, mental:0, disfrute:0, entorno:0, social:0, trabajo:0 };
   var act = window._actData;
   if(act){
-    // Hábitos personales con tag sims → suma 12 al need correspondiente si tiene check hoy
     var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
+    // Hábitos personales con tag sims → +14 al need correspondiente si tiene check hoy
     (act.habitosPersonal||[]).forEach(function(h){
       if(h.checks && h.checks[diaKey] && h.sims){
         var k = h.sims.toLowerCase().trim();
         if(n.hasOwnProperty(k)) n[k] = Math.min(100, n[k] + 14);
       }
     });
-    // Trabajo: hábitos electronics
-    var elecDone = (act.habitosElectronics||[]).filter(function(h){
-      return h.checks && h.checks[diaKey];
-    }).length;
-    var elecTotal = (act.habitosElectronics||[]).length || 1;
-    n.trabajo = Math.round(40 + (elecDone/elecTotal)*60);
+    // Trabajo: porcentaje de hábitos electronics completados hoy
+    var elecHabits = (act.habitosElectronics||[]);
+    if(elecHabits.length){
+      var elecDone = elecHabits.filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
+      n.trabajo = Math.round((elecDone/elecHabits.length)*100);
+    }
   }
-  // Mental: pensamientos recientes
-  if(window._pensamientosData && window._pensamientosData.items){
+  // Mental: pensamientos registrados (cap 10 → 100%)
+  if(window._pensamientosData && window._pensamientosData.items && window._pensamientosData.items.length){
     var pCount = window._pensamientosData.items.length;
-    n.mental = Math.min(100, 40 + Math.min(pCount,10)*6);
+    n.mental = Math.min(100, pCount*10);
   }
-  // Social: relaciones recientes
-  if(window._relacionesData && window._relacionesData.items){
+  // Social: relaciones con interacción últimos 7 días
+  if(window._relacionesData && window._relacionesData.items && window._relacionesData.items.length){
     var hace7 = new Date(); hace7.setDate(hace7.getDate()-7);
     var recientes = window._relacionesData.items.filter(function(r){
       return r.ultimaVez && new Date(r.ultimaVez) >= hace7;
     }).length;
-    n.social = Math.min(100, 30 + recientes*15);
+    n.social = Math.min(100, recientes*20);
   }
   // Disfrute: logros completados
-  if(window._logrosData && window._logrosData.items){
+  if(window._logrosData && window._logrosData.items && window._logrosData.items.length){
     var done = window._logrosData.items.filter(function(l){
       return l.completado==='Sí'||l.completado===true;
     }).length;
-    n.disfrute = Math.min(100, 40 + done*8);
+    n.disfrute = Math.min(100, done*10);
   }
   return n;
 }
@@ -276,21 +272,19 @@ function renderSimsBandSimsStyle(targetId){
   // Estructura: barra ocupa el espacio principal (flex:2), label a la izquierda
   el.innerHTML = _SIMS_NEEDS.map(function(s){
     var v = needs[s.key];
-    if(v === undefined || v === null) v = 50;
+    if(v === undefined || v === null) v = 0;
     var col = s.color;
-    var barCol = v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col);
+    // Color barra: rojo crítico (<30), amarillo medio (30-55), color del need (>55), gris si =0
+    var barCol = v === 0 ? 'rgba(120,120,130,0.45)' : (v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col));
+    var valCol = v === 0 ? 'rgba(180,184,200,0.50)' : barCol;
     return ''+
       '<div class="hud-need">'+
-        '<div class="hud-need-top">'+
-          '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
-          '<span class="hud-need-l">'+s.label+'</span>'+
+        '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
+        '<span class="hud-need-l">'+s.label+'</span>'+
+        '<div class="hud-need-bar-wrap">'+
+          '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'aa,'+barCol+');box-shadow:0 0 6px '+barCol+'88"></div>'+
         '</div>'+
-        '<div class="hud-need-bot">'+
-          '<div class="hud-need-bar-wrap">'+
-            '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'88,'+barCol+');box-shadow:0 0 6px '+barCol+'80"></div>'+
-          '</div>'+
-          '<span class="hud-need-v" style="color:'+barCol+'">'+v+'<span class="max">/100</span></span>'+
-        '</div>'+
+        '<span class="hud-need-v" style="color:'+valCol+'">'+v+'<span class="max">/100</span></span>'+
       '</div>';
   }).join('');
 }
@@ -305,7 +299,7 @@ function _crearDialOverlay(){
   _dialCanvas = document.createElement('canvas');
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
-  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(720px,50vw);height:min(720px,50vw);position:relative;pointer-events:auto;z-index:1';
+  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(760px,52vw);height:min(760px,52vw);position:relative;pointer-events:auto;z-index:1';
   _dialCtx = _dialCanvas.getContext('2d');
 
   _dialOverlay.style.cssText = [
@@ -474,16 +468,14 @@ function _crearDialOverlay(){
       '.hud-mas-v{font-size:12px;font-weight:700;letter-spacing:0;text-align:right;font-family:JetBrains Mono,monospace}',
       '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-left:15px}',
       '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
-      // need (sims) - una columna por need en fila horizontal
-      '.hud-need{display:flex;flex-direction:column;gap:5px;min-width:0}',
-      '.hud-need-top{display:flex;align-items:center;gap:6px;min-width:0}',
-      '.hud-need-ico{font-size:13px;flex-shrink:0;width:14px;display:flex;align-items:center;justify-content:center;line-height:1}',
-      '.hud-need-l{flex:1;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.62);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.hud-need-bot{display:flex;align-items:center;gap:6px;min-width:0}',
-      '.hud-need-bar-wrap{flex:1;height:7px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:0;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4)}',
-      '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative}',
-      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:2px;background:rgba(255,255,255,0.40);border-radius:999px;filter:blur(0.6px)}',
-      '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;text-align:right;line-height:1}',
+      // need (sims) - layout horizontal: ico + label + barra + valor
+      '.hud-need{display:flex;align-items:center;gap:9px;min-width:0;padding:0}',
+      '.hud-need-ico{font-size:14px;flex-shrink:0;width:16px;display:flex;align-items:center;justify-content:center;line-height:1}',
+      '.hud-need-l{flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.65);width:62px}',
+      '.hud-need-bar-wrap{flex:1;height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:30px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.45)}',
+      '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative;min-width:1px}',
+      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:2px;background:rgba(255,255,255,0.45);border-radius:999px;filter:blur(0.6px)}',
+      '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;text-align:right;line-height:1;min-width:42px}',
       '.hud-need-v .max{opacity:.40;font-weight:700;font-size:8px}',
       // CTA pie
       '.hud-cta{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;border-top:1px solid var(--ac-15);transition:padding .15s,background .15s}',
@@ -497,12 +489,12 @@ function _crearDialOverlay(){
       '.hud-trio-cell .lbl{font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;margin-bottom:5px;opacity:.85}',
       '.hud-trio-cell .v{font-size:18px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace}',
       // racha fires
-      '.hud-fires-row{display:flex;align-items:center;gap:8px;padding:10px 16px 14px;border-top:1px solid rgba(255,255,255,0.04)}',
-      '.hud-fires-row > i.lead{font-size:14px}',
-      '.hud-fires-row .lbl{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(220,224,235,0.55);flex-shrink:0}',
+      '.hud-fires-row{display:flex;align-items:center;gap:10px;padding:11px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:rgba(251,146,60,0.05)}',
+      '.hud-fires-row > i.lead{font-size:15px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)}',
+      '.hud-fires-row .lbl{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#FB923C;text-shadow:0 0 6px rgba(251,146,60,0.40);flex-shrink:0}',
       '.hud-fires-row .fires{display:flex;align-items:center;gap:5px;flex:1;justify-content:flex-end}',
-      '.hud-fires-row .fires i{font-size:13px;color:rgba(120,120,130,0.30)}',
-      '.hud-fires-row .fires i.on{color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)}',
+      '.hud-fires-row .fires i{font-size:13px;color:rgba(140,140,150,0.40)}',
+      '.hud-fires-row .fires i.on{color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)}',
       // nav grid 2x3
       '.hud-navg{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px}',
       '.hud-navg-it{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;border:1px solid;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s}',
@@ -528,7 +520,7 @@ function _crearDialOverlay(){
       '.hud-sim-h .ico i{font-size:11px}',
       '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
-      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 14px;padding:8px 18px 14px}',
+      '.hud-sim-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 24px;padding:6px 18px 14px}',
       // stats panel
       '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:6px;padding:12px 14px;height:100%;box-sizing:border-box}',
       '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:10px;min-width:0;padding:0 4px}',
@@ -550,11 +542,11 @@ function _crearDialOverlay(){
       '.hud-card-l{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}',
       '.hud-card-r{font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace}',
       '.hud-card-sub{font-size:11px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.hud-card-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden}',
-      '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease}',
+      '.hud-card-bar{height:6px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 1px 2px rgba(0,0,0,0.40)}',
+      '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease;min-width:1px}',
       '.hud-card-end{font-size:10px;font-weight:800;letter-spacing:.06em;flex-shrink:0;font-family:JetBrains Mono,monospace}',
       // track
-      '.hud-track{display:flex;align-items:center;gap:18px;padding:11px 18px;height:100%;box-sizing:border-box}',
+      '.hud-track{display:flex;align-items:center;gap:18px;padding:14px 20px;height:100%;box-sizing:border-box}',
       '.hud-track-cur{display:flex;align-items:center;gap:10px;flex-shrink:0}',
       '.hud-track-hex{width:38px;height:38px;display:flex;align-items:center;justify-content:center;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0}',
       '.hud-track-hex span{font-size:14px;font-weight:800;color:#fff}',
@@ -873,11 +865,14 @@ function _crearDialOverlay(){
   // ══════════════════════════════════════
 
   // ── _pTrack: track horizontal de niveles ──
-  var _pTrack = _mkFloatPanel('hud-track','#A78BFA','rgba(167,139,250,0.12)');
+  var _pTrack = _mkFloatPanel('hud-track','#A78BFA','rgba(167,139,250,0.18)');
   document.body.appendChild(_pTrack);
   _pTrack.classList.add('hud-pnl');
   _pTrack.style.animationDelay = '1.0s';
   _pTrack.style.borderRadius = '14px';
+  // Track con más contraste: borde más sólido + glow ambiental visible
+  _pTrack.style.border = '1.5px solid rgba(167,139,250,0.55)';
+  _pTrack.style.boxShadow = '0 8px 32px rgba(0,0,0,0.65),0 0 28px rgba(167,139,250,0.30),inset 0 1px 0 rgba(167,139,250,0.40)';
   document.getElementById('hud-track-inner').innerHTML =
     '<div class="hud-track">'+
       '<div class="hud-track-cur">'+
@@ -1010,12 +1005,12 @@ function _crearDialOverlay(){
     // Anchos FIJOS y compactos (no porcentaje del viewport)
     var wUser  = 220;
     var wStats = 340;
-    // Sim ocupa el ancho del dial, NO el resto del viewport
-    var wSim   = Math.round(r.width);
+    // Sim un poco más ancho que el dial (+15%) para que los labels respiren
+    var wSim   = Math.round(r.width * 1.15);
     // Si el viewport es muy estrecho, fallback: solo Sim centrado
     if(vW < (wUser + wStats + wSim + topGap*4 + topPad*2)){
       wUser = 0; wStats = 0;
-      wSim = Math.min(Math.round(r.width), vW - topPad*2);
+      wSim = Math.min(Math.round(r.width * 1.15), vW - topPad*2);
     }
 
     if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; }
@@ -1047,7 +1042,7 @@ function _crearDialOverlay(){
 
     var topY = topPad;
     // Sim CENTRADO en X igual que el dial
-    var simX = Math.round(r.left + (r.width - wSim) / 2);
+    var simX = Math.round((vW - wSim) / 2);
     if(pSim){
       pSim.el.style.left = simX + 'px';
       pSim.el.style.top  = topY + 'px';
@@ -1075,29 +1070,28 @@ function _crearDialOverlay(){
     var pNivel  = getTop('bottom-right')[0];
 
     var botPad  = GAP;
-    var botGap  = 14;
+    var botGap  = 12;
 
-    // En el objetivo: Misión a la izquierda con ancho fijo (similar a USER),
-    // Logro al centro alineado con el dial, Nivel a la derecha (similar a Stats).
-    // Para que no se aplasten en pantallas anchas, capeamos cada uno.
+    // P1b: las 3 cards JUNTAS y CENTRADAS como un bloque.
+    // Misión y Nivel anchos fijos; Logro al ancho del dial. Si el total
+    // excede el viewport, se reparten proporcionales.
     var wMision = 320;
     var wNivel  = 360;
-    // Logro al centro: alineado con el dial
     var wLogro  = Math.round(r.width);
-    // Si no caben los 3, repartir proporcional
-    var totalNeeded = wMision + wLogro + wNivel + botGap*2 + botPad*2;
-    if(totalNeeded > vW){
-      var avail = vW - botPad*2 - botGap*2;
-      wMision = Math.round(avail * 0.25);
-      wNivel  = Math.round(avail * 0.28);
-      wLogro  = avail - wMision - wNivel;
+    var totalCards = wMision + wLogro + wNivel + botGap*2;
+    if(totalCards > vW - botPad*2){
+      var availBot = vW - botPad*2 - botGap*2;
+      wMision = Math.round(availBot * 0.25);
+      wNivel  = Math.round(availBot * 0.28);
+      wLogro  = availBot - wMision - wNivel;
+      totalCards = wMision + wLogro + wNivel + botGap*2;
     }
 
     if(pMision){ pMision.el.style.width = wMision+'px'; }
     if(pLogro){ pLogro.el.style.width = wLogro+'px'; }
     if(pNivel){ pNivel.el.style.width = wNivel+'px'; }
 
-    // Track horizontal: ancho EXACTO del dial (no más, no menos)
+    // Track: ancho EXACTO del dial
     var trackW = Math.round(r.width);
     if(pTrack){ pTrack.el.style.width = trackW+'px'; }
 
@@ -1112,27 +1106,27 @@ function _crearDialOverlay(){
     var trackH = (pTrack && pTrack.el) ? (pTrack.el.scrollHeight || pTrack.el.offsetHeight || 64) : 64;
 
     var botY = vH - botPad - botH;
-    var trackY = botY - trackH - 10;
+    var trackY = botY - trackH - 8;
 
     if(pTrack){
       pTrack.el.style.left = Math.round((vW - trackW)/2)+'px';
       pTrack.el.style.top  = trackY+'px';
       pTrack.el.style.clipPath = chamferRect;
     }
+    // Bloque de 3 cards CENTRADO en el viewport
+    var cardsStartX = Math.round((vW - totalCards) / 2);
     if(pMision){
-      pMision.el.style.left = botPad + 'px';
+      pMision.el.style.left = cardsStartX + 'px';
       pMision.el.style.top  = botY + 'px';
       pMision.el.style.clipPath = chamferRect;
     }
     if(pLogro){
-      // Logro centrado en X igual que el dial
-      var logroX = Math.round(r.left + (r.width - wLogro) / 2);
-      pLogro.el.style.left = logroX + 'px';
+      pLogro.el.style.left = (cardsStartX + wMision + botGap) + 'px';
       pLogro.el.style.top  = botY + 'px';
       pLogro.el.style.clipPath = chamferRect;
     }
     if(pNivel){
-      pNivel.el.style.left = (vW - botPad - wNivel) + 'px';
+      pNivel.el.style.left = (cardsStartX + wMision + botGap + wLogro + botGap) + 'px';
       pNivel.el.style.top  = botY + 'px';
       pNivel.el.style.clipPath = chamferRect;
     }
@@ -1141,9 +1135,9 @@ function _crearDialOverlay(){
     //  COLUMNAS LATERALES — entre fila top y track
     //  IMPORTANTE: las columnas NUNCA invaden zona inferior (botY o trackY)
     // ══════════════════════════════════════════
-    // Usamos topMaxH (altura UNIFORME de la fila top) en lugar de scrollHeight max
-    var colTopY    = topY + topMaxH + GAP*2;
-    var colBotY    = trackY - GAP;     // límite duro: arriba del track
+    // Espacio entre fila top y columnas: APRETADO (antes GAP*2 = 28px → ahora 8px)
+    var colTopY    = topY + topMaxH + 8;
+    var colBotY    = trackY - 8;
     var colVAvail  = Math.max(200, colBotY - colTopY);
 
     // Anchos laterales conservadores con cap más bajo (objetivo: 220-260)
@@ -1177,13 +1171,12 @@ function _crearDialOverlay(){
 
       var startY, gapBetween;
       if(totalH <= colVAvail){
-        // Cabe holgado: centrar verticalmente
-        startY = colTopY + (colVAvail - totalH)/2;
+        // Cabe holgado: arrancar PEGADO arriba (no centrar) para minimizar aire
+        startY = colTopY;
         gapBetween = GAP;
       } else {
-        // No cabe: arrancar pegado arriba y reducir gap (mínimo 6px) para evitar invasión
+        // No cabe: arrancar pegado arriba y reducir gap (mínimo 6px)
         startY = colTopY;
-        // Distribuir el sobrante en gaps negativos hasta el mínimo
         var extra = totalH - colVAvail;
         var gapsCount = panels.length - 1;
         if(gapsCount>0){
