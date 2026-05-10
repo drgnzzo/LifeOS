@@ -1,29 +1,35 @@
-/* RAW Entry — Overlay v.5.093
-   FIX — Números monetarios partidos en 2 líneas:
-   - Ingresos/Egresos del panel Financiero: cambiado de grid 1fr 1fr
-     a flex 1 1 0 con min-width:0; agregado white-space:nowrap +
-     overflow:hidden + text-overflow:ellipsis. Font bajado de 18px a 16px.
-   - Agregado white-space:nowrap a TODAS las clases de montos:
-     .hud-hero-v, .hud-stats-v, .hud-card-r, .hud-card-end,
-     .hud-track-cur-v, .hud-trio-cell .v, .hud-row-v, .hud-mas-v,
-     .hud-mini-row .v
-   - .hud-hero-v ahora también tiene overflow:hidden + ellipsis para
-     que números muy grandes no rompan el layout sino se trunquen.
-
-   - APARICIÓN ALEATORIA de cards (P-1b): cada panel del overlay obtiene
-     un delay random entre 0 y 800ms. Anima fade-in + slide pequeño desde
-     su zona de origen (top-left entra desde top-left, right entra desde
-     la derecha, etc.). Easing: cubic-bezier(.16,1,.3,1), 520-580ms.
-     Flag _animatingEntry preserva el transform durante la animación
-     incluso si _reposicionarHUD se ejecuta en medio.
-   - FADE-IN del overlay subido a 480ms (antes 320ms). El blur del fondo
-     ya estaba aplicado desde el primer frame (P-2a sin animar).
-   - CIERRE con fade-out (P-3c): cerrarDial ahora tarda 280ms en lugar
-     de 220ms. Los paneles también se desvanecen en paralelo (220ms).
-   - NAVEGACIÓN desde tabs del overlay (HOME, LOGROS, BITÁCORA, etc.):
-     antes ejecutaba directo la función → el overlay desaparecía de golpe.
-     Ahora cierra el dial primero con animación, espera 300ms, y luego
-     navega a la sección correspondiente.
+/* RAW Entry — Overlay v.5.094
+   Cambios desde v5.093:
+   - SIM needs (banda top) ahora con BARRA de progreso visible bajo cada
+     valor. Layout cambiado de horizontal compacto (icono+label+barra+valor
+     en línea) a vertical (icono+label arriba, valor en medio, barra full-
+     width abajo). La barra ahora ocupa el 100% del ancho del slot.
+   - SPARKLINE decorativo en el HEADER de cada panel del overlay (línea
+     SVG mini junto al título, con el color del panel). Pseudo-aleatorio
+     determinista según el color (mismo panel siempre con mismo perfil).
+   - EXCEDENTE del mes en el panel Financiero ahora con SIGNO explícito
+     (+ verde para positivos, − para negativos) usando setMoneySigned.
+   - FINANCIERO EXPANDIDO completo con 8 sub-componentes:
+     · Header con status chip "Sistema estable"
+     · 5 cards top: Ingresos, Egresos, Excedente, Ahorro %, Runway
+       (las 3 primeras con sparkline; las 2 últimas con sub-label)
+     · Visión General: donut SVG de tasa de ahorro + lista (Ing/Egr/Aho)
+     · Gasto Promedio Diario: bar chart por día de semana
+     · Proyección Financiera: Mejor / Base / Peor escenario
+     · Protección fin de mes: barra dual Inversionista vs Consumidor
+     · Análisis Mensual: tabla con totales + ahorro %
+     · Tendencia de Excedente: sparkline grande
+     · Desglose Táctico: top 6 entes con monto + % + total
+   - VIDA EN PANELES (al azar en cada apertura):
+     · 2-3 paneles con BREATHING (pulse del glow cada 4.2s)
+     · 1-2 paneles con PERIMETER SCAN (línea de luz que recorre el borde
+       cada 5.8s, con offset rotacional aleatorio para que no coincidan)
+     · El track inferior se excluye (es muy chico). El set varía cada
+       vez que se abre el overlay.
+   - FIX Necesidades expandido sin datos: window._necInlineData estaba
+     undefined porque la var local _necInlineData de raw-dashboard.js
+     no se espejaba al window. Ahora se asigna en api.getNecesidades
+     y en renderNecesidadesInline.
 */
 
 var _dialOverlay   = null;
@@ -290,11 +296,11 @@ function renderSimsBandSimsStyle(targetId){
           '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
           '<span class="hud-need-l">'+s.label+'</span>'+
         '</div>'+
-        '<div class="hud-need-bot">'+
+        '<div class="hud-need-mid">'+
           '<span class="hud-need-v" style="color:'+valCol+'">'+v+'<span class="max">/100</span></span>'+
-          '<div class="hud-need-bar-wrap">'+
-            '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'aa,'+barCol+');box-shadow:0 0 6px '+barCol+'88"></div>'+
-          '</div>'+
+        '</div>'+
+        '<div class="hud-need-bar-wrap">'+
+          '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'aa,'+barCol+');box-shadow:0 0 6px '+barCol+'88"></div>'+
         '</div>'+
       '</div>';
   }).join('');
@@ -472,6 +478,13 @@ function _crearDialOverlay(){
       // Mensaje placeholder para paneles que solo muestran info al expandir
       '.hud-empty-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px 16px;color:rgba(220,224,235,0.45)}',
       '.hud-empty-msg span{font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;text-align:center}',
+      // Breathing glow — sombra que pulsa suavemente
+      '@keyframes hudBreath{0%,100%{box-shadow:0 0 0 0 var(--hb-c,rgba(255,255,255,0.0)),inset 0 0 0 0 transparent}50%{box-shadow:0 0 24px 4px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 12px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
+      '.hud-breathing{animation:hudBreath 4.2s ease-in-out infinite}',
+      // Perimeter scan — pseudo-elemento conic-gradient que rota
+      '@keyframes hudScanRot{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
+      '.hud-scan{position:relative;overflow:hidden}',
+      '.hud-scan::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:conic-gradient(from var(--scan-from,0deg),transparent 0deg,transparent 270deg,var(--scan-c,#A855F7) 320deg,transparent 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:hudScanRot 5.8s linear infinite;pointer-events:none;opacity:.55;z-index:1}',
       // hero
       '.hud-hero{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}',
       '.hud-hero-l{flex:1;min-width:0}',
@@ -504,12 +517,13 @@ function _crearDialOverlay(){
       '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-left:15px}',
       '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
       // need (sims) - layout VERTICAL compacto para 9 columnas en una fila
-      '.hud-need{display:flex;flex-direction:column;gap:4px;min-width:0;padding:0}',
+      '.hud-need{display:flex;flex-direction:column;gap:3px;min-width:0;padding:0}',
       '.hud-need-top{display:flex;align-items:center;gap:5px;min-width:0}',
+      '.hud-need-mid{display:flex;align-items:baseline;gap:6px;min-width:0}',
       '.hud-need-bot{display:flex;align-items:center;gap:6px;min-width:0}',
       '.hud-need-ico{font-size:13px;flex-shrink:0;width:14px;display:flex;align-items:center;justify-content:center;line-height:1}',
       '.hud-need-l{flex:1;font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.65);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-      '.hud-need-bar-wrap{flex:1;height:5px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:20px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.45)}',
+      '.hud-need-bar-wrap{width:100%;height:4px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,0.45)}',
       '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative;min-width:1px}',
       '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:1.5px;background:rgba(255,255,255,0.45);border-radius:999px;filter:blur(0.6px)}',
       '.hud-need-v{font-size:9px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;line-height:1;white-space:nowrap}',
@@ -618,11 +632,26 @@ function _crearDialOverlay(){
   // ── Helpers de contenido ──
   // Header de panel: icono en caja + título + menú "···"
   function _pH(label, color, icon){
+    // Sparkline decorativo: 8 puntos pseudo-aleatorios deterministas según color
+    var seed = (color.charCodeAt(1) || 50) + (color.charCodeAt(3) || 50);
+    var pts = [];
+    for(var k=0;k<8;k++){
+      var v = ((Math.sin(seed+k*0.9)+1)/2 * 0.7 + 0.15);
+      pts.push((k * 7) + ',' + (16 - v*14).toFixed(1));
+    }
+    var sparkPts = pts.join(' ');
+    var lastPt = pts[pts.length-1].split(',');
     return '<div class="hud-h" style="--ac:'+color+'">'+
       '<div class="hud-h-ico" style="background:'+_rgba(color,0.14)+';border:1px solid '+_rgba(color,0.40)+';box-shadow:0 0 12px '+_rgba(color,0.20)+'">'+
         '<i class="fas '+icon+'" style="color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>'+
       '</div>'+
       '<span class="hud-h-t" style="color:'+color+';text-shadow:0 0 12px '+_rgba(color,0.50)+'">'+label+'</span>'+
+      '<svg class="hud-h-spark" viewBox="0 0 49 16" preserveAspectRatio="none" '+
+        'style="width:48px;height:14px;flex-shrink:0;opacity:.65" aria-hidden="true">'+
+        '<polyline points="'+sparkPts+'" fill="none" stroke="'+color+'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" '+
+          'style="filter:drop-shadow(0 0 3px '+_rgba(color,0.55)+')"/>'+
+        '<circle cx="'+lastPt[0]+'" cy="'+lastPt[1]+'" r="1.6" fill="'+color+'" style="filter:drop-shadow(0 0 3px '+color+')"/>'+
+      '</svg>'+
       '<button class="hud-h-expand" data-color="'+color+'" title="Expandir" '+
         'style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+
         '<i class="fas fa-up-right-and-down-left-from-center"></i>'+
@@ -1649,20 +1678,232 @@ function _crearDialOverlay(){
     'hud-financiero': {
       html: function(){
         return ''+
-          '<div id="fin-avanzado-body-overlay" style="padding:8px"></div>'+
-          '<div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:8px"></div>'+
-          '<div id="flujo-mensual-body-overlay" style="padding:8px 0"></div>';
+        '<div style="display:flex;flex-direction:column;gap:14px;padding:0">'+
+          // Header
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px">'+
+            '<div style="display:flex;align-items:center;gap:10px">'+
+              '<div style="width:32px;height:32px;border-radius:8px;background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.40);display:flex;align-items:center;justify-content:center">'+
+                '<i class="fas fa-chart-line" style="color:#22D3EE;font-size:14px"></i>'+
+              '</div>'+
+              '<div>'+
+                '<div style="font-size:14px;font-weight:800;color:#22D3EE;text-shadow:0 0 8px rgba(34,211,238,0.4)">FINANCIERO</div>'+
+                '<div style="font-size:9px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45);margin-top:2px">Sistema financiero operativo</div>'+
+              '</div>'+
+            '</div>'+
+            '<div id="fin-status-chip" style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.30);font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#4ADE80">'+
+              '<span style="width:6px;height:6px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80"></span>Sistema estable'+
+            '</div>'+
+          '</div>'+
+          // 5 cards top
+          '<div id="fin-cards-row" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px"></div>'+
+          // Mid: Visión General + Gasto promedio + Proyección
+          '<div style="display:grid;grid-template-columns:1.0fr 1.1fr 1.4fr;gap:10px">'+
+            '<div id="fin-vision" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
+            '<div id="fin-gasto" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
+            '<div id="fin-proyeccion" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
+          '</div>'+
+          // Protección bar
+          '<div id="fin-proteccion" style="padding:12px;border:1px solid rgba(255,255,255,0.06);border-radius:10px"></div>'+
+          // Bottom: Análisis mensual + Tendencia + Desglose
+          '<div style="display:grid;grid-template-columns:1.2fr 1.1fr 0.9fr;gap:10px">'+
+            '<div id="fin-analisis" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;overflow:auto"></div>'+
+            '<div id="fin-tendencia" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;display:flex;flex-direction:column;min-height:200px"></div>'+
+            '<div id="fin-desglose" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px"></div>'+
+          '</div>'+
+        '</div>';
       },
       hydrate: function(){
-        if(typeof _renderCFO === 'function'){
-          _renderCFO('fin-avanzado-body-overlay');
+        var fin = window._finData || {};
+        var mes = fin.mes || {};
+        var m = fin.metricas || {};
+        var flujo = window._flujoMensualData || {};
+        var meses = flujo.meses || [];
+        var grupos = flujo.grupos || {};
+        var datosM = window.datosMes || {};
+        var fmt = function(n){ return '$ '+Math.round(Math.abs(n||0)).toLocaleString('es-MX'); };
+        var fmtSign = function(n){ var s = n>=0?'+ ':'− '; return s+fmt(n); };
+
+        // ── 5 cards top ──
+        function _spark(color, n){
+          var pts=[]; for(var i=0;i<n;i++){ pts.push((i*8)+','+(20-((Math.sin(i*0.8+color.charCodeAt(1))+1)/2*16))); }
+          return '<svg viewBox="0 0 64 22" preserveAspectRatio="none" style="width:100%;height:32px;margin-top:8px"><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linecap="round" style="filter:drop-shadow(0 0 3px '+color+'80)"/></svg>';
         }
-        if(typeof renderFlujoMensual === 'function' && window._flujoMensualData){
-          renderFlujoMensual(window._flujoMensualData, 'flujo-mensual-body-overlay');
-        } else if(typeof api !== 'undefined' && api.getFlujoPorMes){
+        function _card(label, value, color, sub, useSpark){
+          return '<div style="padding:11px 13px;border:1px solid '+color+'40;border-radius:10px;background:'+color+'08;position:relative;overflow:hidden">'+
+            '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';box-shadow:0 0 8px '+color+';opacity:.7"></div>'+
+            '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:'+color+';margin-bottom:6px;opacity:.85">'+label+'</div>'+
+            '<div style="font-size:18px;font-weight:800;color:'+color+';font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 10px '+color+'40;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+value+'</div>'+
+            (sub ? '<div style="font-size:9px;color:rgba(220,224,235,0.45);margin-top:4px">'+sub+'</div>' : '')+
+            (useSpark ? _spark(color, 8) : '')+
+          '</div>';
+        }
+        var ahorro = m.porcentajeAhorro || 0;
+        var runway = m.runwayDias===null||m.runwayDias===undefined?'∞':m.runwayDias+' días';
+        document.getElementById('fin-cards-row').innerHTML =
+          _card('Ingresos',  fmt(mes.ingresos),  '#22C55E', null, true)+
+          _card('Egresos',   fmt(mes.egresos),   '#EF4444', null, true)+
+          _card('Excedente', fmtSign(mes.excedente), '#22D3EE', null, true)+
+          _card('Ahorro %',  ahorro.toFixed(1)+'%', '#FACC15', 'Objetivo: 50%', false)+
+          _card('Runway',    runway, '#A78BFA', 'Operatividad estimada', false);
+
+        // ── Visión general (donut + lista) ──
+        (function(){
+          var ing = mes.ingresos||0, egr = mes.egresos||0, ahorroN = (ing+egr); // egresos negativo
+          var total = ing > 0 ? ing : 1;
+          var pct = Math.max(0, Math.min(100, Math.round((ahorroN/total)*100)));
+          var R = 36, C = 2*Math.PI*R;
+          var dash = (pct/100)*C;
+          var donut = '<svg viewBox="0 0 100 100" style="width:120px;height:120px"><circle cx="50" cy="50" r="'+R+'" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/><circle cx="50" cy="50" r="'+R+'" fill="none" stroke="#22D3EE" stroke-width="10" stroke-linecap="round" stroke-dasharray="'+dash+' '+C+'" transform="rotate(-90 50 50)" style="filter:drop-shadow(0 0 4px #22D3EE80)"/><text x="50" y="48" text-anchor="middle" fill="#22D3EE" font-size="16" font-weight="800" font-family="JetBrains Mono,monospace">'+pct+'%</text><text x="50" y="62" text-anchor="middle" fill="rgba(220,224,235,0.45)" font-size="6" font-weight="700">TASA DE AHORRO</text></svg>';
+          var html = '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:10px">Visión General</div>'+
+            '<div style="display:flex;align-items:center;gap:14px">'+
+              '<div style="flex-shrink:0">'+donut+'</div>'+
+              '<div style="flex:1;display:flex;flex-direction:column;gap:8px">'+
+                '<div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(220,224,235,0.75)"><span style="width:6px;height:6px;border-radius:50%;background:#22C55E"></span>Ingresos</span><span style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:#22C55E;white-space:nowrap">'+fmt(ing)+'</span></div>'+
+                '<div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(220,224,235,0.75)"><span style="width:6px;height:6px;border-radius:50%;background:#EF4444"></span>Egresos</span><span style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:#EF4444;white-space:nowrap">'+fmt(egr)+'</span></div>'+
+                '<div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(220,224,235,0.75)"><span style="width:6px;height:6px;border-radius:50%;background:#22D3EE"></span>Ahorro</span><span style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:#22D3EE;white-space:nowrap">'+fmt(ahorroN)+'</span></div>'+
+              '</div>'+
+            '</div>';
+          document.getElementById('fin-vision').innerHTML = html;
+        })();
+
+        // ── Gasto promedio diario (bar chart 7 días) ──
+        (function(){
+          var dias = ['L','M','M','J','V','S','D'];
+          // Calcular gasto por día de semana de datosMes (registros con fecha)
+          var sumDia = [0,0,0,0,0,0,0], cntDia = [0,0,0,0,0,0,0];
+          (datosM.todos||[]).forEach(function(r){
+            if(!r.fecha) return;
+            var d = new Date(r.fecha);
+            var dow = (d.getDay()+6)%7; // L=0
+            var monto = Math.abs(parseFloat(r.monto)||0);
+            if(monto>0 && r.tipo!=='Ingreso'){ sumDia[dow] += monto; cntDia[dow]++; }
+          });
+          var prom = sumDia.map(function(s,i){ return cntDia[i]>0 ? s/cntDia[i] : 0; });
+          var maxV = Math.max.apply(null, prom) || 1;
+          var bars = prom.map(function(v,i){
+            var h = Math.max(4, Math.round(v/maxV*60));
+            var c = i===5||i===6 ? '#FACC15' : '#22C55E';
+            return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:100%;max-width:18px;height:'+h+'px;background:linear-gradient(180deg,'+c+'cc,'+c+'66);border-radius:3px 3px 0 0;box-shadow:0 0 6px '+c+'40"></div><div style="font-size:9px;font-weight:700;color:rgba(220,224,235,0.55)">'+dias[i]+'</div></div>';
+          }).join('');
+          var avg = m.gastoPorDiaPromedio || 0;
+          document.getElementById('fin-gasto').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:6px">Gasto Promedio Diario</div>'+
+            '<div style="font-size:20px;font-weight:800;color:#22D3EE;font-family:JetBrains Mono,monospace;margin-bottom:10px;white-space:nowrap">'+fmt(avg)+'</div>'+
+            '<div style="display:flex;align-items:flex-end;gap:6px;height:64px">'+bars+'</div>';
+        })();
+
+        // ── Proyección financiera ──
+        (function(){
+          var exc = mes.excedente||0;
+          var proy = mes.proyeccion || {};
+          var mejor = proy.mejorEscenario || exc * 1.25;
+          var peor  = proy.peorEscenario  || exc * 0.65;
+          // Línea horizontal con 3 puntos
+          var html = '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:6px;display:flex;justify-content:space-between"><span>Proyección Financiera</span><span style="color:rgba(220,224,235,0.45);font-weight:600;letter-spacing:0;text-transform:none">Basado en tendencia</span></div>'+
+            '<div style="display:flex;flex-direction:column;gap:8px">'+
+              '<div style="font-size:8px;font-weight:800;letter-spacing:.10em;color:rgba(220,224,235,0.55)">LIQUIDEZ PROYECTADA</div>'+
+              '<div style="font-size:18px;font-weight:800;color:#22D3EE;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(exc)+'</div>'+
+              '<div style="display:flex;justify-content:space-between;padding:8px;border:1px solid rgba(74,222,128,0.30);border-radius:8px;background:rgba(74,222,128,0.05)"><span style="font-size:9px;font-weight:700;color:#4ADE80">MEJOR ESCENARIO</span><span style="font-size:11px;font-weight:800;color:#4ADE80;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(mejor)+'</span></div>'+
+              '<div style="display:flex;justify-content:space-between;padding:8px;border:1px solid rgba(34,211,238,0.30);border-radius:8px;background:rgba(34,211,238,0.05)"><span style="font-size:9px;font-weight:700;color:#22D3EE">ESCENARIO BASE</span><span style="font-size:11px;font-weight:800;color:#22D3EE;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(exc)+'</span></div>'+
+              '<div style="display:flex;justify-content:space-between;padding:8px;border:1px solid rgba(239,68,68,0.30);border-radius:8px;background:rgba(239,68,68,0.05)"><span style="font-size:9px;font-weight:700;color:#EF4444">PEOR ESCENARIO</span><span style="font-size:11px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(peor)+'</span></div>'+
+            '</div>';
+          document.getElementById('fin-proyeccion').innerHTML = html;
+        })();
+
+        // ── Protección fin de mes (bar inversor/consumidor) ──
+        (function(){
+          var ahorroPct = m.porcentajeAhorro || 0;
+          var inv = Math.max(0, Math.min(100, ahorroPct));
+          var con = 100 - inv;
+          var hoy = new Date();
+          var diasRest = new Date(hoy.getFullYear(),hoy.getMonth()+1,0).getDate() - hoy.getDate();
+          document.getElementById('fin-proteccion').innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'+
+              '<div><span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.65)">Protección fin de mes · </span><span style="font-size:10px;font-weight:700;color:#22D3EE">'+diasRest+' días restantes</span></div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.55)">Al ritmo actual de '+fmt(m.gastoPorDiaPromedio)+'/día</div>'+
+            '</div>'+
+            '<div style="height:14px;border-radius:7px;overflow:hidden;display:flex;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)">'+
+              '<div style="width:'+inv+'%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(74,222,128,0.5);display:flex;align-items:center;justify-content:flex-start;padding-left:10px;font-size:9px;font-weight:800;color:#fff">'+inv.toFixed(0)+'% Inversionista</div>'+
+              '<div style="width:'+con+'%;background:linear-gradient(90deg,#F87171,#EF4444);box-shadow:0 0 8px rgba(239,68,68,0.5);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:9px;font-weight:800;color:#fff">'+con.toFixed(0)+'% Consumidor</div>'+
+            '</div>';
+        })();
+
+        // ── Análisis mensual (tabla) ──
+        (function(){
+          if(!meses.length){ document.getElementById('fin-analisis').innerHTML = '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:24px">Sin datos mensuales</div>'; return; }
+          var rows = meses.map(function(m){
+            var g = grupos[m] || {};
+            var ing = g.ingresos||0, egr = g.egresos||0, exc = g.excedente!==undefined?g.excedente:(ing+egr);
+            var pctA = ing>0 ? Math.round((exc/ing)*100) : 0;
+            return '<tr><td style="padding:6px 8px;font-size:11px">'+m+'</td>'+
+              '<td style="padding:6px 8px;font-size:11px;text-align:right;color:#22C55E;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt(ing)+'</td>'+
+              '<td style="padding:6px 8px;font-size:11px;text-align:right;color:#EF4444;font-family:JetBrains Mono,monospace;white-space:nowrap">'+(egr<0?'-':'')+fmt(egr)+'</td>'+
+              '<td style="padding:6px 8px;font-size:11px;text-align:right;color:'+(exc>=0?'#22D3EE':'#EF4444')+';font-family:JetBrains Mono,monospace;font-weight:700;white-space:nowrap">'+fmtSign(exc)+'</td>'+
+              '<td style="padding:6px 8px;font-size:11px;text-align:right;color:rgba(220,224,235,0.65);font-family:JetBrains Mono,monospace">'+pctA+'%</td></tr>';
+          }).join('');
+          document.getElementById('fin-analisis').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:10px">Análisis Mensual</div>'+
+            '<table style="width:100%;border-collapse:collapse">'+
+              '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08)"><th style="padding:6px 8px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:left">Mes</th><th style="padding:6px 8px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Ingresos</th><th style="padding:6px 8px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Egresos</th><th style="padding:6px 8px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Excedente</th><th style="padding:6px 8px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Ahorro %</th></tr></thead>'+
+              '<tbody>'+rows+'</tbody>'+
+            '</table>';
+        })();
+
+        // ── Tendencia de excedente (sparkline grande) ──
+        (function(){
+          if(!meses.length){ document.getElementById('fin-tendencia').innerHTML = '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:24px">Sin datos</div>'; return; }
+          var vals = meses.map(function(m){ var g=grupos[m]||{}; return g.excedente!==undefined?g.excedente:((g.ingresos||0)+(g.egresos||0)); });
+          var maxV = Math.max.apply(null, vals.map(Math.abs)) || 1;
+          var W = 100, H = 60, pts = vals.map(function(v,i){
+            var x = (i/(vals.length-1||1))*W;
+            var y = H/2 - (v/maxV)*(H/2-4);
+            return x+','+y;
+          }).join(' ');
+          document.getElementById('fin-tendencia').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:8px">Tendencia de Excedente</div>'+
+            '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;flex:1;min-height:120px">'+
+              '<line x1="0" y1="'+(H/2)+'" x2="'+W+'" y2="'+(H/2)+'" stroke="rgba(255,255,255,0.08)" stroke-width="0.3"/>'+
+              '<polyline points="'+pts+'" fill="none" stroke="#22D3EE" stroke-width="1.2" stroke-linecap="round" style="filter:drop-shadow(0 0 3px #22D3EE80)"/>'+
+            '</svg>'+
+            '<div style="display:flex;justify-content:space-between;font-size:8px;color:rgba(220,224,235,0.45);margin-top:6px">'+
+              meses.map(function(m){ return '<span>'+m.slice(0,3).toUpperCase()+'</span>'; }).join('')+
+            '</div>';
+        })();
+
+        // ── Desglose táctico (top entes egresos del mes) ──
+        (function(){
+          var desglose = [];
+          if(datosM && datosM.meses){
+            var mesActual = datosM.meses[datosM.meses.length-1];
+            var entesMes = (datosM.grupos||{})[mesActual] || [];
+            desglose = entesMes.filter(function(e){ return e.monto<0; })
+              .map(function(e){ return {ente:e.ente, monto:Math.abs(e.monto)}; })
+              .sort(function(a,b){ return b.monto-a.monto; }).slice(0,6);
+          }
+          var totalEgr = desglose.reduce(function(s,d){ return s+d.monto; }, 0) || 1;
+          var rows = desglose.map(function(d){
+            var pct = Math.round((d.monto/totalEgr)*100);
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'+
+              '<span style="font-size:11px;color:rgba(220,224,235,0.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">'+d.ente+'</span>'+
+              '<span style="font-size:9px;color:rgba(220,224,235,0.55);font-family:JetBrains Mono,monospace">'+pct+'%</span>'+
+              '<span style="font-size:11px;font-weight:700;color:#EF4444;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt(d.monto)+'</span>'+
+            '</div>';
+          }).join('');
+          var totalStr = fmt(totalEgr);
+          document.getElementById('fin-desglose').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:4px">Desglose Táctico</div>'+
+            '<div style="font-size:9px;color:rgba(220,224,235,0.45);margin-bottom:10px">Top categorías de egreso</div>'+
+            (desglose.length ? rows : '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:14px;font-size:11px">Sin datos</div>')+
+            (desglose.length ? '<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:6px;border-top:1px solid rgba(255,255,255,0.10)"><span style="font-size:10px;font-weight:700;color:rgba(220,224,235,0.65)">Total</span><span style="font-size:11px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace">'+totalStr+'</span></div>' : '');
+        })();
+
+        // Asegurar que tenemos flujo mensual, si no, fetch
+        if(!meses.length && typeof api !== 'undefined' && api.getFlujoPorMes){
           api.getFlujoPorMes().then(function(d){
             window._flujoMensualData = d;
-            renderFlujoMensual(d, 'flujo-mensual-body-overlay');
+            // Re-hidratar
+            var cfg = window._EXPAND_CONFIG && window._EXPAND_CONFIG['hud-financiero'];
+            if(cfg && document.getElementById('fin-analisis')) cfg.hydrate();
           }).catch(function(){});
         }
       },
@@ -1831,6 +2072,7 @@ function _crearDialOverlay(){
       },
     },
   };
+  window._EXPAND_CONFIG = _EXPAND_CONFIG;
 
   function _hudExpand(panelEl){
     if(!panelEl) return;
@@ -1993,6 +2235,17 @@ function _crearDialOverlay(){
       var n = Math.abs(Number(v));
       e.innerHTML = '$ '+Math.round(n).toLocaleString('es-MX');
     }
+    // Money con signo explícito (+ verde para positivos, − rojo para negativos)
+    function setMoneySigned(id,v){
+      var e=document.getElementById(id); if(!e) return;
+      if(v===null||v===undefined||v==='' || isNaN(Number(v))){ e.textContent='—'; return; }
+      var num = Number(v);
+      var sign = num >= 0 ? '+' : '−';
+      var n = Math.abs(num);
+      var entero = Math.floor(n).toLocaleString('es-MX');
+      var dec = (n.toFixed(2).split('.')[1] || '00');
+      e.innerHTML = sign+' $ '+entero+'<span class="cents">.'+dec+'</span>';
+    }
 
     var d = datos || window._hudDatos || {};
 
@@ -2152,7 +2405,7 @@ function _crearDialOverlay(){
     // ── Financiero ──
     var finD = window._finData;
     if(finD && finD.mes){
-      setMoney('_hud-fin-exc', finD.mes.excedente);
+      setMoneySigned('_hud-fin-exc', finD.mes.excedente);
       setMoneyShort('_hud-fin-ing', finD.mes.ingresos);
       setMoneyShort('_hud-fin-egr', finD.mes.egresos);
       var aho = finD.metricas && finD.metricas.porcentajeAhorro;
@@ -2839,6 +3092,56 @@ function toggleEntradaDropdown(){
   if(_dialVisible) cerrarDial(); else abrirDial();
 }
 
+// P-D: Aplicar animaciones de "vida" (breathing + perimeter scan) a algunos
+// cards al azar — cada vez que se abre el overlay, el set puede ser distinto.
+function _aplicarVidaPaneles(){
+  if(!window._hudPanels || !window._hudPanels.length) return;
+  // Limpiar de una apertura previa
+  window._hudPanels.forEach(function(hp){
+    if(!hp.el) return;
+    hp.el.classList.remove('hud-breathing','hud-scan');
+    hp.el.style.removeProperty('--hb-c');
+    hp.el.style.removeProperty('--hb-i');
+    hp.el.style.removeProperty('--scan-c');
+    hp.el.style.removeProperty('--scan-from');
+  });
+  // Excluir paneles muy chicos (track) y los que están animando entrada
+  var candidatos = window._hudPanels.filter(function(hp){
+    return hp.el && hp.el.id !== 'hud-track' && !hp.el._animatingEntry;
+  });
+  if(candidatos.length < 4) return;
+  // Shuffle y separar
+  var shuffled = candidatos.slice().sort(function(){ return Math.random()-0.5; });
+  var nBreath = 2 + Math.floor(Math.random()*2); // 2-3
+  var nScan   = 1 + Math.floor(Math.random()*2); // 1-2
+  // Color por panel id (mapeo aproximado)
+  var COLOR_MAP = {
+    'hud-patrimonio':'#22C55E','hud-necesidades':'#A855F7','hud-bitacora':'#C084FC',
+    'hud-fijos':'#67E8F9','hud-financiero':'#22D3EE','hud-activity':'#FB923C',
+    'hud-variables':'#A5B4FC','hud-mision':'#06B6D4','hud-logro':'#FACC15',
+    'hud-nivel':'#A78BFA','hud-user':'#9CA3AF','hud-stats':'#FBBF24','hud-sim-band':'#A855F7',
+  };
+  function _rgba2(hex, a){
+    var h=hex.replace('#','');
+    if(h.length===3) h=h.split('').map(function(c){return c+c;}).join('');
+    var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+    return 'rgba('+r+','+g+','+b+','+a+')';
+  }
+  shuffled.slice(0, nBreath).forEach(function(hp){
+    var col = COLOR_MAP[hp.el.id] || '#A855F7';
+    hp.el.style.setProperty('--hb-c', _rgba2(col, 0.30));
+    hp.el.style.setProperty('--hb-i', _rgba2(col, 0.06));
+    hp.el.classList.add('hud-breathing');
+  });
+  shuffled.slice(nBreath, nBreath + nScan).forEach(function(hp){
+    var col = COLOR_MAP[hp.el.id] || '#A855F7';
+    hp.el.style.setProperty('--scan-c', col);
+    hp.el.style.setProperty('--scan-from', Math.floor(Math.random()*360)+'deg');
+    hp.el.classList.add('hud-scan');
+  });
+}
+window._aplicarVidaPaneles = _aplicarVidaPaneles;
+
 function abrirDial(){
   _crearDialOverlay();
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
@@ -2915,6 +3218,8 @@ function abrirDial(){
           hp.el._animatingEntry = false;
         });
       }
+      // P-D: aplicar al azar breathings + perimeter scans a 3-4 cards
+      _aplicarVidaPaneles();
     }, 1500);
   } else {
     // Modo compacto / mobile
@@ -2937,10 +3242,11 @@ function cerrarDial(){
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
-  // Fade-out simultáneo de los paneles para que no parpadeen
+  // Fade-out simultáneo de los paneles + quitar animaciones de vida
   if(window._hudPanels){
     window._hudPanels.forEach(function(hp){
       if(!hp.el) return;
+      hp.el.classList.remove('hud-breathing','hud-scan');
       hp.el.style.transition = 'opacity 220ms ease';
       hp.el.style.opacity = '0';
     });
