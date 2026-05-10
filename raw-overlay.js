@@ -1,5 +1,19 @@
-/* RAW Entry — Overlay v.5.094
-   Cambios desde v5.093:
+/* RAW Entry — Overlay v.5.095
+   FIXES sobre v5.094:
+   1. FINANCIERO EXPANDIDO duplicaba el contenido viejo arriba:
+      el CSS .hud-expanded .hud-collapsed-content{display:none} no se
+      estaba aplicando por especificidad de inline styles. Ahora _hudExpand
+      FUERZA display:none inline a TODOS los hijos collapsed cuando se
+      expande, y _hudCollapse los restaura cuando se cierra.
+   2. PANELES INFERIORES amontonados al regresar del modo expandido:
+      la rama expandida deja width/opacity/pointer-events inline en
+      Misión/Logro/Nivel/Track, y al colapsar el flujo normal solo
+      reasigna left+top (no width), así que el width queda forzado.
+      Ahora _hudCollapse limpia esos inline-styles de TODOS los bottom
+      panels al colapsar.
+   3. SIM needs (banda top): barra más visible — altura 5px, fondo y
+      borde más contrastados, margen top de 2px para separar del valor.
+
    - SIM needs (banda top) ahora con BARRA de progreso visible bajo cada
      valor. Layout cambiado de horizontal compacto (icono+label+barra+valor
      en línea) a vertical (icono+label arriba, valor en medio, barra full-
@@ -523,7 +537,7 @@ function _crearDialOverlay(){
       '.hud-need-bot{display:flex;align-items:center;gap:6px;min-width:0}',
       '.hud-need-ico{font-size:13px;flex-shrink:0;width:14px;display:flex;align-items:center;justify-content:center;line-height:1}',
       '.hud-need-l{flex:1;font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.65);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-      '.hud-need-bar-wrap{width:100%;height:4px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,0.45)}',
+      '.hud-need-bar-wrap{width:100%;height:5px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.10);position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,0.55);margin-top:2px}',
       '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative;min-width:1px}',
       '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:1.5px;background:rgba(255,255,255,0.45);border-radius:999px;filter:blur(0.6px)}',
       '.hud-need-v{font-size:9px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;line-height:1;white-space:nowrap}',
@@ -2092,7 +2106,7 @@ function _crearDialOverlay(){
         expContent.className = 'hud-expanded-content';
         var pid = panelEl.id.replace('hud-','');
         expContent.id = 'hud-' + pid + '-expanded';
-        // Marcar el contenido original como collapsed para ocultarlo cuando expandido
+        // Marcar el contenido original como collapsed
         Array.from(inner.children).forEach(function(child){
           if(!child.classList.contains('hud-expanded-content')){
             child.classList.add('hud-collapsed-content');
@@ -2100,16 +2114,23 @@ function _crearDialOverlay(){
         });
         inner.appendChild(expContent);
       }
+      // FORZAR ocultamiento de TODOS los nodos collapsed con inline style.
+      // (la regla CSS por sí sola a veces falla por especificidad.)
+      Array.from(inner.children).forEach(function(child){
+        if(child.classList.contains('hud-collapsed-content')){
+          child.style.display = 'none';
+        } else if(child.classList.contains('hud-expanded-content')){
+          child.style.display = 'flex';
+        }
+      });
       // Inyectar/refrescar contenido según el panel
       var cfg = _EXPAND_CONFIG[panelEl.id];
       if(cfg){
         expContent.innerHTML = cfg.html();
-        // hydrate después del próximo frame para que el DOM esté listo
         requestAnimationFrame(function(){
           try { cfg.hydrate(); } catch(e){ console.warn('hydrate '+panelEl.id, e); }
         });
       } else {
-        // Sin config: placeholder genérico (paneles aún no migrados)
         expContent.innerHTML = ''+
           '<div style="display:flex;align-items:center;justify-content:center;'+
             'min-height:200px;color:rgba(220,224,235,0.40);font-size:11px;'+
@@ -2133,15 +2154,41 @@ function _crearDialOverlay(){
     panelEl.classList.remove('hud-expanded');
     window._hudExpanded = null;
 
+    // Revertir display inline aplicado al expandir
+    var innerCol2 = panelEl.querySelector(':scope > [id$="-inner"]');
+    if(innerCol2){
+      Array.from(innerCol2.children).forEach(function(child){
+        if(child.classList.contains('hud-collapsed-content')){
+          child.style.display = '';
+        } else if(child.classList.contains('hud-expanded-content')){
+          child.style.display = 'none';
+        }
+      });
+    }
+
     // Limpiar AHORA los width/height/minHeight/clipPath del panel que se acaba
-    // de colapsar. Si no, quedan con su tamaño expandido inline y pelean con
-    // el reposicionamiento normal, causando amontonamiento.
+    // de colapsar y de TODOS los paneles bottom (donde la rama expandida les
+    // puso width/opacity/pointer-events inline y se quedan amontonados).
     panelEl.style.width = '';
     panelEl.style.height = '';
     panelEl.style.minHeight = '';
     panelEl.style.clipPath = '';
     var innerCol = panelEl.querySelector(':scope > [id$="-inner"]');
     if(innerCol){ innerCol.style.minHeight = ''; }
+
+    // Limpiar inline-styles que la rama expandida deja en bottom panels
+    // (Misión, Logro, Nivel, Track) — son los que se amontonan al volver.
+    if(window._hudPanels){
+      window._hudPanels.forEach(function(hp){
+        if(!hp.el) return;
+        var side = hp.el._side || '';
+        if(side.indexOf('bottom') === 0){
+          hp.el.style.width = '';        // ← clave: el width forzado del expandido
+          hp.el.style.opacity = '';
+          hp.el.style.pointerEvents = '';
+        }
+      });
+    }
 
     // Asegurar transitions activas en TODOS los paneles antes del reposicionamiento
     // para que el regreso al estado normal sea animado, no instantáneo.
