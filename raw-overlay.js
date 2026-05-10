@@ -1,6 +1,29 @@
-/* RAW Entry — Overlay v.5.104
-   Cambios desde v5.103:
-   - TIMELINE de apertura ralentizado ~1.5x para sensación más cinematográfica:
+/* RAW Entry — Overlay v.5.105
+   Cambios desde v5.104:
+   - FIX BUG "al regresar del modo expandido el layout queda destruido":
+     Track aparecía dentro de la fila top, USER/Sim/Stats con alturas
+     desmedidas, Misión/Logro/Nivel a media pantalla, columnas amontonadas.
+     CAUSA: la rama expandida de _reposicionarHUD modifica width/top/left
+     y otros estilos inline de varios paneles (width:240 a laterales,
+     opacity:0 a Logro/Track). Al colapsar, esos inline styles se quedaban
+     contaminando el reposicionamiento normal: las mediciones de
+     scrollHeight para topMaxH/botH salían incorrectas y las transitions
+     a medio camino capturaban posiciones intermedias.
+     FIX:
+       1. Limpiar SELECTIVAMENTE los inline styles que la rama expandida
+          puso (width, height, minHeight, transform, clipPath de todos;
+          opacity y pointer-events solo de Logro/Track).
+       2. Quitar transitions de left/top/width/height para que el
+          reposicionamiento sea INSTANTÁNEO (solo opacity .35s para
+          suavizar visualmente). Las transitions completas regresan en
+          futuras interacciones cuando ya hay layout estable.
+       3. Hacer DOS pasadas de _reposicionarHUD dentro de rAFs encadenados
+          para que el browser haga reflow entre limpieza y medición.
+
+   ── Heredado v5.104 ──
+   Timeline ralentizado ~1.5x, dial canvas con fade muy suave 1700ms,
+   perimeter scan + breathing en todos los cards (con scan secundario),
+   GAPS aumentados a 22.
      · t=450  aro pulsante (antes 300)
      · t=1700 cascada paneles (antes 1100), duración cascada 2800ms (antes 1800)
      · t=4500 slots vacíos (antes 2900)
@@ -2990,37 +3013,77 @@ function _crearDialOverlay(){
       expWrap.style.justifyContent = '';
     }
 
-    // Limpiar inline-styles que la rama expandida deja en bottom panels
-    // (Misión, Logro, Nivel, Track) — son los que se amontonan al volver.
+    // ╔═══════════════════════════════════════════════════════════════════╗
+    // ║ FIX v5.105: limpiar SELECTIVAMENTE inline-styles que la rama     ║
+    // ║ expandida puso en cada panel:                                     ║
+    // ║  · Paneles laterales (left-*/right-*): width:240px, top de        ║
+    // ║    placeColExpanded → limpiar width, height, minHeight, clipPath.║
+    // ║  · Misión y Nivel (bottom-left/right): width fijo, top=vH-90 →   ║
+    // ║    limpiar width, height (el flujo normal reasigna left/top).    ║
+    // ║  · Logro y Track (bottom-center/track): opacity:0,                ║
+    // ║    pointer-events:none, transition opacity .3s → limpiar todo    ║
+    // ║    eso para que recuperen visibilidad.                           ║
+    // ║  · USER/Sim/Stats (top-*): NO se tocan en rama expandida,        ║
+    // ║    pero por seguridad limpiamos minHeight (del flujo previo).    ║
+    // ╚═══════════════════════════════════════════════════════════════════╝
     if(window._hudPanels){
       window._hudPanels.forEach(function(hp){
         if(!hp.el) return;
         var side = hp.el._side || '';
-        if(side.indexOf('bottom') === 0){
-          hp.el.style.width = '';
-          hp.el.style.opacity = '';
+        // Limpiar dimensiones para que _reposicionarHUD las recalcule limpias
+        hp.el.style.width         = '';
+        hp.el.style.height        = '';
+        hp.el.style.minHeight     = '';
+        hp.el.style.transform     = '';
+        hp.el.style.clipPath      = '';
+        // Logro y Track tenían opacity:0 + pointer-events:none en modo expandido
+        if(side === 'bottom-center' || side === 'bottom-track'){
+          hp.el.style.opacity       = '';
           hp.el.style.pointerEvents = '';
-          // El flujo normal reasigna left/top, pero los limpiamos por seguridad
-          // para que el reposicionamiento comience desde cero (los inline-styles
-          // de la rama expandida pueden interferir con cálculos).
-          hp.el.style.height = '';
-          hp.el.style.transform = '';
+        }
+        var innerHp = hp.el.querySelector(':scope > [id$="-inner"]');
+        if(innerHp){
+          innerHp.style.minHeight       = '';
+          innerHp.style.justifyContent  = '';
         }
       });
     }
 
-    // Asegurar transitions activas en TODOS los paneles antes del reposicionamiento
-    // para que el regreso al estado normal sea animado, no instantáneo.
+    // ╔═══════════════════════════════════════════════════════════════════╗
+    // ║ ESTRATEGIA v5.105: en lugar de animar el regreso (que produce    ║
+    // ║ posiciones intermedias raras durante .42s), aplicamos las        ║
+    // ║ posiciones del modo normal INSTANTÁNEAMENTE (sin transitions),   ║
+    // ║ con solo un fade de opacity para suavizar visualmente. Esto      ║
+    // ║ elimina los artefactos visuales que aparecían al regresar de     ║
+    // ║ modo expandido (track encimado con fila top, Misión/Logro/Nivel  ║
+    // ║ a media pantalla, columnas con altura desmedida).                ║
+    // ╚═══════════════════════════════════════════════════════════════════╝
+
+    // PASO 1: Quitar transitions temporalmente para que los cambios de
+    // left/top/width sean instantáneos.
     if(typeof window._hudPanels !== 'undefined'){
       window._hudPanels.forEach(function(hp){
         if(!hp.el) return;
-        hp.el.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1),opacity .35s ease';
+        hp.el.style.transition = 'opacity .35s ease';
       });
     }
     if(_dialCanvas){
+      // Solo el dial mantiene transition completa para que la animación
+      // de mini→grande se vea (es la animación principal del regreso).
       _dialCanvas.style.transition = 'width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1),box-shadow .35s ease';
     }
-    if(!sinReposicionar && typeof _reposicionarHUD === 'function') _reposicionarHUD();
+
+    // PASO 2: Reposicionar después de un rAF para que el browser haga
+    // reflow tras la limpieza de inline styles. Hacemos DOS pasadas
+    // (segunda confirma mediciones limpias después del primer reflow).
+    if(!sinReposicionar && typeof _reposicionarHUD === 'function'){
+      requestAnimationFrame(function(){
+        _reposicionarHUD();
+        requestAnimationFrame(function(){
+          _reposicionarHUD();
+        });
+      });
+    }
 
     // Después de la animación (~500ms) limpiar las transitions inline para que
     // el flujo normal subsiguiente no anime cambios de layout (resize, DnD, etc.).
