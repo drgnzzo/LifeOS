@@ -1852,16 +1852,29 @@ document.addEventListener('DOMContentLoaded', function(){
       function itemList(items, tipo){
         if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
         var sorted = applyItemFilter(items, tipo);
+        function _fmtFecha(f){
+          if(!f) return '';
+          // formato 'yyyy-MM-dd HH:mm' → 'dd/MMM HH:mm'
+          var m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+          if(!m) return '';
+          var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+          var d = m[3], mes = meses[parseInt(m[2],10)-1] || '', h = m[4]||'', mm = m[5]||'';
+          return d + '/' + mes + (h ? ' ' + h + ':' + mm : '');
+        }
         return '<div style="display:flex;flex-direction:column;width:100%">'+
           sorted.map(function(it){
             var done=it.completado===true||it.completado==='Sí'||it.completado==='Si';
+            var fechaStr = done && it.fechaCompletado ? _fmtFecha(it.fechaCompletado) : '';
             return '<div class="_item-row" style="display:flex;align-items:center;gap:10px;padding:8px 16px;'+
               'transition:background .15s;border-bottom:1px solid rgba(140,100,220,0.14)"'+
               ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
               chkItem(it.fila, tipo, done)+
-              '<span style="font-size:13px;font-weight:500;color:'+(done?'#4A5266':'#C8D0E0')+';'+
-              'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'+
-              'line-height:1.4;word-break:break-word;min-width:0;flex:1">'+it.nombre+'</span>'+
+              '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">'+
+                '<span style="font-size:13px;font-weight:500;color:'+(done?'#4A5266':'#C8D0E0')+';'+
+                'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'+
+                'line-height:1.4;word-break:break-word">'+it.nombre+'</span>'+
+                (fechaStr ? '<span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:rgba(167,139,250,0.65);font-family:JetBrains Mono,monospace">'+fechaStr+'</span>' : '')+
+              '</div>'+
             '</div>';
           }).join('')+'</div>';
       }
