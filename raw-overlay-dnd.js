@@ -462,6 +462,8 @@
   window._overlayDnd = {
     rebuild: buildGhostSlots,
     buildGhostSlots: buildGhostSlots,
+    clear: clearGhostSlots,
+    clearGhostSlots: clearGhostSlots,
     save: saveLayout,
     load: loadLayout,
     reset: function(){
