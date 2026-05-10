@@ -1,26 +1,33 @@
-/* RAW Entry — Core v.5.080
-   Cambios desde v5.079 (refactor de estructura y proporciones del overlay):
-   - Fila top alineada: USER, Estado del Sim y Stats forzados a misma altura
-       (topMaxH) con contenido centrado vertical → arrancan/terminan a misma Y.
-   - Columnas laterales arrancan a colTopY = topY + topMaxH + GAP*2
-       (uso de altura UNIFORME, no scrollHeight max — antes provocaba que
-       Patrimonio quedara más arriba que Financiero).
-   - Columnas laterales NUNCA invaden zona inferior: si no caben, gap entre
-       paneles se reduce a 6px en lugar de solapar con track o cards.
-   - Anchos laterales con cap absoluto de 300px (antes se inflaban).
-   - Dial ampliado: min(720px, 50vw) (antes 640px / 68vw).
-   - Track ampliado: min(720, max(440, dialW-20)) (antes 640).
-   - Headers de panel (_pH) con menú "···" a la derecha (estilo objetivo).
-   - NUEVO helper _pCTA: pie de panel con CTA (Ver detalle / Ver análisis /
-       Ver reporte financiero / Ir a Activity Check / Abrir Bitácora).
-   - Paddings y tamaños de _row, _maslow, _hero apretados (12-13px en vez
-       de 13-14px) para que los 3 paneles laterales quepan sin solapamientos.
-   - Panel Activity+Logros: racha ahora se muestra como "N días" + 7 iconos
-       de fuego (encendidos según racha actual) en vez de barra.
-   - Panel _p3 (Bitácora) usa _pCTA en lugar de _nav('Abrir Bitácora').
-   ── (heredado de v5.079) ──
-   - Panel _p6 con 6 items completos del Hero del header.
-   - _p5 sin nav buttons duplicados.
+/* RAW Entry — Core v.5.081
+   REDISEÑO COMPLETO de los 13 paneles del overlay aplicando sistema de diseño
+   coherente con la imagen objetivo:
+
+   SISTEMA DE DISEÑO (inyectado una sola vez en hud-design-css):
+   - Fuentes: Manrope (UI) + JetBrains Mono (números/valores)
+   - Tokens tipográficos jerárquicos: hero 30px / row 13px / lbl 11px / micro 9px
+   - Centavos atenuados (.cents { opacity:.45 }): "$ 14,027.<dim>00</dim>"
+   - Barras gruesas redondeadas (8px need bars, 5px hero, 3px row)
+   - Iconos FontAwesome sólidos en cajas con border y glow del color
+   - Numeración en monospace con tabular-nums
+
+   PANELES REDISEÑADOS:
+   - _pUser: avatar hexagonal, nombre USER + Nivel + badge escudo + barra XP
+   - _pSim: banda Sims con barras horizontales largas (icono + label + barra + valor)
+   - _pStats: 3 cells (Energía/Racha/Créditos) con iconos grandes
+   - _p1 Patrimonio: hero con chip opcional + miniBar fondo + 4 rows con icono FA
+   - _p2 Necesidades: 5 maslow rows con dot pulsante
+   - _p3 Bitácora: 5 rows con icono FA (no emojis) + CTA Abrir Bitácora
+   - _p4 Financiero: hero + grid 2x1 (Ingresos/Egresos en cells) + miniBar Ahorro + 2 rows
+   - _p5 Activity+Logros: trio cells (Hábitos/Logros/Racha) + fila de fuegos
+   - _p6 Navegación: GRID 2x3 con cada item en caja con borde (no lista vertical)
+   - _pTrack: hexágono nivel actual + info + stops + trofeo
+   - _pMision/_pLogro: cards horizontales con icono + label + sub + barra
+   - _pNivel: hexágono nivel siguiente + XP + bonus + caja regalo
+
+   CTAs unificados (_pCTA): link sutil al pie con label + chevron, hover effect.
+   Iconos de fuego con clase .on (en vez de styles inline).
+   setMoney() formatea $X,XXX.<dim>00</dim> en hero y excedente.
+   Banda Sims (renderSimsBandSimsStyle) usa CSS clases .hud-need*.
 */
 window._apartadosData = window._apartadosData || [];
 window._fijosData     = window._fijosData     || [];
@@ -539,26 +546,22 @@ function renderSimsBandSimsStyle(targetId){
   }
   renderSimsBandSimsStyle._retry = 0;
   var needs = _calcSimsNeeds();
-  // Layout: grid 2 columnas × ceil(9/2)=5 filas
+  // Layout: cada need en una fila horizontal compacta — icono + label + barra + valor
+  // Estructura: barra ocupa el espacio principal (flex:2), label a la izquierda
   el.innerHTML = _SIMS_NEEDS.map(function(s){
     var v = needs[s.key];
     if(v === undefined || v === null) v = 50;
     var col = s.color;
-    // Color de la barra según nivel del need (estilo Sims: rojo si crítico, amarillo medio, verde/color si bien)
+    // Color barra: rojo crítico, amarillo medio, color del need si bien
     var barCol = v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col);
-    var barColDim = barCol + '55';
     return ''+
-      '<div style="display:flex;flex-direction:column;gap:6px;min-width:0">'+
-        '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">'+
-          '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
-            '<span style="font-size:14px;line-height:1;flex-shrink:0;filter:drop-shadow(0 0 5px '+col+'66)">'+s.icon+'</span>'+
-            '<span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.label+'</span>'+
-          '</div>'+
-          '<span style="font-size:11px;font-weight:800;color:'+barCol+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+barCol+'66;flex-shrink:0">'+v+'</span>'+
+      '<div class="hud-need">'+
+        '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
+        '<span class="hud-need-l">'+s.label+'</span>'+
+        '<div class="hud-need-bar-wrap">'+
+          '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'88,'+barCol+');box-shadow:0 0 6px '+barCol+'80"></div>'+
         '</div>'+
-        '<div style="height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);position:relative">'+
-          '<div style="height:100%;width:'+v+'%;background:linear-gradient(90deg,'+barColDim+','+barCol+');box-shadow:0 0 8px '+barCol+'80,inset 0 0 4px rgba(255,255,255,0.10);transition:width .8s ease;border-radius:3px"></div>'+
-        '</div>'+
+        '<span class="hud-need-v" style="color:'+barCol+'">'+v+'<span class="max"> /100</span></span>'+
       '</div>';
   }).join('');
 }
@@ -666,233 +669,370 @@ function _crearDialOverlay(){
     return p;
   }
 
-  // ── Helpers de contenido ──
-  function _pH(label, color, icon){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:13px 16px 11px">'+
-      '<div style="width:30px;height:30px;border-radius:8px;background:'+color+'18;border:1px solid '+color+'45;'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;'+
-        'box-shadow:0 0 12px '+color+'30;filter:drop-shadow(0 0 4px '+color+')">'+
-        '<i class="fas '+icon+'" style="font-size:12px;color:'+color+'"></i>'+
-      '</div>'+
-      '<span style="font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;'+
-        'color:'+color+';text-shadow:0 0 12px '+color+'88;flex:1">'+label+'</span>'+
-      '<span style="font-size:14px;font-weight:800;color:rgba(220,220,240,0.40);letter-spacing:.10em;cursor:default;line-height:0;padding:0 4px;flex-shrink:0">···</span>'+
-    '</div>'+
-    '<div style="height:1px;background:linear-gradient(90deg,'+color+'50,rgba(140,100,220,0.08),transparent)"></div>';
+  // ══════════════════════════════════════════
+  //  SISTEMA DE DISEÑO — tokens y helpers
+  // ══════════════════════════════════════════
+  // Colores: cada panel tiene un accent. Funciones helper para variantes.
+  function _hex2rgb(h){
+    h = h.replace('#','');
+    if(h.length===3) h = h.split('').map(function(c){return c+c;}).join('');
+    return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
+  }
+  function _rgba(c, a){
+    var rgb = _hex2rgb(c);
+    return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')';
   }
 
-  // CTA de pie de panel (Ver detalle / Ver análisis / etc.)
-  // Si la función no existe en window, el CTA se renderiza como decorativo (no clickeable).
+  // Inyectar fuentes y CSS base de los paneles (una sola vez)
+  if(!document.getElementById('hud-design-css')){
+    var lk = document.createElement('link');
+    lk.rel = 'stylesheet';
+    lk.href = 'https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap';
+    document.head.appendChild(lk);
+    var ds = document.createElement('style');
+    ds.id = 'hud-design-css';
+    ds.textContent = [
+      '.hud-pnl{font-family:Manrope,-apple-system,BlinkMacSystemFont,sans-serif;color:#E5E7EB}',
+      '.hud-pnl .num{font-family:JetBrains Mono,ui-monospace,monospace;font-variant-numeric:tabular-nums}',
+      '.hud-pnl .dim{opacity:.45}',
+      // header
+      '.hud-h{display:flex;align-items:center;gap:10px;padding:14px 16px 12px}',
+      '.hud-h-ico{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
+      '.hud-h-ico i{font-size:12px}',
+      '.hud-h-t{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
+      '.hud-h-k{font-size:14px;font-weight:800;color:rgba(220,220,240,0.35);letter-spacing:.10em;cursor:default;line-height:0}',
+      '.hud-h-bar{height:1px;margin:0 16px;background:linear-gradient(90deg,var(--ac-50),transparent)}',
+      // hero
+      '.hud-hero{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}',
+      '.hud-hero-l{flex:1;min-width:0}',
+      '.hud-hero-lbl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(200,208,230,0.40);margin-bottom:6px}',
+      '.hud-hero-v{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-family:JetBrains Mono,ui-monospace,monospace}',
+      '.hud-hero-v .cents{font-size:18px;opacity:.45;font-weight:700}',
+      '.hud-hero-chip{padding:5px 9px;border-radius:7px;font-size:10px;font-weight:800;letter-spacing:.06em;display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.1;flex-shrink:0}',
+      '.hud-hero-chip .chip-sub{font-size:8px;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:.10em}',
+      // mini-bar (fondo emergencia)
+      '.hud-mini{padding:0 16px 14px}',
+      '.hud-mini-row{display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(200,208,230,0.50);margin-bottom:6px}',
+      '.hud-mini-row .v{font-size:11px;font-weight:800;color:var(--ac);letter-spacing:0;text-transform:none;font-family:JetBrains Mono,monospace}',
+      '.hud-mini-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.04)}',
+      '.hud-mini-fill{height:100%;border-radius:999px;transition:width .8s ease}',
+      // row
+      '.hud-row{display:flex;align-items:center;gap:10px;padding:9px 16px}',
+      '.hud-row + .hud-row{border-top:1px solid rgba(255,255,255,0.04)}',
+      '.hud-row-ico{width:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px}',
+      '.hud-row-l{flex:1;min-width:0;font-size:13px;font-weight:600;color:rgba(220,224,235,0.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-row-bar{width:60px;height:3px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;flex-shrink:0}',
+      '.hud-row-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease}',
+      '.hud-row-v{font-size:13px;font-weight:700;letter-spacing:0;flex-shrink:0;text-align:right;min-width:78px;font-family:JetBrains Mono,monospace}',
+      // maslow
+      '.hud-mas{padding:9px 16px}',
+      '.hud-mas + .hud-mas{border-top:1px solid rgba(255,255,255,0.04)}',
+      '.hud-mas-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}',
+      '.hud-mas-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite}',
+      '.hud-mas-l{flex:1;font-size:13px;font-weight:600;color:rgba(220,224,235,0.78);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-mas-v{font-size:12px;font-weight:700;letter-spacing:0;text-align:right;font-family:JetBrains Mono,monospace}',
+      '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;margin-left:15px}',
+      '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
+      // need (sims) - barras gruesas
+      '.hud-need{display:flex;align-items:center;gap:10px;min-width:0}',
+      '.hud-need-ico{font-size:14px;flex-shrink:0;width:18px;display:flex;align-items:center;justify-content:center}',
+      '.hud-need-l{flex:1;font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.62);min-width:0}',
+      '.hud-need-bar-wrap{flex:2;height:8px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);position:relative;min-width:60px}',
+      '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative}',
+      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:6px;right:6px;height:2px;background:rgba(255,255,255,0.30);border-radius:999px;filter:blur(1px)}',
+      '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;min-width:38px;text-align:right}',
+      '.hud-need-v .max{opacity:.40;font-weight:700;font-size:9px}',
+      // CTA pie
+      '.hud-cta{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;border-top:1px solid var(--ac-15);transition:padding .15s,background .15s}',
+      '.hud-cta:hover{background:var(--ac-08);padding-left:20px}',
+      '.hud-cta .lbl{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}',
+      '.hud-cta .chev{font-size:9px;opacity:.7}',
+      // duo (Activity+Logros)
+      '.hud-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px}',
+      '.hud-trio-cell{padding:10px 8px;border-radius:9px;border:1px solid;text-align:left;position:relative;overflow:hidden;background:rgba(255,255,255,0.02)}',
+      '.hud-trio-cell .top{position:absolute;top:0;left:0;right:0;height:2px}',
+      '.hud-trio-cell .lbl{font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;margin-bottom:5px;opacity:.85}',
+      '.hud-trio-cell .v{font-size:18px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace}',
+      // racha fires
+      '.hud-fires-row{display:flex;align-items:center;gap:8px;padding:10px 16px 14px;border-top:1px solid rgba(255,255,255,0.04)}',
+      '.hud-fires-row > i.lead{font-size:14px}',
+      '.hud-fires-row .lbl{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(220,224,235,0.55);flex-shrink:0}',
+      '.hud-fires-row .fires{display:flex;align-items:center;gap:5px;flex:1;justify-content:flex-end}',
+      '.hud-fires-row .fires i{font-size:13px;color:rgba(120,120,130,0.30)}',
+      '.hud-fires-row .fires i.on{color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)}',
+      // nav grid 2x3
+      '.hud-navg{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px}',
+      '.hud-navg-it{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;border:1px solid;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s}',
+      '.hud-navg-it:hover{transform:translateY(-1px)}',
+      '.hud-navg-it .ico{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}',
+      '.hud-navg-it .lbl{flex:1;font-size:12px;font-weight:700;color:rgba(220,224,235,0.80);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-navg-it .ch{font-size:9px;opacity:.55}',
+      // user panel
+      '.hud-user{display:flex;align-items:center;gap:14px;padding:14px 16px;height:100%;box-sizing:border-box}',
+      '.hud-user-av{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:0;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0;position:relative}',
+      '.hud-user-av i{font-size:18px}',
+      '.hud-user-c{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}',
+      '.hud-user-row1{display:flex;align-items:baseline;gap:10px}',
+      '.hud-user-name{font-size:18px;font-weight:800;letter-spacing:.06em;color:#fff}',
+      '.hud-user-niv{font-size:11px;font-weight:700;color:rgba(220,224,235,0.65);letter-spacing:.04em}',
+      '.hud-user-niv-badge{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:3px;font-size:8px}',
+      '.hud-user-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;width:100%}',
+      '.hud-user-bar > div{height:100%;border-radius:999px;transition:width .8s ease}',
+      '.hud-user-xp{font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);text-align:right;font-family:JetBrains Mono,monospace}',
+      // sim panel band
+      '.hud-sim-h{display:flex;align-items:center;gap:10px;padding:13px 18px 8px}',
+      '.hud-sim-h .ico{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
+      '.hud-sim-h .ico i{font-size:11px}',
+      '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
+      '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
+      '.hud-sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 28px;padding:6px 18px 14px}',
+      // stats panel
+      '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:6px;padding:12px 14px;height:100%;box-sizing:border-box}',
+      '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:10px;min-width:0;padding:0 4px}',
+      '.hud-stats-cell + .hud-stats-cell{border-left:1px solid rgba(255,255,255,0.06)}',
+      '.hud-stats-ico{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
+      '.hud-stats-ico i{font-size:15px}',
+      '.hud-stats-txt{display:flex;flex-direction:column;gap:1px;min-width:0}',
+      '.hud-stats-v{font-size:20px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace}',
+      '.hud-stats-v .max{opacity:.40;font-weight:700;font-size:11px;margin-left:2px}',
+      '.hud-stats-l{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
+      // bottom cards (mision, logro, nivel)
+      '.hud-card{display:flex;align-items:center;gap:12px;padding:13px 16px}',
+      '.hud-card-ico{width:42px;height:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:10px}',
+      '.hud-card-ico-hex{width:42px;height:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)}',
+      '.hud-card-ico-hex span{font-size:15px;font-weight:800;color:#fff}',
+      '.hud-card-ico i{font-size:16px}',
+      '.hud-card-c{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}',
+      '.hud-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px}',
+      '.hud-card-l{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}',
+      '.hud-card-r{font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace}',
+      '.hud-card-sub{font-size:11px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-card-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden}',
+      '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease}',
+      '.hud-card-end{font-size:10px;font-weight:800;letter-spacing:.06em;flex-shrink:0;font-family:JetBrains Mono,monospace}',
+      // track
+      '.hud-track{display:flex;align-items:center;gap:18px;padding:11px 18px;height:100%;box-sizing:border-box}',
+      '.hud-track-cur{display:flex;align-items:center;gap:10px;flex-shrink:0}',
+      '.hud-track-hex{width:38px;height:38px;display:flex;align-items:center;justify-content:center;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0}',
+      '.hud-track-hex span{font-size:14px;font-weight:800;color:#fff}',
+      '.hud-track-cur-info{display:flex;flex-direction:column;gap:2px}',
+      '.hud-track-cur-l{font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
+      '.hud-track-cur-v{font-size:13px;font-weight:800;font-family:JetBrains Mono,monospace}',
+      '.hud-track-mid{display:flex;align-items:center;gap:8px;flex:1;justify-content:center;flex-wrap:nowrap}',
+    ].join('\n');
+    document.head.appendChild(ds);
+  }
+
+  // ── Helpers de contenido ──
+  // Header de panel: icono en caja + título + menú "···"
+  function _pH(label, color, icon){
+    return '<div class="hud-h" style="--ac:'+color+'">'+
+      '<div class="hud-h-ico" style="background:'+_rgba(color,0.14)+';border:1px solid '+_rgba(color,0.40)+';box-shadow:0 0 12px '+_rgba(color,0.20)+'">'+
+        '<i class="fas '+icon+'" style="color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>'+
+      '</div>'+
+      '<span class="hud-h-t" style="color:'+color+';text-shadow:0 0 12px '+_rgba(color,0.50)+'">'+label+'</span>'+
+      '<span class="hud-h-k">···</span>'+
+    '</div>'+
+    '<div class="hud-h-bar" style="--ac-50:'+_rgba(color,0.40)+'"></div>';
+  }
+
+  // Pie CTA sutil (link, no banner)
   function _pCTA(label, color, fn){
     var clickable = fn && typeof window[fn] === 'function';
     var onclick = clickable ? ('event.stopPropagation();window.'+fn+'();') : '';
-    return '<div '+(clickable?('onclick="'+onclick+'"'):'')+' '+
-      'style="display:flex;align-items:center;justify-content:space-between;'+
-      'padding:11px 16px;border-top:1px solid '+color+'22;'+
-      'background:linear-gradient(90deg,'+color+'08,transparent);'+
-      'cursor:'+(clickable?'pointer':'default')+';transition:background .15s">'+
-      '<span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:'+color+';text-shadow:0 0 6px '+color+'55">'+label+'</span>'+
-      '<i class="fas fa-chevron-right" style="font-size:10px;color:'+color+';opacity:'+(clickable?'.7':'.35')+'"></i>'+
+    return '<div '+(clickable?('onclick="'+onclick+'"'):'')+' class="hud-cta" style="'+
+      '--ac-15:'+_rgba(color,0.12)+';'+
+      '--ac-08:'+_rgba(color,0.08)+';'+
+      'cursor:'+(clickable?'pointer':'default')+'">'+
+      '<span class="lbl" style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+label+'</span>'+
+      '<i class="fas fa-chevron-right chev" style="color:'+color+'"></i>'+
     '</div>';
   }
 
-  function _hero(id, color, sublabel){
-    return '<div style="padding:10px 16px 6px">'+
-      '<div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;'+
-        'color:rgba(200,208,230,0.30);margin-bottom:4px">'+sublabel+'</div>'+
-      '<div id="'+id+'" style="font-size:28px;font-weight:800;color:'+color+';letter-spacing:-.03em;line-height:1;'+
-        'text-shadow:0 0 24px '+color+'55,0 0 48px '+color+'22;animation:hudValIn .5s ease-out">—</div>'+
-    '</div>';
-  }
-
-  function _row(label, id, color, barId, emoji){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;'+
-      'border-top:1px solid rgba(255,255,255,0.05)">'+
-      '<div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">'+
-        (emoji
-          ? '<span style="font-size:13px;flex-shrink:0">'+emoji+'</span>'
-          : '<div style="width:7px;height:7px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>')+
-        '<span style="font-size:12px;font-weight:600;color:rgba(210,210,235,0.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>'+
+  // Hero financiero: label arriba + número grande + chip a la derecha (opcional)
+  function _hero(id, color, sublabel, chipId){
+    return '<div class="hud-hero">'+
+      '<div class="hud-hero-l">'+
+        '<div class="hud-hero-lbl">'+sublabel+'</div>'+
+        '<div id="'+id+'" class="hud-hero-v" style="color:'+color+';text-shadow:0 0 24px '+_rgba(color,0.40)+'">—</div>'+
       '</div>'+
+      (chipId ? '<div id="'+chipId+'" class="hud-hero-chip" style="display:none"></div>' : '')+
+    '</div>';
+  }
+
+  // Mini barra (Fondo emergencia, Ahorro %)
+  function _miniBar(label, valId, barId, color){
+    return '<div class="hud-mini">'+
+      '<div class="hud-mini-row" style="--ac:'+color+'">'+
+        '<span>'+label+'</span>'+
+        '<span class="v" id="'+valId+'" style="color:'+color+'">—</span>'+
+      '</div>'+
+      '<div class="hud-mini-bar">'+
+        '<div id="'+barId+'" class="hud-mini-fill" style="background:linear-gradient(90deg,'+color+','+_rgba(color,0.65)+');box-shadow:0 0 8px '+_rgba(color,0.50)+'"></div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  // Row con icono FA, label y valor
+  function _row(label, id, color, barId, faIcon){
+    return '<div class="hud-row">'+
+      '<span class="hud-row-ico"><i class="fas '+(faIcon||'fa-circle')+'" style="color:'+color+';font-size:'+(faIcon?'11px':'5px')+';filter:drop-shadow(0 0 4px '+color+')"></i></span>'+
+      '<span class="hud-row-l">'+label+'</span>'+
       (barId
-        ? '<div style="width:48px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;flex-shrink:0">'+
-            '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+color+'80;border-radius:2px;transition:width .8s ease"></div>'+
-          '</div>' : '')+
-      '<span id="'+id+'" style="font-size:13px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;'+
-        'flex-shrink:0;text-shadow:0 0 8px '+color+'55;min-width:68px;text-align:right">—</span>'+
+        ? '<div class="hud-row-bar"><div id="'+barId+'" style="background:'+color+';box-shadow:0 0 4px '+_rgba(color,0.50)+'"></div></div>'
+        : '')+
+      '<span id="'+id+'" class="hud-row-v" style="color:'+color+'">—</span>'+
     '</div>';
   }
 
-  function _duo(id1,lbl1,c1, id2,lbl2,c2){
-    return '<div style="display:flex;gap:8px;padding:10px 16px 12px">'+
-      '<div style="flex:1;background:'+c1+'12;border:1px solid '+c1+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
-        '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+c1+';opacity:.6;box-shadow:0 0 8px '+c1+'"></div>'+
-        '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:'+c1+'90;margin-bottom:7px">'+lbl1+'</div>'+
-        '<div id="'+id1+'" style="font-size:22px;font-weight:800;color:'+c1+';text-shadow:0 0 14px '+c1+'55;line-height:1">—</div>'+
-      '</div>'+
-      '<div style="flex:1;background:'+c2+'12;border:1px solid '+c2+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
-        '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+c2+';opacity:.6;box-shadow:0 0 8px '+c2+'"></div>'+
-        '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:'+c2+'90;margin-bottom:7px">'+lbl2+'</div>'+
-        '<div id="'+id2+'" style="font-size:22px;font-weight:800;color:'+c2+';text-shadow:0 0 14px '+c2+'55;line-height:1">—</div>'+
-      '</div>'+
-    '</div>';
-  }
-
+  // Maslow row con dot
   function _maslow(label, id, barId, color){
-    return '<div style="padding:7px 16px;border-top:1px solid rgba(255,255,255,0.04)">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
-        '<div style="width:7px;height:7px;border-radius:50%;background:'+color+';box-shadow:0 0 7px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>'+
-        '<span style="font-size:12px;font-weight:600;color:rgba(210,210,235,0.70);flex:1">'+label+'</span>'+
-        '<span id="'+id+'" style="font-size:12px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+color+'66">—</span>'+
+    return '<div class="hud-mas">'+
+      '<div class="hud-mas-top">'+
+        '<span class="hud-mas-dot" style="background:'+color+';box-shadow:0 0 7px '+color+'"></span>'+
+        '<span class="hud-mas-l">'+label+'</span>'+
+        '<span id="'+id+'" class="hud-mas-v" style="color:'+color+'">—</span>'+
       '</div>'+
-      '<div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;margin-left:15px">'+
-        '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 6px '+color+'80;border-radius:2px;transition:width .9s ease"></div>'+
-      '</div>'+
+      '<div class="hud-mas-bar"><div id="'+barId+'" style="background:'+color+';box-shadow:0 0 6px '+_rgba(color,0.50)+'"></div></div>'+
     '</div>';
   }
 
-  function _nav(label, icon, color, fn){
+  // Trio cell (Hábitos / Logros / Racha)
+  function _trioCell(id, label, value, color){
+    return '<div class="hud-trio-cell" style="border-color:'+_rgba(color,0.30)+';background:'+_rgba(color,0.06)+'">'+
+      '<div class="top" style="background:'+color+';box-shadow:0 0 8px '+color+';opacity:.7"></div>'+
+      '<div class="lbl" style="color:'+color+'">'+label+'</div>'+
+      '<div id="'+id+'" class="v" style="color:'+color+';text-shadow:0 0 10px '+_rgba(color,0.40)+'">'+(value||'—')+'</div>'+
+    '</div>';
+  }
+
+  // Nav grid item
+  function _navG(label, icon, color, fn){
     var b = document.createElement('div');
-    b.style.cssText = 'display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;'+
-      'transition:background .15s;border-top:1px solid rgba(255,255,255,0.05)';
+    b.className = 'hud-navg-it';
+    b.style.borderColor = _rgba(color,0.25);
+    b.style.background = _rgba(color,0.05);
     b.innerHTML =
-      '<div style="width:30px;height:30px;border-radius:8px;background:'+color+'15;border:1px solid '+color+'35;'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px '+color+'20">'+
-        '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>'+
+      '<div class="ico" style="background:'+_rgba(color,0.14)+';border:1px solid '+_rgba(color,0.35)+'">'+
+        '<i class="fas '+icon+'" style="color:'+color+';filter:drop-shadow(0 0 3px '+color+')"></i>'+
       '</div>'+
-      '<span style="font-size:13px;font-weight:600;color:rgba(220,220,240,0.75);flex:1">'+label+'</span>'+
-      '<i class="fas fa-chevron-right" style="font-size:10px;color:'+color+'60"></i>';
-    b.addEventListener('mouseenter',function(){ b.style.background=color+'14'; b.querySelector('span').style.color='#fff'; });
-    b.addEventListener('mouseleave',function(){ b.style.background='transparent'; b.querySelector('span').style.color='rgba(220,220,240,0.75)'; });
+      '<span class="lbl">'+label+'</span>'+
+      '<i class="fas fa-chevron-right ch" style="color:'+color+'"></i>';
+    b.addEventListener('mouseenter',function(){ b.style.background = _rgba(color,0.12); b.style.boxShadow = '0 4px 14px '+_rgba(color,0.20); });
+    b.addEventListener('mouseleave',function(){ b.style.background = _rgba(color,0.05); b.style.boxShadow = 'none'; });
     b.addEventListener('click',function(e){ e.stopPropagation(); cerrarDial(); if(typeof window[fn]==='function') window[fn](); });
     return b;
   }
 
   // ══════════════════════════════════════
-  //  ZONA SUPERIOR (full-width, 3 sub-paneles)
+  //  ZONA SUPERIOR
   // ══════════════════════════════════════
 
-  // ── _pUser: USER / Nivel / XP (top-left) ──
+  // ── _pUser (top-left): hexágono + USER + Nivel + barra XP ──
   var _pUser = _mkFloatPanel('hud-user','#A78BFA','rgba(167,139,250,0.15)');
   document.body.appendChild(_pUser);
+  _pUser.classList.add('hud-pnl');
   _pUser.style.animationDelay = '0s';
-  _pUser.style.borderRadius = '12px';
+  _pUser.style.borderRadius = '14px';
   document.getElementById('hud-user-inner').innerHTML =
-    '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px">'+
-      '<div style="width:42px;height:42px;border-radius:10px;background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.45);'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 14px rgba(167,139,250,0.30)">'+
-        '<i class="fas fa-user-astronaut" style="font-size:16px;color:#A78BFA;filter:drop-shadow(0 0 5px #A78BFA)"></i>'+
+    '<div class="hud-user">'+
+      '<div class="hud-user-av" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 16px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
+        '<i class="fas fa-user" style="color:#fff;text-shadow:0 0 8px #A78BFA"></i>'+
       '</div>'+
-      '<div style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1">'+
-        '<div style="display:flex;align-items:baseline;gap:10px">'+
-          '<span style="font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#fff">USER</span>'+
-          '<span id="_hud-user-nivel" style="font-size:11px;font-weight:700;color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,0.55)">Nivel 1</span>'+
+      '<div class="hud-user-c">'+
+        '<div class="hud-user-row1">'+
+          '<span class="hud-user-name">USER</span>'+
+          '<span class="hud-user-niv">Nivel <span id="_hud-user-nivel">1</span></span>'+
+          '<span class="hud-user-niv-badge" style="background:'+_rgba('#A78BFA',0.20)+';border:1px solid '+_rgba('#A78BFA',0.45)+';color:#A78BFA"><i class="fas fa-shield-halved"></i></span>'+
         '</div>'+
-        '<div style="display:flex;align-items:center;gap:8px">'+
-          '<div style="height:5px;flex:1;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;min-width:60px">'+
-            '<div id="_hud-user-xpbar" style="height:100%;width:0%;background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px rgba(167,139,250,0.6);border-radius:3px;transition:width .8s ease"></div>'+
-          '</div>'+
-          '<span id="_hud-user-xp" style="font-size:10px;font-weight:700;color:rgba(220,220,240,0.65);font-variant-numeric:tabular-nums;white-space:nowrap">0 / 1,000 XP</span>'+
-        '</div>'+
+        '<div class="hud-user-bar"><div id="_hud-user-xpbar" style="background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px '+_rgba('#A78BFA',0.55)+'"></div></div>'+
+        '<div class="hud-user-xp" id="_hud-user-xp">0 / 1,000 XP</div>'+
       '</div>'+
     '</div>';
 
-  // ══════════════════════════════════════
-  //  BANDA SIM — _pSim, top-center, ESTILO SIMS (sin flechas)
-  // ══════════════════════════════════════
+  // ── _pSim (top-center): banda Sims, 9 needs en grid 2 cols ──
   var _pSim = _mkFloatPanel('hud-sim-band','#FBBF24','rgba(251,191,36,0.15)');
   document.body.appendChild(_pSim);
+  _pSim.classList.add('hud-pnl');
   _pSim.style.animationDelay = '0.4s';
-  _pSim.style.borderRadius = '12px';
+  _pSim.style.borderRadius = '14px';
   document.getElementById('hud-sim-band-inner').innerHTML =
-    '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px 8px">'+
-      '<div style="width:26px;height:26px;border-radius:7px;background:rgba(251,191,36,0.18);border:1px solid rgba(251,191,36,0.45);'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;'+
-        'box-shadow:0 0 12px rgba(251,191,36,0.30)">'+
-        '<i class="fas fa-heart-pulse" style="font-size:11px;color:#FBBF24"></i>'+
+    '<div class="hud-sim-h">'+
+      '<div class="ico" style="background:'+_rgba('#FBBF24',0.16)+';border:1px solid '+_rgba('#FBBF24',0.45)+';box-shadow:0 0 12px '+_rgba('#FBBF24',0.30)+'">'+
+        '<i class="fas fa-heart-pulse" style="color:#FBBF24"></i>'+
       '</div>'+
-      '<span style="font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;'+
-        'color:#FBBF24;text-shadow:0 0 10px rgba(251,191,36,0.55);flex:1">Estado del Sim</span>'+
-      '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;'+
-        'color:rgba(220,220,240,0.40)">9 needs</span>'+
+      '<span class="t" style="color:#FBBF24;text-shadow:0 0 10px '+_rgba('#FBBF24',0.50)+'">Estado del Sim</span>'+
+      '<span class="meta">9 needs</span>'+
     '</div>'+
-    '<div id="hud-sim-band-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;padding:6px 16px 14px"></div>';
-
-  // Render inicial síncrono de la banda Sims
+    '<div id="hud-sim-band-grid" class="hud-sim-grid"></div>';
   if(typeof renderSimsBandSimsStyle === 'function') renderSimsBandSimsStyle('hud-sim-band-grid');
 
-  // ── _pStats: Energía / Racha / Créditos (top-right) ──
-  var _pStats = _mkFloatPanel('hud-stats','#22D3EE','rgba(34,211,238,0.15)');
+  // ── _pStats (top-right): Energía / Racha / Créditos en 3 cells ──
+  var _pStats = _mkFloatPanel('hud-stats','#FBBF24','rgba(251,191,36,0.15)');
   document.body.appendChild(_pStats);
+  _pStats.classList.add('hud-pnl');
   _pStats.style.animationDelay = '0.8s';
-  _pStats.style.borderRadius = '12px';
+  _pStats.style.borderRadius = '14px';
   document.getElementById('hud-stats-inner').innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-around;gap:14px;padding:12px 16px">'+
+    '<div class="hud-stats-row">'+
       // Energía
-      '<div style="display:flex;align-items:center;gap:9px;min-width:0">'+
-        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.40);'+
-          'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px rgba(251,191,36,0.25)">'+
-          '<i class="fas fa-bolt" style="font-size:13px;color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
+      '<div class="hud-stats-cell">'+
+        '<div class="hud-stats-ico" style="background:'+_rgba('#FBBF24',0.14)+';border:1px solid '+_rgba('#FBBF24',0.40)+';box-shadow:0 0 12px '+_rgba('#FBBF24',0.25)+'">'+
+          '<i class="fas fa-bolt" style="color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
         '</div>'+
-        '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
-          '<span style="font-size:14px;font-weight:800;color:#FBBF24;text-shadow:0 0 8px rgba(251,191,36,0.55);line-height:1"><span id="_hud-energia">—</span><span style="font-size:9px;color:rgba(220,220,240,0.40);font-weight:600">/100</span></span>'+
-          '<span style="font-size:8px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Energía</span>'+
+        '<div class="hud-stats-txt">'+
+          '<span class="hud-stats-v" style="color:#FBBF24"><span id="_hud-energia">—</span><span class="max">/100</span></span>'+
+          '<span class="hud-stats-l">Energía</span>'+
         '</div>'+
       '</div>'+
-      '<div style="width:1px;height:30px;background:rgba(255,255,255,0.08)"></div>'+
       // Racha
-      '<div style="display:flex;align-items:center;gap:9px;min-width:0">'+
-        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(251,146,60,0.15);border:1px solid rgba(251,146,60,0.40);'+
-          'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px rgba(251,146,60,0.25)">'+
-          '<i class="fas fa-fire" style="font-size:13px;color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
+      '<div class="hud-stats-cell">'+
+        '<div class="hud-stats-ico" style="background:'+_rgba('#FB923C',0.14)+';border:1px solid '+_rgba('#FB923C',0.40)+';box-shadow:0 0 12px '+_rgba('#FB923C',0.25)+'">'+
+          '<i class="fas fa-fire" style="color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
         '</div>'+
-        '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
-          '<span style="font-size:14px;font-weight:800;color:#FB923C;text-shadow:0 0 8px rgba(251,146,60,0.55);line-height:1"><span id="_hud-racha-dias">—</span><span style="font-size:9px;color:rgba(220,220,240,0.40);font-weight:600"> días</span></span>'+
-          '<span style="font-size:8px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Racha actual</span>'+
+        '<div class="hud-stats-txt">'+
+          '<span class="hud-stats-v" style="color:#FB923C"><span id="_hud-racha-dias">—</span><span class="max"> días</span></span>'+
+          '<span class="hud-stats-l">Racha actual</span>'+
         '</div>'+
       '</div>'+
-      '<div style="width:1px;height:30px;background:rgba(255,255,255,0.08)"></div>'+
       // Créditos
-      '<div style="display:flex;align-items:center;gap:9px;min-width:0">'+
-        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(34,211,238,0.15);border:1px solid rgba(34,211,238,0.40);'+
-          'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px rgba(34,211,238,0.25)">'+
-          '<i class="fas fa-gem" style="font-size:13px;color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
+      '<div class="hud-stats-cell">'+
+        '<div class="hud-stats-ico" style="background:'+_rgba('#22D3EE',0.14)+';border:1px solid '+_rgba('#22D3EE',0.40)+';box-shadow:0 0 12px '+_rgba('#22D3EE',0.25)+'">'+
+          '<i class="fas fa-gem" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
         '</div>'+
-        '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
-          '<span id="_hud-creditos" style="font-size:14px;font-weight:800;color:#22D3EE;text-shadow:0 0 8px rgba(34,211,238,0.55);line-height:1">—</span>'+
-          '<span style="font-size:8px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Créditos</span>'+
+        '<div class="hud-stats-txt">'+
+          '<span id="_hud-creditos" class="hud-stats-v" style="color:#22D3EE">—</span>'+
+          '<span class="hud-stats-l">Créditos</span>'+
         '</div>'+
       '</div>'+
     '</div>';
+
+  // ══════════════════════════════════════
+  //  COLUMNA IZQUIERDA
+  // ══════════════════════════════════════
 
   // ── Panel 1: Patrimonio ──
   var _p1 = _mkFloatPanel('hud-patrimonio','#22C55E','rgba(34,197,94,0.15)');
   document.body.appendChild(_p1);
+  _p1.classList.add('hud-pnl');
   _p1.style.animationDelay = '0s';
   document.getElementById('hud-patrimonio-inner').innerHTML =
     _pH('Patrimonio','#22C55E','fa-landmark') +
-    _hero('_hud-saldo','#22C55E','Disponible hoy') +
-    '<div style="padding:0 16px 10px">'+
-      '<div style="display:flex;justify-content:space-between;margin-bottom:5px">'+
-        '<span style="font-size:11px;color:rgba(200,208,230,0.30);text-transform:uppercase;letter-spacing:.10em">Fondo emergencia</span>'+
-        '<span id="_hud-fondo-pct" style="font-size:12px;font-weight:700;color:#22C55E">—</span>'+
-      '</div>'+
-      '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
-        '<div id="_hud-fondo-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(34,197,94,.5);border-radius:3px;transition:width .8s ease"></div>'+
-      '</div>'+
-    '</div>'+
-    _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','🏦') +
-    _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','💳') +
-    _row('Efectivo', '_hud-efec',  '#FCD34D',null,'💵') +
-    _row('Apartados','_hud-apart', '#F59E0B',null,'🔒') +
-    _pCTA('Ver detalle','#22C55E','irAPatrimonio');
+    _hero('_hud-saldo','#22C55E','Disponible hoy','_hud-saldo-chip') +
+    _miniBar('Fondo emergencia','_hud-fondo-pct','_hud-fondo-bar','#22C55E') +
+    _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','fa-building-columns') +
+    _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','fa-credit-card') +
+    _row('Efectivo', '_hud-efec',  '#FCD34D',null,'fa-money-bill-wave') +
+    _row('Apartados','_hud-apart', '#F59E0B',null,'fa-lock') +
+    _pCTA('Ver detalle completo','#22C55E','irAPatrimonio');
 
   // ── Panel 2: Necesidades ──
   var _p2 = _mkFloatPanel('hud-necesidades','#A855F7','rgba(168,85,247,0.15)');
   document.body.appendChild(_p2);
+  _p2.classList.add('hud-pnl');
   _p2.style.animationDelay = '1.3s';
   document.getElementById('hud-necesidades-inner').innerHTML =
-    _pH('Necesidades','#A855F7','fa-layer-group') +
+    _pH('Necesidades','#A855F7','fa-wave-square') +
     _maslow('Fisiológicas',   '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
     _maslow('Seguridad',      '_hud-nec-2','_hud-nec-2-bar','#F59E0B') +
     _maslow('Afiliación',     '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
@@ -900,187 +1040,180 @@ function _crearDialOverlay(){
     _maslow('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E') +
     _pCTA('Ver análisis','#A855F7','irANecesidades');
 
-  // ── Panel 3: Bitácora (con NUTRICIÓN agregada) ──
+  // ── Panel 3: Bitácora ──
   var _p3 = _mkFloatPanel('hud-bitacora','#C084FC','rgba(192,132,252,0.15)');
   document.body.appendChild(_p3);
+  _p3.classList.add('hud-pnl');
   _p3.style.animationDelay = '2.6s';
   document.getElementById('hud-bitacora-inner').innerHTML =
     _pH('Bitácora','#C084FC','fa-book-open') +
-    _row('Pensamientos', '_hud-pens','#C084FC',null,'💭') +
-    _row('Relaciones',   '_hud-rels','#EC4899',null,'👥') +
-    _row('Salud',        '_hud-sal', '#EF4444',null,'❤️') +
-    _row('Nutrición',    '_hud-nut', '#86EFAC',null,'🥗') +
-    _row('Entrenamiento','_hud-ent', '#FB923C',null,'💪') +
+    _row('Pensamientos', '_hud-pens','#C084FC',null,'fa-comment-dots') +
+    _row('Relaciones',   '_hud-rels','#EC4899',null,'fa-user-group') +
+    _row('Salud',        '_hud-sal', '#EF4444',null,'fa-heart') +
+    _row('Nutrición',    '_hud-nut', '#86EFAC',null,'fa-apple-whole') +
+    _row('Entrenamiento','_hud-ent', '#FB923C',null,'fa-dumbbell') +
     _pCTA('Abrir Bitácora','#C084FC','irABitacora');
+
+  // ══════════════════════════════════════
+  //  COLUMNA DERECHA
+  // ══════════════════════════════════════
 
   // ── Panel 4: Financiero ──
   var _p4 = _mkFloatPanel('hud-financiero','#22D3EE','rgba(34,211,238,0.15)');
   document.body.appendChild(_p4);
+  _p4.classList.add('hud-pnl');
   _p4.style.animationDelay = '0.6s';
   document.getElementById('hud-financiero-inner').innerHTML =
     _pH('Financiero','#22D3EE','fa-chart-line') +
-    _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
-    _duo('_hud-fin-ing','Ingresos','#22C55E','_hud-fin-egr','Egresos','#EF4444') +
-    _row('Ahorro %',  '_hud-fin-aho','#FACC15','_hud-aho-bar',null) +
-    _row('Runway',    '_hud-runway', '#22D3EE',null,'🛫') +
-    _row('Gasto/día','_hud-gastoDia','#A78BFA',null,'📊') +
-    _pCTA('Ver reporte financiero','#22D3EE','irAFinanciero');
+    _hero('_hud-fin-exc','#22D3EE','Excedente del mes',null) +
+    // Ingresos / Egresos lado a lado
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px 12px">'+
+      '<div style="padding:10px 12px;background:'+_rgba('#22C55E',0.07)+';border:1px solid '+_rgba('#22C55E',0.28)+';border-radius:9px;position:relative;overflow:hidden">'+
+        '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:#22C55E;box-shadow:0 0 8px #22C55E;opacity:.7"></div>'+
+        '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#22C55E;margin-bottom:6px;opacity:.85">Ingresos</div>'+
+        '<div id="_hud-fin-ing" style="font-size:18px;font-weight:800;color:#22C55E;font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 12px '+_rgba('#22C55E',0.40)+'">—</div>'+
+      '</div>'+
+      '<div style="padding:10px 12px;background:'+_rgba('#EF4444',0.07)+';border:1px solid '+_rgba('#EF4444',0.28)+';border-radius:9px;position:relative;overflow:hidden">'+
+        '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:#EF4444;box-shadow:0 0 8px #EF4444;opacity:.7"></div>'+
+        '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#EF4444;margin-bottom:6px;opacity:.85">Egresos</div>'+
+        '<div id="_hud-fin-egr" style="font-size:18px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 12px '+_rgba('#EF4444',0.40)+'">—</div>'+
+      '</div>'+
+    '</div>'+
+    _miniBar('Ahorro %','_hud-fin-aho','_hud-aho-bar','#FACC15') +
+    _row('Runway',    '_hud-runway', '#22D3EE',null,'fa-plane-departure') +
+    _row('Gasto/día','_hud-gastoDia','#A78BFA',null,'fa-chart-pie') +
+    _pCTA('Ver resumen financiero','#22D3EE','irAFinanciero');
 
-  // ── Panel 5: Activity + Logros ──
+  // ── Panel 5: Activity + Logros (3 trio cells + racha con fuegos) ──
   var _p5 = _mkFloatPanel('hud-activity','#FB923C','rgba(251,146,60,0.15)');
   document.body.appendChild(_p5);
+  _p5.classList.add('hud-pnl');
   _p5.style.animationDelay = '1.9s';
   document.getElementById('hud-activity-inner').innerHTML =
     _pH('Activity + Logros','#FB923C','fa-bolt') +
-    _duo('_hud-act-done','Hábitos hoy','#FB923C','_hud-lgr-done','Logros','#FACC15') +
-    '<div style="padding:9px 16px 12px;border-top:1px solid rgba(255,255,255,0.05)">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">'+
-        '<div style="display:flex;align-items:center;gap:7px">'+
-          '<i class="fas fa-fire" style="font-size:14px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>'+
-          '<span style="font-size:9px;font-weight:800;color:rgba(210,210,235,0.55);text-transform:uppercase;letter-spacing:.12em">Racha actual</span>'+
-        '</div>'+
-        '<span id="_hud-racha" style="font-size:18px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">— días</span>'+
-      '</div>'+
-      '<div id="_hud-racha-fires" style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+
-        '<i class="fas fa-fire fire-1" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
-        '<i class="fas fa-fire fire-2" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
-        '<i class="fas fa-fire fire-3" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
-        '<i class="fas fa-fire fire-4" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
-        '<i class="fas fa-fire fire-5" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
-        '<i class="fas fa-fire fire-6" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
-        '<i class="fas fa-fire fire-7" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
+    '<div class="hud-trio">'+
+      _trioCell('_hud-act-done','Hábitos hoy','—','#FB923C')+
+      _trioCell('_hud-lgr-done','Logros','—','#FACC15')+
+      _trioCell('_hud-racha','Racha actual','—','#EF4444')+
+    '</div>'+
+    '<div class="hud-fires-row">'+
+      '<i class="fas fa-fire lead" style="color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>'+
+      '<span class="lbl">Racha</span>'+
+      '<div id="_hud-racha-fires" class="fires">'+
+        '<i class="fas fa-fire"></i><i class="fas fa-fire"></i><i class="fas fa-fire"></i>'+
+        '<i class="fas fa-fire"></i><i class="fas fa-fire"></i><i class="fas fa-fire"></i>'+
+        '<i class="fas fa-fire"></i>'+
       '</div>'+
     '</div>'+
     _pCTA('Ir a Activity Check','#FB923C','irAActivity');
-  // (los items de navegación viven solo en _p6 — un único panel)
 
-  // ── Panel 6: Navegación ──
+  // ── Panel 6: Navegación (grid 2x3) ──
   var _p6 = _mkFloatPanel('hud-nav','#A78BFA','rgba(167,139,250,0.12)');
   document.body.appendChild(_p6);
+  _p6.classList.add('hud-pnl');
   _p6.style.animationDelay = '3.2s';
   document.getElementById('hud-nav-inner').innerHTML =
-    _pH('Navegación','#A78BFA','fa-compass');
+    _pH('Navegación','#A78BFA','fa-compass') +
+    '<div id="hud-navg-grid" class="hud-navg"></div>';
+  var _navGrid = document.getElementById('hud-navg-grid');
   [
-    {label:'Activity',     icon:'fa-bolt',         fn:'irAActivity',  color:'#FB923C'},
-    {label:'Logros',       icon:'fa-trophy',       fn:'irALogros',    color:'#FACC15'},
-    {label:'Nutrición',    icon:'fa-leaf',         fn:'irANutricion', color:'#4ADE80'},
-    {label:'Bitácora',     icon:'fa-book-open',    fn:'irABitacora',  color:'#C084FC'},
-    {label:'RAW Sheet',    icon:'fa-table',        fn:'irASheets',    color:'#A5B4FC'},
-    {label:'Actualizar',   icon:'fa-rotate-right', fn:'refreshTodo',  color:'#64748B'},
-  ].forEach(function(n){ _p6.appendChild(_nav(n.label,n.icon,n.color,n.fn)); });
+    {label:'Activity',   icon:'fa-bolt',         fn:'irAActivity',  color:'#FB923C'},
+    {label:'Bitácora',   icon:'fa-book-open',    fn:'irABitacora',  color:'#C084FC'},
+    {label:'Logros',     icon:'fa-trophy',       fn:'irALogros',    color:'#FACC15'},
+    {label:'RAW Sheet',  icon:'fa-table',        fn:'irASheets',    color:'#A5B4FC'},
+    {label:'Nutrición',  icon:'fa-leaf',         fn:'irANutricion', color:'#4ADE80'},
+    {label:'Actualizar', icon:'fa-rotate-right', fn:'refreshTodo',  color:'#94A3B8'},
+  ].forEach(function(n){ _navGrid.appendChild(_navG(n.label,n.icon,n.color,n.fn)); });
 
   // ══════════════════════════════════════
-  //  ZONA INFERIOR — track de niveles + 3 cards
+  //  ZONA INFERIOR — track + 3 cards
   // ══════════════════════════════════════
 
-  // ── _pTrack: track horizontal de niveles (debajo del dial) ──
+  // ── _pTrack: track horizontal de niveles ──
   var _pTrack = _mkFloatPanel('hud-track','#A78BFA','rgba(167,139,250,0.12)');
   document.body.appendChild(_pTrack);
+  _pTrack.classList.add('hud-pnl');
   _pTrack.style.animationDelay = '1.0s';
-  _pTrack.style.borderRadius = '12px';
+  _pTrack.style.borderRadius = '14px';
   document.getElementById('hud-track-inner').innerHTML =
-    '<div style="display:flex;align-items:center;gap:14px;padding:10px 16px">'+
-      // Hexágono nivel actual
-      '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+
-        '<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'+
-          'background:radial-gradient(circle,rgba(167,139,250,0.22),rgba(167,139,250,0.05));'+
-          'border:1.5px solid #A78BFA;border-radius:8px;'+
-          'box-shadow:0 0 16px rgba(167,139,250,0.45),inset 0 0 8px rgba(167,139,250,0.18);'+
-          'clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)">'+
-          '<span id="_hud-track-nivel" style="font-size:15px;font-weight:800;color:#fff;text-shadow:0 0 8px #A78BFA">1</span>'+
+    '<div class="hud-track">'+
+      '<div class="hud-track-cur">'+
+        '<div class="hud-track-hex" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 16px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
+          '<span id="_hud-track-nivel">1</span>'+
         '</div>'+
-        '<span style="font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,220,240,0.45)">Actual</span>'+
+        '<div class="hud-track-cur-info">'+
+          '<span class="hud-track-cur-l">Nivel actual</span>'+
+          '<span id="_hud-track-xp" class="hud-track-cur-v" style="color:#A78BFA;text-shadow:0 0 8px '+_rgba('#A78BFA',0.45)+'">0 / 1,000 XP</span>'+
+        '</div>'+
       '</div>'+
-      // XP info
-      '<div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex-shrink:0">'+
-        '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Nivel actual</span>'+
-        '<span id="_hud-track-xp" style="font-size:13px;font-weight:800;color:#A78BFA;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(167,139,250,0.55)">0 / 1,000 XP</span>'+
-      '</div>'+
-      // Track de niveles siguientes
-      '<div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center">'+
-        '<div id="_hud-track-stops" style="display:flex;align-items:center;gap:4px"></div>'+
-      '</div>'+
-      // Cofre del horizonte
-      '<div style="display:flex;align-items:center;flex-shrink:0">'+
-        '<i class="fas fa-trophy" style="font-size:18px;color:#A78BFA;filter:drop-shadow(0 0 6px rgba(167,139,250,0.6))"></i>'+
-      '</div>'+
+      '<div class="hud-track-mid"><div id="_hud-track-stops" style="display:flex;align-items:center;gap:6px"></div></div>'+
+      '<div style="flex-shrink:0"><i class="fas fa-trophy" style="font-size:20px;color:#A78BFA;filter:drop-shadow(0 0 6px '+_rgba('#A78BFA',0.55)+')"></i></div>'+
     '</div>';
 
   // ── _pMision: Misión Diaria (bottom-left) ──
   var _pMision = _mkFloatPanel('hud-mision','#22D3EE','rgba(34,211,238,0.15)');
   document.body.appendChild(_pMision);
+  _pMision.classList.add('hud-pnl');
   _pMision.style.animationDelay = '1.4s';
-  _pMision.style.borderRadius = '12px';
+  _pMision.style.borderRadius = '14px';
   document.getElementById('hud-mision-inner').innerHTML =
-    '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px">'+
-      '<div style="width:36px;height:36px;border-radius:9px;background:rgba(34,211,238,0.15);border:1px solid rgba(34,211,238,0.45);'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px rgba(34,211,238,0.30)">'+
-        '<i class="fas fa-bullseye" style="font-size:14px;color:#22D3EE;filter:drop-shadow(0 0 5px #22D3EE)"></i>'+
+    '<div class="hud-card">'+
+      '<div class="hud-card-ico" style="background:'+_rgba('#22D3EE',0.14)+';border:1px solid '+_rgba('#22D3EE',0.45)+';box-shadow:0 0 12px '+_rgba('#22D3EE',0.30)+'">'+
+        '<i class="fas fa-bullseye" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
       '</div>'+
-      '<div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
-          '<span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#22D3EE;text-shadow:0 0 8px rgba(34,211,238,0.55)">Misión Diaria</span>'+
-          '<span id="_hud-mision-progreso" style="font-size:11px;font-weight:800;color:#22D3EE;font-variant-numeric:tabular-nums">0/3</span>'+
+      '<div class="hud-card-c">'+
+        '<div class="hud-card-h">'+
+          '<span class="hud-card-l" style="color:#22D3EE;text-shadow:0 0 6px '+_rgba('#22D3EE',0.40)+'">Misión Diaria</span>'+
+          '<span id="_hud-mision-progreso" class="hud-card-r" style="color:#22D3EE">0/3</span>'+
         '</div>'+
-        '<span id="_hud-mision-label" style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Completa 3 hábitos hoy</span>'+
-        '<div style="display:flex;align-items:center;gap:8px">'+
-          '<div style="height:5px;flex:1;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
-            '<div id="_hud-mision-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22D3EE,#67E8F9);box-shadow:0 0 6px rgba(34,211,238,0.6);border-radius:3px;transition:width .8s ease"></div>'+
-          '</div>'+
-          '<span id="_hud-mision-recompensa" style="font-size:9px;font-weight:700;color:#FACC15;text-shadow:0 0 6px rgba(250,204,21,0.45);white-space:nowrap">+50 XP</span>'+
-        '</div>'+
+        '<span id="_hud-mision-label" class="hud-card-sub">Completa 3 hábitos hoy</span>'+
+        '<div class="hud-card-bar"><div id="_hud-mision-bar" style="background:linear-gradient(90deg,#22D3EE,#67E8F9);box-shadow:0 0 6px '+_rgba('#22D3EE',0.55)+'"></div></div>'+
       '</div>'+
+      '<span id="_hud-mision-recompensa" class="hud-card-end" style="color:#FACC15;text-shadow:0 0 6px '+_rgba('#FACC15',0.40)+'">+50 XP</span>'+
     '</div>';
 
   // ── _pLogro: Logro Reciente (bottom-center) ──
   var _pLogro = _mkFloatPanel('hud-logro','#FACC15','rgba(250,204,21,0.15)');
   document.body.appendChild(_pLogro);
+  _pLogro.classList.add('hud-pnl');
   _pLogro.style.animationDelay = '1.7s';
-  _pLogro.style.borderRadius = '12px';
+  _pLogro.style.borderRadius = '14px';
   document.getElementById('hud-logro-inner').innerHTML =
-    '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px">'+
-      '<div style="width:36px;height:36px;border-radius:9px;background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.45);'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px rgba(250,204,21,0.30)">'+
-        '<i class="fas fa-star" style="font-size:14px;color:#FACC15;filter:drop-shadow(0 0 5px #FACC15)"></i>'+
+    '<div class="hud-card">'+
+      '<div class="hud-card-ico" style="background:'+_rgba('#FACC15',0.14)+';border:1px solid '+_rgba('#FACC15',0.45)+';box-shadow:0 0 12px '+_rgba('#FACC15',0.30)+'">'+
+        '<i class="fas fa-star" style="color:#FACC15;filter:drop-shadow(0 0 4px #FACC15)"></i>'+
       '</div>'+
-      '<div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
-          '<span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#FACC15;text-shadow:0 0 8px rgba(250,204,21,0.55)">Logro Reciente</span>'+
-          '<span id="_hud-logro-pct" style="font-size:11px;font-weight:800;color:#FACC15;font-variant-numeric:tabular-nums">0%</span>'+
+      '<div class="hud-card-c">'+
+        '<div class="hud-card-h">'+
+          '<span class="hud-card-l" style="color:#FACC15;text-shadow:0 0 6px '+_rgba('#FACC15',0.40)+'">Logro reciente</span>'+
+          '<span id="_hud-logro-pct" class="hud-card-r" style="color:#FACC15">0%</span>'+
         '</div>'+
-        '<span id="_hud-logro-titulo" style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>'+
-        '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
-          '<div id="_hud-logro-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#FACC15,#FCD34D);box-shadow:0 0 6px rgba(250,204,21,0.6);border-radius:3px;transition:width .8s ease"></div>'+
-        '</div>'+
+        '<span id="_hud-logro-titulo" class="hud-card-sub">—</span>'+
+        '<div class="hud-card-bar"><div id="_hud-logro-bar" style="background:linear-gradient(90deg,#FACC15,#FCD34D);box-shadow:0 0 6px '+_rgba('#FACC15',0.55)+'"></div></div>'+
       '</div>'+
     '</div>';
 
   // ── _pNivel: Nivel Siguiente (bottom-right) ──
   var _pNivel = _mkFloatPanel('hud-nivel','#A78BFA','rgba(167,139,250,0.15)');
   document.body.appendChild(_pNivel);
+  _pNivel.classList.add('hud-pnl');
   _pNivel.style.animationDelay = '2.0s';
-  _pNivel.style.borderRadius = '12px';
+  _pNivel.style.borderRadius = '14px';
   document.getElementById('hud-nivel-inner').innerHTML =
-    '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px">'+
-      // Hexágono pequeño con número del siguiente nivel
-      '<div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;'+
-        'background:radial-gradient(circle,rgba(167,139,250,0.22),rgba(167,139,250,0.05));'+
-        'border:1.5px solid #A78BFA;'+
-        'box-shadow:0 0 12px rgba(167,139,250,0.40),inset 0 0 6px rgba(167,139,250,0.18);'+
-        'clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0">'+
-        '<span id="_hud-nivel-num" style="font-size:13px;font-weight:800;color:#fff;text-shadow:0 0 8px #A78BFA">2</span>'+
+    '<div class="hud-card">'+
+      '<div class="hud-card-ico-hex" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 14px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
+        '<span id="_hud-nivel-num">2</span>'+
       '</div>'+
-      '<div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
-          '<span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,0.55)">Nivel Siguiente</span>'+
+      '<div class="hud-card-c">'+
+        '<span class="hud-card-l" style="color:#A78BFA;text-shadow:0 0 6px '+_rgba('#A78BFA',0.40)+'">Nivel siguiente</span>'+
+        '<div style="display:flex;align-items:baseline;gap:8px;font-family:JetBrains Mono,monospace">'+
+          '<span id="_hud-nivel-xp" style="font-size:13px;font-weight:800;color:#A78BFA;text-shadow:0 0 8px '+_rgba('#A78BFA',0.45)+'">+1,000 XP</span>'+
+          '<span style="color:rgba(255,255,255,0.18)">|</span>'+
+          '<span id="_hud-nivel-bonus" style="font-size:12px;font-weight:700;color:#22D3EE;text-shadow:0 0 6px '+_rgba('#22D3EE',0.40)+'">+$250</span>'+
         '</div>'+
-        '<div style="display:flex;align-items:baseline;gap:8px">'+
-          '<span id="_hud-nivel-xp" style="font-size:12px;font-weight:800;color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,0.55);font-variant-numeric:tabular-nums">+1,000 XP</span>'+
-          '<span style="color:rgba(255,255,255,0.15)">|</span>'+
-          '<span id="_hud-nivel-bonus" style="font-size:11px;font-weight:700;color:#22D3EE;text-shadow:0 0 6px rgba(34,211,238,0.45);font-variant-numeric:tabular-nums">+$250</span>'+
-        '</div>'+
-        '<div id="_hud-nivel-dots" style="display:flex;align-items:center;gap:4px"></div>'+
+        '<span class="hud-card-sub" style="font-size:10px;color:rgba(220,224,235,0.50)">Recompensas desbloqueadas</span>'+
       '</div>'+
+      '<i class="fas fa-gift" style="font-size:20px;color:#A78BFA;flex-shrink:0;filter:drop-shadow(0 0 6px '+_rgba('#A78BFA',0.55)+')"></i>'+
     '</div>';
 
   _pUser._side='top-left';     _pUser._order=0;
@@ -1374,6 +1507,22 @@ function _crearDialOverlay(){
     function fmt2(v){ if(v===null||v===undefined||v==='') return '—'; var n=Number(v); if(isNaN(n)) return '—'; return '$ '+Math.abs(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
     function set(id,v){ var e=document.getElementById(id); if(e&&v!==undefined&&v!==null) e.textContent=v; }
     function setW(id,pct){ var e=document.getElementById(id); if(e){ e.style.width=Math.min(100,Math.max(0,parseFloat(pct)||0))+'%'; } }
+    // Formatea $X,XXX.<dim>00</dim> en hero (centavos atenuados).
+    function setMoney(id,v){
+      var e=document.getElementById(id); if(!e) return;
+      if(v===null||v===undefined||v==='' || isNaN(Number(v))){ e.textContent='—'; return; }
+      var n = Math.abs(Number(v));
+      var entero = Math.floor(n).toLocaleString('es-MX');
+      var dec = (n.toFixed(2).split('.')[1] || '00');
+      e.innerHTML = '$ '+entero+'<span class="cents">.'+dec+'</span>';
+    }
+    // Money formato corto sin centavos (ingresos/egresos)
+    function setMoneyShort(id,v){
+      var e=document.getElementById(id); if(!e) return;
+      if(v===null||v===undefined||v==='' || isNaN(Number(v))){ e.textContent='—'; return; }
+      var n = Math.abs(Number(v));
+      e.innerHTML = '$ '+Math.round(n).toLocaleString('es-MX');
+    }
 
     var d = datos || window._hudDatos || {};
 
@@ -1385,7 +1534,7 @@ function _crearDialOverlay(){
     // ── USER / Nivel / XP (top-left) ──
     if(typeof _calcXPNivel === 'function'){
       var xp = _calcXPNivel();
-      set('_hud-user-nivel', 'Nivel '+xp.nivel);
+      set('_hud-user-nivel', xp.nivel);
       set('_hud-user-xp', xp.xpActual.toLocaleString('es-MX')+' / '+xp.xpMeta.toLocaleString('es-MX')+' XP');
       setW('_hud-user-xpbar', (xp.xpActual/xp.xpMeta)*100);
       // Track
@@ -1402,22 +1551,15 @@ function _crearDialOverlay(){
       set('_hud-energia', rc.energia);
       set('_hud-racha-dias', rc.racha);
       set('_hud-creditos', rc.creditos.toLocaleString('es-MX'));
-      // Panel _p5: racha en formato "N días" + iconos de fuego encendidos
+      // Panel _p5: trio cell "Racha actual" + iconos de fuego encendidos
       var rachaEl = document.getElementById('_hud-racha');
-      if(rachaEl) rachaEl.textContent = rc.racha + ' día' + (rc.racha===1?'':'s');
+      if(rachaEl) rachaEl.textContent = rc.racha + 'd';
       var firesEl = document.getElementById('_hud-racha-fires');
       if(firesEl){
         var fires = firesEl.querySelectorAll('i');
         for(var fi=0; fi<fires.length; fi++){
-          if(fi < rc.racha){
-            fires[fi].style.color = '#FB923C';
-            fires[fi].style.filter = 'drop-shadow(0 0 5px #FB923C)';
-            fires[fi].style.opacity = '1';
-          } else {
-            fires[fi].style.color = 'rgba(100,100,110,0.35)';
-            fires[fi].style.filter = 'none';
-            fires[fi].style.opacity = '1';
-          }
+          if(fi < rc.racha){ fires[fi].classList.add('on'); }
+          else { fires[fi].classList.remove('on'); }
         }
       }
     }
@@ -1462,9 +1604,14 @@ function _crearDialOverlay(){
     var totalApD  = (window._apartadosData||[]).reduce(function(s,a){
       return a.estado&&a.estado.toLowerCase()==='usado'?s:s+(a.monto||0);
     },0);
-    if(totalDisp !== 0) set('_hud-saldo', fmt2(totalDisp - totalApD));
+    if(totalDisp !== 0) setMoney('_hud-saldo', totalDisp - totalApD);
     var sv = document.getElementById('saldo-val');
-    if(sv && sv.textContent && sv.textContent.trim().length>2 && sv.textContent.trim()!=='—') set('_hud-saldo', sv.textContent.trim());
+    if(sv && sv.textContent && sv.textContent.trim().length>2 && sv.textContent.trim()!=='—'){
+      // Si saldo-val ya tiene un valor formateado, parsearlo y aplicar setMoney
+      var raw = sv.textContent.trim().replace(/[^\d.\-]/g,'');
+      var num = parseFloat(raw);
+      if(!isNaN(num)) setMoney('_hud-saldo', num);
+    }
 
     var fijos = window._fijosData || [];
     var maxMonto = fijos.reduce(function(m,f){ return f.nombre!=='P'?Math.max(m,Math.abs(f.monto||0)):m; },1);
@@ -1501,14 +1648,14 @@ function _crearDialOverlay(){
     // ── Financiero ──
     var finD = window._finData;
     if(finD && finD.mes){
-      set('_hud-fin-exc', fmt(finD.mes.excedente));
-      set('_hud-fin-ing', fmt(finD.mes.ingresos));
-      set('_hud-fin-egr', fmt(finD.mes.egresos));
+      setMoney('_hud-fin-exc', finD.mes.excedente);
+      setMoneyShort('_hud-fin-ing', finD.mes.ingresos);
+      setMoneyShort('_hud-fin-egr', finD.mes.egresos);
       var aho = finD.metricas && finD.metricas.porcentajeAhorro;
       set('_hud-fin-aho', aho!=null ? Math.round(aho)+'%' : '—');
       setW('_hud-aho-bar', Math.min(100,Math.max(0,aho||0)));
       var run = finD.metricas && finD.metricas.runwayDias;
-      set('_hud-runway', run!=null ? run+' dias' : '—');
+      set('_hud-runway', run!=null ? run+' días' : '—');
       var gd = finD.metricas && finD.metricas.gastoPorDiaPromedio;
       set('_hud-gastoDia', gd ? fmt(gd) : '—');
     }
