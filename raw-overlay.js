@@ -1,26 +1,25 @@
-/* RAW Entry — Overlay v.5.088
-   Cambios desde v5.087 (REESTRUCTURACIÓN ZONA SUPERIOR):
-   - MEGA-CARD TOP de borde a borde sin huecos: USER + Sim + Stats
-     pegados horizontalmente (antes había gaps entre ellos).
-   - Sim ahora ocupa TODO el ancho disponible entre USER y Stats
-     (antes era r.width*1.15 → dejaba huecos a los lados).
-   - Sim con DOS RENGLONES:
-     · Renglón 1: TABS horizontales (botones del Hero como pills):
-       Estado del Sim (activo) · Home · Logros · Bitácora · Activity
-       · SOS · Nutrición · RAW · Actualizar.
-       Click en tab que NO sea SIM → ejecuta su acción (irABitacora,
-       refreshTodo, etc.) — P-A2 confirmado.
-     · Renglón 2: contenido del tab activo. Por defecto las 9 needs
-       del Sim en UNA SOLA fila horizontal (9 columnas, layout vertical
-       compacto: ico+label arriba, valor+barra abajo).
-   - Banda Sim: grid de 9 cols (antes 3×3); cada need vertical compacta.
-   - Dial 10% MÁS GRANDE: min(836px, 57vw) (antes 760/52).
-   - ELIMINADO panel _p6 Navegación (heredado v5.087).
+/* RAW Entry — Overlay v.5.089
+   Cambios desde v5.088:
+   FIX-1 — Mega-card top alineada al ancho de columnas laterales:
+           USER ocupa exactamente el ancho de la col izquierda;
+           Stats ocupa exactamente el ancho de la col derecha;
+           Sim toma el resto. Los cálculos de leftX/rightX/leftW/rightW
+           se hicieron MOVER ARRIBA en _reposicionarHUD para usarlos
+           en la zona top.
+   FIX-2 — Quitados los "···" del header de cada panel (no hacían nada).
+   FIX-3 — Apretadas proporciones de USER, Sim y Stats:
+           paddings reducidos, fonts un punto más chicos, gaps menores.
+           Resultado: barra top más compacta verticalmente.
+   FIX-4 — Bug de paneles encimados al regresar de vista expandida:
+           limpieza robusta de TODOS los estilos inline (transition,
+           transform, height, minHeight, opacity, pointer-events,
+           position) en cada panel + dial canvas, antes de re-posicionar.
 
    Pendiente para próximas fases:
    - Patrimonio expandido con datos de Home (Fase 2)
    - Financiero expandido (Fase 3)
-   - Paneles Fijos y Variables nuevos (Fase 4)
+   - Paneles Fijos y Variables NUEVOS en columnas extremas
+     (5 columnas total: 2 izq + dial + 2 der) — Fase 4
    - Necesidades expandido = card de Necesidades de Home (Fase 5)
 */
 
@@ -525,25 +524,25 @@ function _crearDialOverlay(){
       '.hud-navg-it .lbl{flex:1;font-size:12px;font-weight:700;color:rgba(220,224,235,0.80);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.hud-navg-it .ch{font-size:9px;opacity:.55}',
       // user panel
-      '.hud-user{display:flex;align-items:center;gap:14px;padding:14px 16px;height:100%;box-sizing:border-box}',
-      '.hud-user-av{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:0;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0;position:relative}',
-      '.hud-user-av i{font-size:18px}',
-      '.hud-user-c{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}',
-      '.hud-user-row1{display:flex;align-items:baseline;gap:10px}',
-      '.hud-user-name{font-size:18px;font-weight:800;letter-spacing:.06em;color:#fff}',
-      '.hud-user-niv{font-size:11px;font-weight:700;color:rgba(220,224,235,0.65);letter-spacing:.04em}',
+      '.hud-user{display:flex;align-items:center;gap:11px;padding:8px 12px;height:100%;box-sizing:border-box}',
+      '.hud-user-av{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:0;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0;position:relative}',
+      '.hud-user-av i{font-size:15px}',
+      '.hud-user-c{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}',
+      '.hud-user-row1{display:flex;align-items:baseline;gap:8px}',
+      '.hud-user-name{font-size:15px;font-weight:800;letter-spacing:.06em;color:#fff}',
+      '.hud-user-niv{font-size:10px;font-weight:700;color:rgba(220,224,235,0.65);letter-spacing:.04em}',
       '.hud-user-niv-badge{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:3px;font-size:8px}',
       '.hud-user-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;width:100%}',
       '.hud-user-bar > div{height:100%;border-radius:999px;transition:width .8s ease}',
       '.hud-user-xp{font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);text-align:right;font-family:JetBrains Mono,monospace}',
       // sim panel band
       // ── MEGA-CARD TOP: tabs + contenido ──
-      '.hud-megatabs{display:flex;align-items:stretch;gap:6px;padding:10px 14px 0;border-bottom:1px solid rgba(255,255,255,0.06)}',
-      '.hud-megatab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;'+
-        'padding:9px 10px;border-radius:10px 10px 0 0;background:transparent;border:1px solid transparent;border-bottom:0;'+
-        'cursor:pointer;font-family:inherit;font-weight:800;font-size:9px;letter-spacing:.10em;text-transform:uppercase;'+
+      '.hud-megatabs{display:flex;align-items:stretch;gap:4px;padding:6px 10px 0;border-bottom:1px solid rgba(255,255,255,0.06)}',
+      '.hud-megatab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;'+
+        'padding:6px 8px;border-radius:8px 8px 0 0;background:transparent;border:1px solid transparent;border-bottom:0;'+
+        'cursor:pointer;font-family:inherit;font-weight:800;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;'+
         'color:rgba(220,224,235,0.55);transition:all .18s;flex:1;min-width:0;position:relative;top:1px}',
-      '.hud-megatab i{font-size:14px;color:rgba(220,224,235,0.65);transition:color .18s}',
+      '.hud-megatab i{font-size:12px;color:rgba(220,224,235,0.65);transition:color .18s}',
       '.hud-megatab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
       '.hud-megatab:hover{background:rgba(255,255,255,0.04);color:rgba(220,224,235,0.85)}',
       '.hud-megatab:hover i{color:var(--tc)}',
@@ -551,8 +550,8 @@ function _crearDialOverlay(){
         'box-shadow:0 -2px 12px var(--tc-glow),inset 0 -2px 0 var(--tc);color:var(--tc);text-shadow:0 0 6px var(--tc-glow)}',
       '.hud-megatab.active i{color:var(--tc);filter:drop-shadow(0 0 4px var(--tc))}',
       '.hud-sim-content{padding:0}',
-      '.hud-sim-h-inline{display:flex;align-items:center;gap:10px;padding:11px 18px 7px}',
-      '.hud-sim-h-inline i{font-size:14px;flex-shrink:0}',
+      '.hud-sim-h-inline{display:flex;align-items:center;gap:8px;padding:6px 14px 4px}',
+      '.hud-sim-h-inline i{font-size:13px;flex-shrink:0}',
       '.hud-sim-h-txt{display:flex;flex-direction:column;gap:1px;min-width:0}',
       '.hud-sim-h-txt .t{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;text-shadow:0 0 8px rgba(167,139,250,0.40)}',
       '.hud-sim-h-txt .meta{font-size:8.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
@@ -562,17 +561,17 @@ function _crearDialOverlay(){
       '.hud-sim-h .ico i{font-size:11px}',
       '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
-      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 12px;padding:4px 18px 12px}',
+      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 10px;padding:2px 14px 8px}',
       // stats panel
-      '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:6px;padding:12px 14px;height:100%;box-sizing:border-box}',
-      '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:10px;min-width:0;padding:0 4px}',
+      '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:4px;padding:8px 10px;height:100%;box-sizing:border-box}',
+      '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:8px;min-width:0;padding:0 3px}',
       '.hud-stats-cell + .hud-stats-cell{border-left:1px solid rgba(255,255,255,0.06)}',
-      '.hud-stats-ico{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
-      '.hud-stats-ico i{font-size:15px}',
+      '.hud-stats-ico{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
+      '.hud-stats-ico i{font-size:13px}',
       '.hud-stats-txt{display:flex;flex-direction:column;gap:1px;min-width:0}',
-      '.hud-stats-v{font-size:20px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace}',
-      '.hud-stats-v .max{opacity:.40;font-weight:700;font-size:11px;margin-left:2px}',
-      '.hud-stats-l{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
+      '.hud-stats-v{font-size:16px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace}',
+      '.hud-stats-v .max{opacity:.40;font-weight:700;font-size:9px;margin-left:2px}',
+      '.hud-stats-l{font-size:7.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
       // bottom cards (mision, logro, nivel)
       '.hud-card{display:flex;align-items:center;gap:12px;padding:13px 16px}',
       '.hud-card-ico{width:42px;height:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:10px}',
@@ -612,7 +611,6 @@ function _crearDialOverlay(){
         'style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+
         '<i class="fas fa-up-right-and-down-left-from-center"></i>'+
       '</button>'+
-      '<span class="hud-h-k">···</span>'+
     '</div>'+
     '<div class="hud-h-bar" style="--ac-50:'+_rgba(color,0.40)+'"></div>';
   }
@@ -1186,57 +1184,82 @@ function _crearDialOverlay(){
       return;
     }
 
-    // ── Restaurar estado del dial si veníamos de modo expandido ──
-    if(_dialCanvas._wasMini){
-      _dialCanvas.style.transition = 'width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)';
-      // Siguen las líneas normales de tamaño/posición
-    }
-    // Limpiar opacidad/pointer-events de Logro y Track al volver
-    var pLogroBack = getTop('bottom-center')[0];
-    var pTrackBack = getTop('bottom-track')[0];
-    if(pLogroBack){ pLogroBack.el.style.opacity = ''; pLogroBack.el.style.pointerEvents = ''; }
-    if(pTrackBack){ pTrackBack.el.style.opacity = ''; pTrackBack.el.style.pointerEvents = ''; }
-    // Restaurar dial al tamaño/posición normal (fuera del flujo fixed)
-    _dialCanvas.style.position   = 'relative';
-    _dialCanvas.style.left       = '';
-    _dialCanvas.style.top        = '';
-    _dialCanvas.style.zIndex     = '1';
-    _dialCanvas.style.cursor     = 'pointer';
-    _dialCanvas.style.boxShadow  = '';
+    // ══════════════════════════════════════════════════════════════════════
+    //  REGRESO DE MODO EXPANDIDO — limpieza robusta de TODOS los estilos
+    //  inline que se aplicaron en la rama expandida, para que el flujo
+    //  normal de abajo pueda re-posicionar limpiamente sin sobrescribir
+    //  con transitions raras que dejen los paneles encimados.
+    // ══════════════════════════════════════════════════════════════════════
+    // Restaurar el dial canvas al estado original COMPLETO
+    _dialCanvas.style.transition  = '';
+    _dialCanvas.style.position    = 'relative';
+    _dialCanvas.style.left        = '';
+    _dialCanvas.style.top         = '';
+    _dialCanvas.style.zIndex      = '1';
+    _dialCanvas.style.cursor      = 'pointer';
+    _dialCanvas.style.boxShadow   = '';
     _dialCanvas.style.borderRadius = '';
-    _dialCanvas.style.width      = 'min(836px,57vw)';
-    _dialCanvas.style.height     = 'min(836px,57vw)';
-    _dialCanvas.title            = '';
-    // Limpiar tamaño/posición forzados de paneles laterales (volverán al flujo)
+    _dialCanvas.style.transform   = '';
+    _dialCanvas.style.width       = 'min(836px,57vw)';
+    _dialCanvas.style.height      = 'min(836px,57vw)';
+    _dialCanvas.title             = '';
+
+    // Limpiar TODOS los paneles: transitions, transforms, height/minHeight forzados,
+    // opacity y pointer-events que la rama expandida pudo haber dejado.
     window._hudPanels.forEach(function(hp){
-      if(hp.el === expandedEl) return;
-      // Limpiar height y minHeight forzados (en panel expandido los habíamos puesto)
-      hp.el.style.height = '';
-      hp.el.style.minHeight = '';
+      var el = hp.el;
+      // Quitar transition para que el reposicionamiento de abajo aplique sin animar
+      // de forma rara (el modo expandido las activa). Las animaciones del estado
+      // normal (entrada del overlay) son CSS class-based, no inline.
+      el.style.transition    = '';
+      el.style.transform     = '';
+      el.style.height        = '';
+      el.style.minHeight     = '';
+      el.style.opacity       = '';
+      el.style.pointerEvents = '';
+      // El inner también tenía minHeight forzado en el modo expandido
+      var inner = el.querySelector(':scope > [id$="-inner"]');
+      if(inner){ inner.style.minHeight = ''; }
     });
 
     // ══════════════════════════════════════════
-    //  ZONA SUPERIOR — fila continua de borde a borde, SIN HUECOS
+    //  CÁLCULO DE COLUMNAS LATERALES — se hace primero porque la zona top
+    //  necesita conocer leftX, rightX, leftW, rightW para alinearse al ancho.
+    // ══════════════════════════════════════════
+    var leftSpace  = r.left;
+    var rightSpace = vW - r.right;
+    var leftW  = Math.min(Math.max(180, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.85));
+    var rightW = Math.min(Math.max(180, rightSpace - GAP*2), Math.floor(rightSpace * 0.85));
+    leftW  = Math.min(leftW, 260);
+    rightW = Math.min(rightW, 260);
+    var leftX  = Math.floor((leftSpace  - leftW)  / 2);
+    var rightX = r.right + Math.floor((rightSpace - rightW) / 2);
+
+    // ══════════════════════════════════════════
+    //  ZONA SUPERIOR — fila continua, ancho = desde leftX hasta (rightX+rightW)
     //  USER + Sim (mega-card con tabs) + Stats forman UNA barra horizontal
-    //  pegados entre sí, ocupando TODO el ancho del viewport.
+    //  pegados entre sí, alineada al ancho de las columnas laterales.
     // ══════════════════════════════════════════
     var topPad  = GAP;
     var pUser  = getTop('top-left')[0];
     var pSim   = getTop('top-center')[0];
     var pStats = getTop('top-right')[0];
 
-    // Anchos fijos para USER y Stats; Sim toma el resto del viewport.
-    var wUser  = 220;
-    var wStats = 340;
-    var wSim   = vW - wUser - wStats - topPad*2;
-    // En viewports muy estrechos, fallback compacto
-    if(wSim < 400){
-      wUser = 180; wStats = 280;
-      wSim = vW - wUser - wStats - topPad*2;
-    }
+    // Ancho total de la barra top: desde inicio de col izq hasta fin de col der
+    var topBarStartX = leftX;
+    var topBarEndX   = rightX + rightW;
+    var topBarTotalW = topBarEndX - topBarStartX;
+
+    // USER ocupa el ancho de la columna izquierda; Stats el de la derecha;
+    // Sim ocupa el centro restante.
+    var wUser  = leftW;
+    var wStats = rightW;
+    var wSim   = topBarTotalW - wUser - wStats;
     if(wSim < 300){
-      wUser = 0; wStats = 0;
-      wSim = vW - topPad*2;
+      // Fallback: encoger USER y Stats si Sim queda muy estrecho
+      wUser = Math.min(180, wUser);
+      wStats = Math.min(280, wStats);
+      wSim = topBarTotalW - wUser - wStats;
     }
 
     if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; pUser.el.style.opacity=''; }
@@ -1245,8 +1268,7 @@ function _crearDialOverlay(){
     if(pStats && wStats>0){ pStats.el.style.width = wStats+'px'; pStats.el.style.visibility='visible'; pStats.el.style.opacity=''; }
     else if(pStats){ pStats.el.style.width='0px'; pStats.el.style.opacity='0'; pStats.el.style.visibility='hidden'; }
 
-    // Medir altura natural de cada uno (Sim será la más alta porque tiene
-    // 2 renglones: tabs + barra Sim)
+    // Medir altura natural (Sim será la más alta por sus 2 renglones)
     var topMaxH = 0;
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
@@ -1256,7 +1278,7 @@ function _crearDialOverlay(){
       }
     });
     if(topMaxH===0) topMaxH = 130;
-    // Forzar altura uniforme para que se vean alineadas como UNA barra
+    // Forzar altura uniforme para alinearse como UNA barra
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
         hp.el.style.minHeight = topMaxH+'px';
@@ -1269,19 +1291,19 @@ function _crearDialOverlay(){
     });
 
     var topY = topPad;
-    // PEGADAS sin gaps entre ellas: User-Sim-Stats consecutivos
+    // PEGADAS sin gaps entre ellas, comenzando en topBarStartX
     if(pUser && wUser>0){
-      pUser.el.style.left = topPad + 'px';
+      pUser.el.style.left = topBarStartX + 'px';
       pUser.el.style.top  = topY + 'px';
       pUser.el.style.clipPath = chamferRect;
     }
     if(pSim){
-      pSim.el.style.left = (topPad + wUser) + 'px';
+      pSim.el.style.left = (topBarStartX + wUser) + 'px';
       pSim.el.style.top  = topY + 'px';
       pSim.el.style.clipPath = chamferRect;
     }
     if(pStats && wStats>0){
-      pStats.el.style.left = (vW - topPad - wStats) + 'px';
+      pStats.el.style.left = (topBarStartX + wUser + wSim) + 'px';
       pStats.el.style.top  = topY + 'px';
       pStats.el.style.clipPath = chamferRect;
     }
@@ -1359,22 +1381,11 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════
     //  COLUMNAS LATERALES — entre fila top y track
     //  IMPORTANTE: las columnas NUNCA invaden zona inferior (botY o trackY)
+    //  NOTA: leftX/rightX/leftW/rightW ya fueron calculados arriba (zona top los necesitaba).
     // ══════════════════════════════════════════
-    // Espacio entre fila top y columnas: APRETADO (antes GAP*2 = 28px → ahora 8px)
     var colTopY    = topY + topMaxH + 8;
     var colBotY    = trackY - 8;
     var colVAvail  = Math.max(200, colBotY - colTopY);
-
-    // Anchos laterales conservadores con cap más bajo (objetivo: 220-260)
-    var leftSpace  = r.left;
-    var rightSpace = vW - r.right;
-    var leftW  = Math.min(Math.max(180, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.85));
-    var rightW = Math.min(Math.max(180, rightSpace - GAP*2), Math.floor(rightSpace * 0.85));
-    // Cap absoluto: máximo 260px (antes 300)
-    leftW  = Math.min(leftW, 260);
-    rightW = Math.min(rightW, 260);
-    var leftX  = Math.floor((leftSpace  - leftW)  / 2);
-    var rightX = r.right + Math.floor((rightSpace - rightW) / 2);
 
     var leftPanels  = window._hudPanels.filter(function(hp){ return hp.el._side==='left';  });
     var rightPanels = window._hudPanels.filter(function(hp){ return hp.el._side==='right'; });
