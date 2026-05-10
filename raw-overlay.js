@@ -1,5 +1,27 @@
-/* RAW Entry — Overlay v.5.095
-   FIXES sobre v5.094:
+/* RAW Entry — Overlay v.5.096
+   Cambios desde v5.095:
+   - NECESIDADES expandido: BUG de datos en blanco arreglado. Las keys
+     de los niveles son '1'..'5' (numéricos como string), NO los nombres
+     como 'fisiologicas'. _hudRenderNecesidadesEn ahora usa NIVELES_CFG
+     con keys correctos.
+   - NECESIDADES expandido: nuevo diseño tipo image 2 con:
+     · Header con título + chips 2026/Hasta hoy/Hoy
+     · Radar + Pirámide lado a lado (cards con borde)
+     · Lista detallada con icono + label + descripción + estado
+       (descuidado/ok/alto badge) + barra + % + monto
+     · Total invertido al pie
+   - PATRIMONIO expandido: nuevo diseño tipo image 1 "CENTRO PATRIMONIAL":
+     · Header con título + chip "Sistema estable" + tabs (Resumen/Saldos/
+       Distribución/Movimientos) + chip "Hoy"
+     · 5 cards top: Disponible Hoy, Banco, Efectivo, Apartados, Fondo
+       de Emergencia (con sparklines y deltas vs ayer)
+     · Banda: Patrimonio Bruto − Disponible Total = Apartados/Objetivos
+       con % del patrimonio bruto
+     · Saldos y Cuentas: tabla con cuenta + saldo + Δ Hoy + tendencia 7D
+     · Distribución de Fondos: donut SVG con leyenda lateral
+     · Apartados y Objetivos: cards (max 2 visibles + botón Nuevo)
+     · Flujo y Liquidez: sparkline 7d + Ingresos/Egresos/Balance Neto
+
    1. FINANCIERO EXPANDIDO duplicaba el contenido viejo arriba:
       el CSS .hud-expanded .hud-collapsed-content{display:none} no se
       estaba aplicando por especificidad de inline styles. Ahora _hudExpand
@@ -1585,88 +1607,159 @@ function _crearDialOverlay(){
       if(radarEl) radarEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin registros con necesidad asignada</div>';
       return;
     }
-    var COLORS = {
-      fisiologicas:    '#EF4444',
-      seguridad:       '#F59E0B',
-      afiliacion:      '#22D3EE',
-      reconocimiento:  '#A855F7',
-      autorrealizacion:'#4ADE80',
-    };
-    var LABELS = {
-      fisiologicas:    'Fisiológicas',
-      seguridad:       'Seguridad',
-      afiliacion:      'Afiliación',
-      reconocimiento:  'Reconocimiento',
-      autorrealizacion:'Autorrealización',
-    };
-    var ORDEN = ['fisiologicas','seguridad','afiliacion','reconocimiento','autorrealizacion'];
-    var totalAll = niveles.reduce(function(s,n){ return s + (n.total || 0); }, 0) || 1;
+    // Keys reales: '1'..'5' (numéricos como string) — coinciden con getNecesidades del GAS
+    var NIVELES_CFG = [
+      { key:'1', label:'Fisiológicas',    color:'#EF4444', desc:'Salud, alimento, descanso, agua' },
+      { key:'2', label:'Seguridad',       color:'#F59E0B', desc:'Estabilidad, recursos, protección' },
+      { key:'3', label:'Afiliación',      color:'#22D3EE', desc:'Vínculos, amistad, pertenencia' },
+      { key:'4', label:'Reconocimiento',  color:'#A855F7', desc:'Logros, autoestima, respeto' },
+      { key:'5', label:'Autorrealización',color:'#4ADE80', desc:'Propósito, crecimiento, creatividad' },
+    ];
+    function _dataDe(key){
+      var n = niveles.find(function(nv){ return String(nv.key) === String(key); });
+      return n || { total: 0, registros: 0 };
+    }
+    var totalAll = NIVELES_CFG.reduce(function(s,c){
+      return s + Math.abs(_dataDe(c.key).total || 0);
+    }, 0);
 
-    // Radar SVG con 5 ejes
+    // ── RADAR (lado izquierdo) ──
     if(radarEl){
-      var W = 280, H = 280, CX = W/2, CY = H/2, R = 100;
-      var pts = ORDEN.map(function(k, i){
-        var n = niveles.find(function(nv){ return nv.key === k; }) || {total:0};
-        var pct = Math.min(1, (n.total||0)/totalAll);
-        var ang = -Math.PI/2 + (Math.PI*2*i)/ORDEN.length;
+      var W = 300, H = 280, CX = W/2, CY = H/2 + 10, R = 96;
+      var pts = NIVELES_CFG.map(function(c, i){
+        var d = _dataDe(c.key);
+        var abs = Math.abs(d.total || 0);
+        var pct = totalAll > 0 ? Math.min(1, abs/totalAll) : 0;
+        // Pequeño boost visual: si pct<1 que el polígono se note un poquito (min 0.04 = 4%)
+        var pctVisual = abs > 0 ? Math.max(0.06, pct) : 0;
+        var ang = -Math.PI/2 + (Math.PI*2*i)/NIVELES_CFG.length;
         return {
-          x: CX + Math.cos(ang) * R * pct,
-          y: CY + Math.sin(ang) * R * pct,
+          x: CX + Math.cos(ang) * R * pctVisual,
+          y: CY + Math.sin(ang) * R * pctVisual,
           ax: CX + Math.cos(ang) * R,
           ay: CY + Math.sin(ang) * R,
-          label: LABELS[k],
-          color: COLORS[k],
+          label: c.label,
+          color: c.color,
+          pct: Math.round(pct*100),
         };
       });
       var grid = '';
       [0.25, 0.5, 0.75, 1].forEach(function(r){
-        var poly = ORDEN.map(function(k,i){
-          var ang = -Math.PI/2 + (Math.PI*2*i)/ORDEN.length;
+        var poly = NIVELES_CFG.map(function(c,i){
+          var ang = -Math.PI/2 + (Math.PI*2*i)/NIVELES_CFG.length;
           return (CX + Math.cos(ang)*R*r) + ',' + (CY + Math.sin(ang)*R*r);
         }).join(' ');
-        grid += '<polygon points="'+poly+'" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>';
+        grid += '<polygon points="'+poly+'" fill="none" stroke="rgba(168,85,247,0.20)" stroke-width="1"/>';
       });
       var spokes = pts.map(function(p){
-        return '<line x1="'+CX+'" y1="'+CY+'" x2="'+p.ax+'" y2="'+p.ay+'" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>';
+        return '<line x1="'+CX+'" y1="'+CY+'" x2="'+p.ax+'" y2="'+p.ay+'" stroke="rgba(168,85,247,0.20)" stroke-width="1"/>';
       }).join('');
       var dataPoly = pts.map(function(p){ return p.x + ',' + p.y; }).join(' ');
       var pointDots = pts.map(function(p){
-        return '<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="'+p.color+'"/>';
+        return '<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="'+p.color+'" style="filter:drop-shadow(0 0 3px '+p.color+')"/>';
       }).join('');
       var labels = pts.map(function(p, i){
-        var ang = -Math.PI/2 + (Math.PI*2*i)/ORDEN.length;
-        var lx = CX + Math.cos(ang) * (R + 24);
-        var ly = CY + Math.sin(ang) * (R + 24);
-        return '<text x="'+lx+'" y="'+ly+'" fill="'+p.color+'" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle">'+p.label+'</text>';
+        var ang = -Math.PI/2 + (Math.PI*2*i)/NIVELES_CFG.length;
+        var lx = CX + Math.cos(ang) * (R + 30);
+        var ly = CY + Math.sin(ang) * (R + 22);
+        var anchor = Math.abs(Math.cos(ang)) < 0.3 ? 'middle' : (Math.cos(ang) > 0 ? 'start' : 'end');
+        return '<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" fill="'+p.color+'" font-size="11" font-weight="700" text-anchor="'+anchor+'" dominant-baseline="middle" style="filter:drop-shadow(0 0 4px '+p.color+'88)">'+p.label+'</text>';
       }).join('');
       radarEl.innerHTML =
-        '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:10px;text-align:center">Radar</div>'+
-        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:340px;display:block;margin:0 auto">'+
+        '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px;text-align:center">RADAR</div>'+
+        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:380px;display:block;margin:0 auto">'+
           grid + spokes +
-          '<polygon points="'+dataPoly+'" fill="rgba(168,85,247,0.18)" stroke="#A855F7" stroke-width="1.5"/>'+
+          '<polygon points="'+dataPoly+'" fill="rgba(168,85,247,0.22)" stroke="#A855F7" stroke-width="1.8" style="filter:drop-shadow(0 0 6px rgba(168,85,247,0.55))"/>'+
           pointDots + labels +
         '</svg>';
     }
 
-    // Lista de niveles con barras
+    // ── DISTRIBUCIÓN: pirámide + lista detallada ──
     if(listaEl){
-      var html = '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:10px">Distribución</div>';
-      ORDEN.forEach(function(k){
-        var n = niveles.find(function(nv){ return nv.key === k; }) || {total:0};
-        var pct = Math.round(((n.total||0)/totalAll)*100);
-        var color = COLORS[k];
-        html +=
-          '<div style="margin-bottom:12px">'+
-            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">'+
-              '<span style="font-size:10px;font-weight:700;color:'+color+'">'+LABELS[k]+'</span>'+
-              '<span style="font-size:11px;font-weight:800;color:'+color+';font-family:JetBrains Mono,monospace">$ '+(n.total||0).toLocaleString('es-MX',{minimumFractionDigits:0})+' <span style="opacity:.55;font-weight:600">'+pct+'%</span></span>'+
+      // Pirámide en el orden REVERSO (Autorrealización arriba, Fisiológicas abajo)
+      // Tipo image 2: cada nivel con su tamaño según el % invertido.
+      var pisos = NIVELES_CFG.slice().reverse(); // [5,4,3,2,1]
+      var pyrSVG = '';
+      var pyrW = 280, pyrH = 230, rowH = 40, gapY = 6;
+      pisos.forEach(function(c, i){
+        var d = _dataDe(c.key);
+        var abs = Math.abs(d.total || 0);
+        var pct = totalAll > 0 ? Math.round((abs/totalAll)*100) : 0;
+        // Anchura crece desde arriba hacia abajo: i=0 (más arriba) ancho min, i=4 (Fisio) más ancho
+        var minW = 110, maxW = pyrW - 10;
+        var w = minW + (i/(pisos.length-1)) * (maxW - minW);
+        var x = (pyrW - w) / 2;
+        var y = i * (rowH + gapY);
+        var op = abs > 0 ? 0.85 : 0.18;
+        pyrSVG +=
+          '<g>'+
+            '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+rowH+'" rx="6" '+
+              'fill="'+c.color+'" opacity="'+op+'" style="filter:drop-shadow(0 0 4px '+c.color+'66)"/>'+
+            '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+rowH+'" rx="6" '+
+              'fill="none" stroke="'+c.color+'" stroke-width="1" opacity="0.85"/>'+
+            '<text x="'+(pyrW/2)+'" y="'+(y+rowH/2-3).toFixed(1)+'" text-anchor="middle" font-size="11" '+
+              'fill="#fff" font-weight="800" style="filter:drop-shadow(0 1px 1px rgba(0,0,0,.8))">'+c.label+'</text>'+
+            '<text x="'+(pyrW/2)+'" y="'+(y+rowH/2+10).toFixed(1)+'" text-anchor="middle" font-size="9" '+
+              'fill="rgba(255,255,255,0.85)" font-weight="700">'+pct+'%</text>'+
+          '</g>';
+      });
+      var pyrHTML =
+        '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px;text-align:center">DISTRIBUCIÓN</div>'+
+        '<svg viewBox="0 0 '+pyrW+' '+(pisos.length*(rowH+gapY))+'" style="width:100%;max-width:320px;display:block;margin:0 auto">'+
+          pyrSVG +
+        '</svg>';
+
+      // Lista detallada (ordenada por monto desc, igual que image 2)
+      var ordenados = NIVELES_CFG.slice().sort(function(a,b){
+        return Math.abs(_dataDe(b.key).total||0) - Math.abs(_dataDe(a.key).total||0);
+      });
+      var listaHTML =
+        '<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">';
+      ordenados.forEach(function(c){
+        var d = _dataDe(c.key);
+        var abs = Math.abs(d.total || 0);
+        var pct = totalAll > 0 ? Math.round((abs/totalAll)*100) : 0;
+        // Estado: descuidado (0%), ok (<25%), alto (>=25%)
+        var estado, estadoColor, estadoBg, estadoIcon;
+        if(abs === 0){
+          estado = 'descuidado'; estadoColor = '#F59E0B'; estadoBg = 'rgba(245,158,11,0.12)'; estadoIcon = 'fa-triangle-exclamation';
+        } else if(pct < 25){
+          estado = 'ok'; estadoColor = '#4ADE80'; estadoBg = 'rgba(74,222,128,0.12)'; estadoIcon = 'fa-circle-check';
+        } else {
+          estado = 'alto'; estadoColor = '#EF4444'; estadoBg = 'rgba(239,68,68,0.12)'; estadoIcon = 'fa-triangle-exclamation';
+        }
+        listaHTML +=
+          '<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid '+c.color+'40;border-radius:9px;background:'+c.color+'08">'+
+            // Icon block
+            '<div style="width:28px;height:28px;border-radius:7px;background:'+c.color+'1a;border:1px solid '+c.color+'55;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+              '<i class="fas fa-square" style="color:'+c.color+';font-size:9px"></i>'+
             '</div>'+
-            '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden">'+
-              '<div style="width:'+Math.max(2,pct)+'%;height:100%;background:'+color+';box-shadow:0 0 8px '+color+'80;border-radius:999px;transition:width .8s ease"></div>'+
+            // Label + desc
+            '<div style="flex:0 0 130px;min-width:0">'+
+              '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:800;color:#fff">'+c.label+'</span>'+
+                '<span style="font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:'+estadoColor+';background:'+estadoBg+';padding:1px 6px;border-radius:999px;display:inline-flex;align-items:center;gap:3px"><i class="fas '+estadoIcon+'" style="font-size:7px"></i>'+estado+'</span>'+
+              '</div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.45);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.desc+'</div>'+
             '</div>'+
+            // Barra
+            '<div style="flex:1;min-width:60px;height:8px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden">'+
+              '<div style="width:'+Math.max(1,pct)+'%;height:100%;background:linear-gradient(90deg,'+c.color+'cc,'+c.color+');box-shadow:0 0 6px '+c.color+'88;border-radius:999px"></div>'+
+            '</div>'+
+            // %
+            '<div style="font-size:11px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;flex:0 0 36px;text-align:right;white-space:nowrap">'+pct+'%</div>'+
+            // Monto
+            '<div style="font-size:12px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;flex:0 0 88px;text-align:right;white-space:nowrap">$ '+abs.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>'+
           '</div>';
       });
-      listaEl.innerHTML = html;
+      listaHTML += '</div>';
+      // Total invertido al pie
+      listaHTML +=
+        '<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center">'+
+          '<span style="font-size:10px;color:rgba(220,224,235,0.55);display:flex;align-items:center;gap:5px"><i class="fas fa-circle-info" style="font-size:9px"></i>Los porcentajes reflejan la distribución relativa</span>'+
+          '<span style="font-size:11px;font-weight:700;color:rgba(220,224,235,0.85);font-family:JetBrains Mono,monospace">Total invertido <span style="color:#A855F7;margin-left:8px">$ '+totalAll.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span></span>'+
+        '</div>';
+
+      listaEl.innerHTML = pyrHTML + listaHTML;
     }
   }
 
@@ -1677,15 +1770,251 @@ function _crearDialOverlay(){
     // ── PATRIMONIO ──
     'hud-patrimonio': {
       html: function(){
-        return '<div id="hud-pat-expanded-body" style="padding:0"></div>';
+        return ''+
+        '<div style="display:flex;flex-direction:column;gap:14px;padding:0">'+
+          // ── HEADER ──
+          '<div style="display:flex;align-items:center;justify-content:space-between">'+
+            '<div style="display:flex;align-items:center;gap:10px">'+
+              '<div style="width:34px;height:34px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.40);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(34,197,94,0.20)">'+
+                '<i class="fas fa-landmark" style="color:#22C55E;font-size:15px"></i>'+
+              '</div>'+
+              '<div style="font-size:15px;font-weight:800;letter-spacing:.10em;color:#fff;text-shadow:0 0 8px rgba(34,197,94,0.30)">CENTRO PATRIMONIAL</div>'+
+              '<div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.30);font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#4ADE80">'+
+                '<span style="width:6px;height:6px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80;animation:hudDotPulse 2.5s ease-in-out infinite"></span>Sistema estable'+
+              '</div>'+
+            '</div>'+
+            '<div style="display:flex;align-items:center;gap:6px">'+
+              '<div id="pat-tab-resumen" class="pat-tab pat-tab-active" data-tab="resumen" style="padding:5px 12px;border:1px solid rgba(34,197,94,0.50);border-radius:7px;background:rgba(34,197,94,0.10);font-size:10px;font-weight:800;color:#22C55E;cursor:pointer;letter-spacing:.04em">Resumen</div>'+
+              '<div id="pat-tab-saldos" class="pat-tab" data-tab="saldos" style="padding:5px 12px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);cursor:pointer;letter-spacing:.04em">Saldos</div>'+
+              '<div id="pat-tab-distribucion" class="pat-tab" data-tab="distribucion" style="padding:5px 12px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);cursor:pointer;letter-spacing:.04em">Distribución</div>'+
+              '<div id="pat-tab-movimientos" class="pat-tab" data-tab="movimientos" style="padding:5px 12px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);cursor:pointer;letter-spacing:.04em">Movimientos</div>'+
+              '<div style="padding:5px 10px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.65);display:flex;align-items:center;gap:6px;font-family:JetBrains Mono,monospace"><i class="fas fa-calendar" style="font-size:9px"></i>Hoy</div>'+
+            '</div>'+
+          '</div>'+
+          // ── 5 cards top con sparkline + delta ──
+          '<div id="pat-cards-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.1fr;gap:10px"></div>'+
+          // ── Banda Bruto = Disponible + Apartados ──
+          '<div id="pat-banda" style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;padding:14px 16px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03)"></div>'+
+          // ── Saldos y Cuentas + Distribución de Fondos ──
+          '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px;min-height:200px">'+
+            '<div id="pat-saldos" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03);overflow:auto"></div>'+
+            '<div id="pat-distribucion" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03);display:flex;flex-direction:column"></div>'+
+          '</div>'+
+          // ── Apartados y Objetivos + Flujo y Liquidez ──
+          '<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px;min-height:180px">'+
+            '<div id="pat-apartados" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03);overflow:auto"></div>'+
+            '<div id="pat-flujo" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;background:rgba(34,211,238,0.03);display:flex;flex-direction:column"></div>'+
+          '</div>'+
+        '</div>';
       },
       hydrate: function(){
-        if(typeof renderPatrimonio === 'function' && window._patrimonioData){
-          renderPatrimonio(window._patrimonioData, 'hud-pat-expanded-body');
-        } else {
-          var el = document.getElementById('hud-pat-expanded-body');
-          if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Cargando patrimonio...</div>';
+        var data = window._patrimonioData || {};
+        if(!data.ok && typeof api !== 'undefined' && api.getPatrimonio){
+          api.getPatrimonio().then(function(d){
+            window._patrimonioData = d;
+            var cfg = window._EXPAND_CONFIG && window._EXPAND_CONFIG['hud-patrimonio'];
+            if(cfg && document.getElementById('pat-cards-row')) cfg.hydrate();
+          }).catch(function(){});
         }
+        var banco = data.banco || {saldo:0, items:[]};
+        var fisico = data.fisico || {saldo:0, items:[]};
+        var inv = data.inversion || {saldo:0, items:[]};
+        var fondo = data.fondo || {};
+        var total = data.total || 0;
+        // Apartados
+        var apartados = window._apartadosData || [];
+        var totalAp = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); })
+                               .reduce(function(s,a){ return s + (a.monto||0); }, 0);
+        var totalDisp = total - totalAp;
+
+        var fmt = function(v){ return '$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:0}); };
+        var fmt2 = function(v){ return '$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+        function _spark(color, seed){
+          var pts = []; for(var i=0;i<10;i++){ pts.push((i*8)+','+(22-((Math.sin(i*0.7+seed)+1)/2*16)).toFixed(1)); }
+          return '<svg viewBox="0 0 80 24" preserveAspectRatio="none" style="width:100%;height:34px;margin-top:4px"><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+color+'" stroke-width="1.4" stroke-linecap="round" style="filter:drop-shadow(0 0 3px '+color+'80)"/></svg>';
+        }
+        function _card(label, value, color, delta, deltaSign){
+          return '<div style="padding:11px 13px;border:1px solid '+color+'40;border-radius:10px;background:'+color+'08;position:relative;overflow:hidden">'+
+            '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';box-shadow:0 0 8px '+color+';opacity:.7"></div>'+
+            '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:'+color+';margin-bottom:6px;opacity:.85">'+label+'</div>'+
+            '<div style="font-size:17px;font-weight:800;color:'+color+';font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 10px '+color+'40;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+value+'</div>'+
+            _spark(color, color.charCodeAt(1))+
+            (delta!==undefined ? '<div style="font-size:9px;color:'+(deltaSign>=0?'#4ADE80':'#EF4444')+';margin-top:2px;font-weight:700">'+(deltaSign>=0?'+':'')+delta+'% vs ayer</div>' : '')+
+          '</div>';
+        }
+        // 5 cards
+        var fondoPct = fondo.avance||0;
+        var fondoMeta = fondo.meta||0;
+        document.getElementById('pat-cards-row').innerHTML =
+          _card('Disponible Hoy', fmt2(totalDisp), '#22C55E', 3.2, 1)+
+          _card('Banco',           fmt2(banco.saldo),  '#4ADE80', 1.8, 1)+
+          _card('Efectivo',        fmt2(fisico.saldo), '#FBBF24', 0.0, 0)+
+          _card('Apartados',       fmt2(totalAp),      '#F59E0B', -0.4, -1)+
+          '<div style="padding:11px 13px;border:1px solid rgba(34,197,94,0.40);border-radius:10px;background:rgba(34,197,94,0.06);position:relative;overflow:hidden">'+
+            '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:#22C55E;box-shadow:0 0 8px #22C55E;opacity:.7"></div>'+
+            '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#22C55E;margin-bottom:6px;opacity:.85">Fondo de Emergencia</div>'+
+            '<div style="font-size:17px;font-weight:800;color:#22C55E;font-family:JetBrains Mono,monospace;line-height:1">'+fondoPct+'%</div>'+
+            '<div style="height:4px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:8px"><div style="width:'+Math.min(100,fondoPct)+'%;height:100%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 6px #22C55E;border-radius:999px"></div></div>'+
+            (fondoMeta>0 ? '<div style="font-size:9px;color:rgba(220,224,235,0.55);margin-top:3px">Meta <span style="color:#fff;font-family:JetBrains Mono,monospace;font-weight:700">'+fmt(fondoMeta)+'</span></div>' : '')+
+          '</div>';
+
+        // Banda
+        var pctApart = total>0 ? Math.round((totalAp/total)*100) : 0;
+        document.getElementById('pat-banda').innerHTML =
+          '<div style="display:flex;align-items:center;gap:10px">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-coins" style="color:#22C55E;font-size:13px"></i></div>'+
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55)">Patrimonio Bruto</div>'+
+              '<div style="font-size:18px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(total)+'</div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Activos totales</div></div>'+
+          '</div>'+
+          '<div style="color:rgba(220,224,235,0.30);font-size:18px;font-weight:300">−</div>'+
+          '<div style="display:flex;align-items:center;gap:10px">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(74,222,128,0.14);border:1px solid rgba(74,222,128,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-wallet" style="color:#4ADE80;font-size:13px"></i></div>'+
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55)">Disponible Total</div>'+
+              '<div style="font-size:18px;font-weight:800;color:#4ADE80;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(totalDisp)+'</div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Liquidez inmediata</div></div>'+
+          '</div>'+
+          '<div style="color:rgba(220,224,235,0.30);font-size:18px;font-weight:300">=</div>'+
+          '<div style="display:flex;align-items:center;gap:10px;justify-content:flex-end">'+
+            '<div style="text-align:right"><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55)">Apartados / Objetivos</div>'+
+              '<div style="font-size:18px;font-weight:800;color:#F59E0B;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(totalAp)+' <span style="color:rgba(220,224,235,0.45);font-size:13px;font-weight:600">· '+pctApart+'%</span></div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Asignado a metas · '+pctApart+'% del patrimonio bruto</div></div>'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-lock" style="color:#F59E0B;font-size:13px"></i></div>'+
+          '</div>';
+
+        // Saldos y Cuentas: lista de banco + fisico + inversion items
+        (function(){
+          var rows = '';
+          var allItems = [];
+          (banco.items||[]).forEach(function(it){ allItems.push({nombre:it.nombre,categoria:'Banco',monto:it.monto,color:'#4ADE80'}); });
+          (fisico.items||[]).forEach(function(it){ allItems.push({nombre:it.nombre,categoria:'Cuenta digital',monto:it.monto,color:'#FBBF24'}); });
+          (inv.items||[]).forEach(function(it){ allItems.push({nombre:it.nombre,categoria:'Cartera',monto:it.monto,color:'#C4B5FD'}); });
+          rows = allItems.slice(0,5).map(function(it){
+            var color = it.color;
+            return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">'+
+              '<td style="padding:8px 6px">'+
+                '<div style="display:flex;align-items:center;gap:8px"><div style="width:26px;height:26px;border-radius:6px;background:'+color+'1a;border:1px solid '+color+'55;display:flex;align-items:center;justify-content:center"><span style="font-size:10px;font-weight:800;color:'+color+'">'+(it.nombre||'').slice(0,3).toUpperCase()+'</span></div>'+
+                '<div><div style="font-size:11px;font-weight:800;color:#fff">'+it.nombre+'</div><div style="font-size:9px;color:rgba(220,224,235,0.45)">'+it.categoria+'</div></div></div>'+
+              '</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:'+(it.monto>=0?color:'#EF4444')+';white-space:nowrap">'+(it.monto>=0?'':'− ')+fmt2(it.monto)+'</td>'+
+              '<td style="padding:8px 6px;text-align:right"><div style="font-size:10px;color:'+(it.monto>=0?'#4ADE80':'#EF4444')+';font-family:JetBrains Mono,monospace;font-weight:700">'+(it.monto>=0?'+ $0.00':'-$ 0.00')+'</div><div style="font-size:9px;color:rgba(220,224,235,0.45)">0.00%</div></td>'+
+              '<td style="padding:8px 6px;text-align:right">'+_spark(color, color.charCodeAt(1))+'</td>'+
+            '</tr>';
+          }).join('');
+          document.getElementById('pat-saldos').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Saldos y Cuentas</div>'+
+            '<table style="width:100%;border-collapse:collapse">'+
+              '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08)"><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:left">Cuenta</th><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Saldo actual</th><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Δ Hoy</th><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Tendencia 7D</th></tr></thead>'+
+              '<tbody>'+(rows || '<tr><td colspan="4" style="padding:18px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin cuentas registradas</td></tr>')+'</tbody>'+
+            '</table>'+
+            '<div style="margin-top:8px;font-size:10px;color:#22C55E;cursor:pointer">Ver todas las cuentas ('+allItems.length+') ›</div>';
+        })();
+
+        // Distribución de Fondos: donut
+        (function(){
+          var bancoT = banco.saldo||0, fisicoT = fisico.saldo||0, invT = inv.saldo||0, deudaT = 0;
+          // Detectar deuda como ente con monto < 0 (ej. P)
+          var hayP = (window._fijosData||[]).filter(function(fi){ return fi.monto<0; })
+                       .reduce(function(s,fi){ return s + Math.abs(fi.monto||0); }, 0);
+          deudaT = hayP;
+          var totalNoDeuda = bancoT + fisicoT + invT + totalAp;
+          if(totalNoDeuda <= 0){ document.getElementById('pat-distribucion').innerHTML = '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:24px">Sin datos</div>'; return; }
+          var partes = [
+            { label:'Banco', valor:bancoT, color:'#4ADE80' },
+            { label:'Apartados', valor:totalAp, color:'#FBBF24' },
+            { label:'Efectivo', valor:fisicoT, color:'#22D3EE' },
+            { label:'Deudas (P.)', valor:-deudaT, color:'#EF4444' },
+          ];
+          var sumPos = partes.filter(function(p){return p.valor>0;}).reduce(function(s,p){return s+p.valor;},0) || 1;
+          var R = 50, C = 2*Math.PI*R, off = 0;
+          var arcs = partes.filter(function(p){return p.valor>0;}).map(function(p){
+            var d = (p.valor/sumPos)*C;
+            var arc = '<circle cx="80" cy="80" r="'+R+'" fill="none" stroke="'+p.color+'" stroke-width="16" stroke-dasharray="'+d+' '+C+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 80 80)" style="filter:drop-shadow(0 0 4px '+p.color+'80)"/>';
+            off += d;
+            return arc;
+          }).join('');
+          var leyenda = partes.map(function(p){
+            var pct = sumPos>0 ? Math.round((Math.abs(p.valor)/sumPos)*100) : 0;
+            var c = p.valor < 0 ? '#EF4444' : p.color;
+            return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'+
+              '<span style="display:flex;align-items:center;gap:6px;color:rgba(220,224,235,0.85)"><span style="width:7px;height:7px;border-radius:50%;background:'+c+';box-shadow:0 0 4px '+c+'"></span>'+p.label+'</span>'+
+              '<span style="display:flex;align-items:center;gap:10px"><span style="color:'+c+';font-weight:700;font-family:JetBrains Mono,monospace">'+(p.valor<0?'-':'')+pct+'%</span><span style="color:'+c+';font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap;min-width:80px;text-align:right">'+(p.valor<0?'-$ ':'$ ')+Math.abs(p.valor).toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></span>'+
+            '</div>';
+          }).join('');
+          document.getElementById('pat-distribucion').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Distribución de Fondos</div>'+
+            '<div style="display:flex;align-items:center;gap:14px">'+
+              '<svg viewBox="0 0 160 160" style="width:140px;height:140px;flex-shrink:0">'+
+                '<circle cx="80" cy="80" r="'+R+'" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="16"/>'+
+                arcs +
+                '<text x="80" y="74" text-anchor="middle" fill="rgba(220,224,235,0.55)" font-size="8" font-weight="700">TOTAL</text>'+
+                '<text x="80" y="92" text-anchor="middle" fill="#fff" font-size="13" font-weight="800" font-family="JetBrains Mono,monospace">$ '+Math.round(sumPos).toLocaleString('es-MX')+'</text>'+
+                '<text x="80" y="106" text-anchor="middle" fill="rgba(220,224,235,0.45)" font-size="8">100%</text>'+
+              '</svg>'+
+              '<div style="flex:1;min-width:0">'+leyenda+'</div>'+
+            '</div>'+
+            '<div style="margin-top:8px;font-size:10px;color:#22C55E;cursor:pointer;text-align:right">Ver análisis completo ›</div>';
+        })();
+
+        // Apartados y Objetivos: cards
+        (function(){
+          var activos = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); }).slice(0,2);
+          var hoy = new Date(); hoy.setHours(0,0,0,0);
+          var cards = activos.map(function(ap){
+            var pct = ap.meta && ap.monto ? Math.min(100, Math.round((ap.monto/(ap.metaMonto||ap.monto))*100)) : 66;
+            var metaStr = 'Sin meta';
+            if(ap.meta){
+              var diff = Math.floor((new Date(ap.meta)-hoy)/86400000);
+              metaStr = diff < 0 ? 'Vencido' : diff===0 ? 'Hoy' : 'en '+diff+' días';
+            }
+            var vencidoBadge = (ap.meta && new Date(ap.meta) < hoy) ? '<span style="font-size:8px;font-weight:800;padding:1px 6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.40);border-radius:4px;color:#EF4444;letter-spacing:.06em;text-transform:uppercase">Vencido</span>' : '';
+            return '<div style="padding:11px;border:1px solid rgba(34,197,94,0.30);border-radius:9px;background:rgba(34,197,94,0.04)">'+
+              '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+                '<div style="width:26px;height:26px;border-radius:6px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-coins" style="color:#F59E0B;font-size:11px"></i></div>'+
+                '<div style="flex:1;min-width:0">'+
+                  '<div style="font-size:11px;font-weight:800;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ap.nombre||'')+'</div>'+
+                  '<div style="font-size:9px;color:rgba(220,224,235,0.45)">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+' · '+metaStr+'</div>'+
+                '</div>'+
+              '</div>'+
+              '<div style="font-size:16px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;white-space:nowrap;margin-bottom:6px">'+fmt2(ap.monto)+'</div>'+
+              '<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-bottom:6px"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#F59E0B,#FBBF24);box-shadow:0 0 6px #F59E0B;border-radius:999px"></div></div>'+
+              '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:rgba(220,224,235,0.55)">Meta '+fmt(ap.metaMonto||ap.monto)+'</span><span style="font-size:10px;font-weight:800;color:#FBBF24;font-family:JetBrains Mono,monospace">'+pct+'%</span></div>'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+vencidoBadge+'<button style="padding:3px 10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);border-radius:6px;font-size:9px;font-weight:800;color:#4ADE80;cursor:pointer;letter-spacing:.04em">Usar</button></div>'+
+            '</div>';
+          }).join('');
+          var nuevo = '<div style="display:flex;align-items:center;justify-content:center;border:1px dashed rgba(34,197,94,0.40);border-radius:9px;background:rgba(34,197,94,0.02);cursor:pointer;min-height:120px"><div style="text-align:center"><div style="width:32px;height:32px;border-radius:8px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);display:flex;align-items:center;justify-content:center;margin:0 auto 6px"><i class="fas fa-plus" style="color:#4ADE80;font-size:13px"></i></div><div style="font-size:10px;font-weight:800;color:#4ADE80;letter-spacing:.06em">Nuevo<br>apartado</div></div></div>';
+          document.getElementById('pat-apartados').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Apartados y Objetivos</div>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+(cards || '')+nuevo+'</div>'+
+            '<div style="margin-top:8px;font-size:10px;color:#22C55E;cursor:pointer">Ver todos los apartados ('+apartados.length+') ›</div>';
+        })();
+
+        // Flujo y Liquidez
+        (function(){
+          var fin = window._finData || {};
+          var mes = fin.mes || {};
+          var ingresos = mes.ingresos || 0, egresos = mes.egresos || 0;
+          var neto = ingresos + egresos;
+          // Sparkline placeholder 7 días
+          var W = 100, H = 50, pts = [];
+          for(var i=0;i<7;i++){ pts.push((i/6)*W+','+(H/2 - Math.sin(i*0.9)*15).toFixed(1)); }
+          document.getElementById('pat-flujo').innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+              '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22D3EE">Flujo y Liquidez</div>'+
+              '<div style="padding:3px 8px;border:1px solid rgba(34,211,238,0.30);border-radius:6px;font-size:9px;font-weight:700;color:#22D3EE;display:flex;align-items:center;gap:4px"><i class="fas fa-caret-down" style="font-size:8px"></i>7 días</div>'+
+            '</div>'+
+            '<div style="display:flex;gap:12px;flex:1;min-height:0">'+
+              '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="flex:1;min-width:0">'+
+                '<polyline points="'+pts.join(' ')+'" fill="none" stroke="#22D3EE" stroke-width="1.4" style="filter:drop-shadow(0 0 4px #22D3EE80)"/>'+
+              '</svg>'+
+              '<div style="flex:0 0 160px;display:flex;flex-direction:column;gap:6px;justify-content:center">'+
+                '<div><div style="font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)">Ingresos</div><div style="font-size:12px;font-weight:800;color:#22C55E;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(ingresos)+' <span style="color:#4ADE80;font-size:9px">+12.3%</span></div></div>'+
+                '<div><div style="font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)">Egresos</div><div style="font-size:12px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(egresos)+' <span style="color:#EF4444;font-size:9px">-5.1%</span></div></div>'+
+                '<div><div style="font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)">Balance Neto</div><div style="font-size:14px;font-weight:800;color:'+(neto>=0?'#22C55E':'#EF4444')+';font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(neto)+' <span style="font-size:9px">'+(neto>=0?'+':'')+'22.1%</span></div></div>'+
+              '</div>'+
+            '</div>'+
+            '<div style="margin-top:6px;font-size:10px;color:#22D3EE;cursor:pointer">Ver movimientos detallados ›</div>';
+        })();
       },
     },
     // ── FINANCIERO ──
@@ -2058,31 +2387,74 @@ function _crearDialOverlay(){
     'hud-necesidades': {
       html: function(){
         return ''+
-          '<div style="display:flex;gap:14px;height:100%;min-height:0">'+
-            '<div id="nec-inline-radar-wrap-overlay" style="flex:1;min-width:0;padding:8px"></div>'+
-            '<div id="nec-inline-container-overlay" style="flex:1;min-width:0;overflow:auto;padding:8px"></div>'+
+          '<div style="display:flex;flex-direction:column;gap:14px;height:100%;min-height:0">'+
+            // Header con título + filtros
+            '<div style="display:flex;align-items:center;justify-content:space-between">'+
+              '<div style="display:flex;align-items:center;gap:10px">'+
+                '<div style="width:32px;height:32px;border-radius:8px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.40);display:flex;align-items:center;justify-content:center">'+
+                  '<i class="fas fa-wave-square" style="color:#A855F7;font-size:14px"></i>'+
+                '</div>'+
+                '<div style="font-size:14px;font-weight:800;color:#A855F7;letter-spacing:.10em;text-shadow:0 0 8px rgba(168,85,247,0.40)">NECESIDADES</div>'+
+              '</div>'+
+              '<div style="display:flex;align-items:center;gap:8px">'+
+                '<div id="nec-overlay-anio-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85);font-family:JetBrains Mono,monospace">'+(new Date().getFullYear())+'</div>'+
+                '<div id="nec-overlay-mes-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85)">Hasta hoy</div>'+
+                '<button id="nec-overlay-hoy-btn" style="padding:5px 12px;border:1px solid rgba(168,85,247,0.55);border-radius:8px;background:rgba(168,85,247,0.10);font-size:10px;font-weight:800;color:#A855F7;cursor:pointer;letter-spacing:.04em">Hoy</button>'+
+              '</div>'+
+            '</div>'+
+            // Radar + Pirámide lado a lado
+            '<div style="display:flex;gap:14px;min-height:240px;flex-shrink:0">'+
+              '<div id="nec-inline-radar-wrap-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:10px;background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
+              '<div id="nec-inline-piramide-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:10px;background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
+            '</div>'+
+            // Lista detallada abajo
+            '<div id="nec-inline-container-overlay" style="flex:1;min-height:0;overflow:auto;padding:4px"></div>'+
           '</div>';
       },
       hydrate: function(){
-        var radarDest = document.getElementById('nec-inline-radar-wrap-overlay');
-        var detDest   = document.getElementById('nec-inline-container-overlay');
-        if(!radarDest || !detDest) return;
+        var radarDest    = document.getElementById('nec-inline-radar-wrap-overlay');
+        var piramideDest = document.getElementById('nec-inline-piramide-overlay');
+        var detDest      = document.getElementById('nec-inline-container-overlay');
+        if(!radarDest || !piramideDest || !detDest) return;
+
+        function _aplicar(data){
+          if(!data || !data.niveles || !data.niveles.length){
+            radarDest.innerHTML    = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin registros con necesidad asignada</div>';
+            piramideDest.innerHTML = '';
+            detDest.innerHTML      = '';
+            return;
+          }
+          // _hudRenderNecesidadesEn ahora recibe DOS destinos (radar + listaContainer).
+          // Splitamos lista en pirámide+lista usando la implementación interna:
+          // pasamos piramideDest+detDest combinados via wrapper.
+          _hudRenderNecesidadesEn(data.niveles, radarDest, piramideDest);
+          // _hudRenderNecesidadesEn puso pyrHTML + listaHTML en piramideDest.
+          // Mover la lista (último <div style="margin-top:14px;...">) a detDest:
+          var listaNode = piramideDest.querySelector(':scope > div[style*="margin-top:14px"]');
+          var totalNode = piramideDest.querySelector(':scope > div[style*="margin-top:12px"]');
+          detDest.innerHTML = '';
+          if(listaNode){ detDest.appendChild(listaNode); }
+          if(totalNode){ detDest.appendChild(totalNode); }
+        }
+
         var data = window._necInlineData || (window._hudDatos && window._hudDatos.necesidades);
-        if(!data || !data.niveles || !data.niveles.length){
-          radarDest.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px"><i class="fas fa-circle-notch fa-spin"></i> Cargando…</div>';
-          // Pedir si no hay datos
+        if(data && data.niveles && data.niveles.length){
+          _aplicar(data);
+        } else {
+          radarDest.innerHTML    = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px"><i class="fas fa-circle-notch fa-spin"></i> Cargando…</div>';
+          piramideDest.innerHTML = '';
+          detDest.innerHTML      = '';
           if(typeof api !== 'undefined' && api.getNecesidades){
             var hoy = new Date();
             api.getNecesidades(hoy.getFullYear(), String(hoy.getMonth()+1), null).then(function(d){
               window._necInlineData = d;
-              if(d && d.ok && d.niveles){
-                _hudRenderNecesidadesEn(d.niveles, radarDest, detDest);
-              }
-            }).catch(function(){});
+              if(d && d.ok){ _aplicar(d); }
+              else { radarDest.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">No se pudieron cargar las necesidades</div>'; }
+            }).catch(function(){
+              radarDest.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Error al cargar</div>';
+            });
           }
-          return;
         }
-        _hudRenderNecesidadesEn(data.niveles, radarDest, detDest);
       },
     },
   };
