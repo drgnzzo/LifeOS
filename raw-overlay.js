@@ -1,45 +1,44 @@
-/* RAW Entry — Overlay v.5.115
-   Reestructuración mayor del top/bottom para que el dial respire y las
-   columnas se vean visualmente alineadas.
+/* RAW Entry — Overlay v.5.116
+   Reestructuración mayor del layout: top 2 zonas + bottom 4 cards.
 
-   ── Cambios ──
+   ── TOP — 2 zonas únicamente ──
+   · Zona 1 (esquina sup izq): USER+Stats FUSIONADOS dentro de _pUser
+     (2 renglones: USER ribbon arriba + Energía/Racha/Créditos abajo,
+     separados por una línea fina). Ancho = COL_W (col-A).
+   · Zona 2 (resto): Sim banda extendido — desde el fin de col-A hasta
+     el fin de col-D. Mucho más ancho que antes; las 9 tabs y 9 needs
+     quedan más holgadas.
+   · _pStats permanece en el DOM pero oculto (width=0, opacity=0,
+     pointer-events=none). Mantiene compatibilidad con DnD.
 
-   1) USER y Stats convertidos a RIBBON delgados:
-      · USER: una sola fila horizontal (avatar pequeño + USER + Nv1 + barra
-        XP fina + número XP). Antes era 2 renglones apilados que parecían
-        vacíos. Nuevo CSS: .hud-user-ribbon, .hud-user-av-sm, etc.
-      · Stats: 3 cells horizontales compactas (Energía / Racha / Créditos),
-        separadas por líneas finas. Antes eran cells con ícono grande +
-        texto en bloques.
-      · Altura natural de ambas: ~40-50px (vs ~80-120px antes).
+   ── BOTTOM — 4 cards en UNA SOLA fila ──
+   Track horizontal ELIMINADO. _pTrack reutilizado como card "Nivel
+   Actual" en posición 'bottom-2nd' (col-B). Las 4 cards bottom alineadas
+   con las 4 columnas verticales:
+   · Misión Diaria (col-A)
+   · Nivel Actual (col-B) — antes era el track horizontal
+   · Logro Reciente (col-C)
+   · Nivel Siguiente (col-D)
+   El contenido del Nivel Actual usa la clase .hud-card normal con
+   .hud-card-ico-hex (hexagonal) y stops inline (.hud-track-stops-inline).
 
-   2) Quitado el CAP de 220px en topMaxH. Antes el código forzaba que
-      USER/Sim/Stats tuvieran la misma altura, estirando USER y Stats
-      hasta igualar Sim. Ahora cada panel toma su altura natural y USER
-      y Stats se centran VERTICALMENTE contra Sim (que es el más alto).
-      Cálculo:
-         topYUser  = topY + (hSim - hUser) / 2
-         topYStats = topY + (hSim - hStats) / 2
+   ── Beneficio para el dial ──
+   _calcDialSize ahora considera DOS cotas (top y bot). Reserva bot baja
+   de 174 a 102 (sin track). Aún así el cuello sigue siendo el top porque
+   Sim banda mide ~170. Resultados:
+   · vH=960  → dial 564
+   · vH=1080 → dial 696
+   · vH=1350 → dial 836 (cap)
 
-   3) _calcDialSize: RESERVA_TOP reducida de 242 a 192 (porque ya no hay
-      cap de 220; Sim banda mide ~170 naturalmente).
-      Resultados:
-         · vH=960  → dial 564 (era 245, ridículo)
-         · vH=1080 → dial 696 (era 586)
-         · vH=1350 → dial 836 (cap, igual que antes)
-         · vH=768  → dial 354 (era 245)
+   ── Compatibilidad ──
+   ALLOWED_SIDES en raw-overlay-dnd.js incluye 'bottom-2nd'. Modo expandido
+   actualizado: pTrackEx lookup usa 'bottom-2nd'. Reset opacity en regreso
+   incluye 'bottom-2nd'. Cascada entry incluye transform para 'bottom-2nd'.
 
-   4) Bottom alineado con columnas:
-      · Misión.left = leftX (mismo X que col-A)
-      · Logro centrado bajo el dial, ancho = ancho del dial
-      · Nivel pegado a la derecha de col-D (rightX + rightW - wNivel)
-      · Misión y Nivel toman el ancho de leftW/rightW respectivamente,
-        para que las cards verticales (Patrimonio↔Misión, Activity↔Nivel)
-        se vean como una sola columna visual.
-
-   5) COL_W dinámico con varios escalones (340/300/270/240/210), elige
-      el mayor que quepa. Esto evita que las cards queden estrechas y
-      corten info en 2 renglones.
+   ── Heredado v5.115 ──
+   Primer intento ribbon: USER y Stats compactos con centrado vertical
+   contra Sim. Track aún horizontal. COL_W con escalones dinámicos
+   340/300/270/240/210.
 
    ── Heredado v5.114 ──
    Dial dinámico responsivo con _calcDialSize().
@@ -963,6 +962,10 @@ function _crearDialOverlay(){
       '.hud-stats-v .max{opacity:.40;font-weight:700;font-size:9px;margin-left:2px}',
       '.hud-stats-l{font-size:7.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
       // ── RIBBON STYLES (v5.115): USER y Stats en una sola fila compacta ──
+      // ── STACK (v5.116): USER+Stats fusionados en _pUser (2 renglones) ──
+      '.hud-user-stack{display:flex;flex-direction:column;height:100%;box-sizing:border-box}',
+      '.hud-user-stack > .hud-user-ribbon, .hud-user-stack > .hud-stats-ribbon{flex:1;min-height:0}',
+      '.hud-user-stack-sep{height:1px;background:rgba(255,255,255,0.06);margin:0 12px;flex-shrink:0}',
       '.hud-user-ribbon{display:flex;align-items:center;gap:8px;padding:8px 12px;height:100%;box-sizing:border-box;min-height:0}',
       '.hud-user-av-sm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0}',
       '.hud-user-name-sm{font-size:12px;font-weight:800;letter-spacing:.06em;color:#fff;flex-shrink:0}',
@@ -995,6 +998,9 @@ function _crearDialOverlay(){
       // track
       '.hud-track{display:flex;align-items:center;gap:18px;padding:14px 20px;height:100%;box-sizing:border-box}',
       '.hud-track-cur{display:flex;align-items:center;gap:10px;flex-shrink:0}',
+      // v5.116: stops inline en la card "Nivel Actual" (bottom)
+      '.hud-track-stops-inline{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;overflow:hidden}',
+      '.hud-track-stops-inline > div{flex-shrink:0}',
       '.hud-track-hex{width:38px;height:38px;display:flex;align-items:center;justify-content:center;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0}',
       '.hud-track-hex span{font-size:14px;font-weight:800;color:#fff}',
       '.hud-track-cur-info{display:flex;flex-direction:column;gap:2px}',
@@ -1136,14 +1142,39 @@ function _crearDialOverlay(){
   _pUser.style.animationDelay = '0s';
   _pUser.style.borderRadius = '14px';
   document.getElementById('hud-user-inner').innerHTML =
-    '<div class="hud-user-ribbon">'+
-      '<div class="hud-user-av-sm" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 12px '+_rgba('#A78BFA',0.45)+',inset 0 0 6px '+_rgba('#A78BFA',0.18)+'">'+
-        '<i class="fas fa-user" style="color:#fff;text-shadow:0 0 6px #A78BFA;font-size:11px"></i>'+
+    '<div class="hud-user-stack">'+
+      // RENGLÓN 1: USER ribbon
+      '<div class="hud-user-ribbon">'+
+        '<div class="hud-user-av-sm" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 12px '+_rgba('#A78BFA',0.45)+',inset 0 0 6px '+_rgba('#A78BFA',0.18)+'">'+
+          '<i class="fas fa-user" style="color:#fff;text-shadow:0 0 6px #A78BFA;font-size:11px"></i>'+
+        '</div>'+
+        '<span class="hud-user-name-sm">USER</span>'+
+        '<span class="hud-user-niv-sm">Nv<span id="_hud-user-nivel">1</span></span>'+
+        '<div class="hud-user-bar-sm"><div id="_hud-user-xpbar" style="background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px '+_rgba('#A78BFA',0.55)+'"></div></div>'+
+        '<span class="hud-user-xp-sm" id="_hud-user-xp">0/1,000</span>'+
       '</div>'+
-      '<span class="hud-user-name-sm">USER</span>'+
-      '<span class="hud-user-niv-sm">Nv<span id="_hud-user-nivel">1</span></span>'+
-      '<div class="hud-user-bar-sm"><div id="_hud-user-xpbar" style="background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px '+_rgba('#A78BFA',0.55)+'"></div></div>'+
-      '<span class="hud-user-xp-sm" id="_hud-user-xp">0/1,000</span>'+
+      // SEPARADOR
+      '<div class="hud-user-stack-sep"></div>'+
+      // RENGLÓN 2: Stats ribbon (Energía / Racha / Créditos)
+      '<div class="hud-stats-ribbon">'+
+        '<div class="hud-stats-cell-sm">'+
+          '<i class="fas fa-bolt" style="color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
+          '<span class="hud-stats-v-sm" style="color:#FBBF24"><span id="_hud-energia">—</span><span class="max">/100</span></span>'+
+          '<span class="hud-stats-l-sm">Energía</span>'+
+        '</div>'+
+        '<div class="hud-stats-sep"></div>'+
+        '<div class="hud-stats-cell-sm">'+
+          '<i class="fas fa-fire" style="color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
+          '<span class="hud-stats-v-sm" style="color:#FB923C"><span id="_hud-racha-dias">—</span><span class="max">d</span></span>'+
+          '<span class="hud-stats-l-sm">Racha</span>'+
+        '</div>'+
+        '<div class="hud-stats-sep"></div>'+
+        '<div class="hud-stats-cell-sm">'+
+          '<i class="fas fa-gem" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
+          '<span id="_hud-creditos" class="hud-stats-v-sm" style="color:#22D3EE">—</span>'+
+          '<span class="hud-stats-l-sm">Créditos</span>'+
+        '</div>'+
+      '</div>'+
     '</div>';
 
   // ── _pSim (top-center): MEGA-CARD con 2 renglones ──
@@ -1396,18 +1427,18 @@ function _crearDialOverlay(){
   _pTrack.style.border = '1.5px solid rgba(167,139,250,0.55)';
   _pTrack.style.boxShadow = '0 8px 32px rgba(0,0,0,0.65),0 0 28px rgba(167,139,250,0.30),inset 0 1px 0 rgba(167,139,250,0.40)';
   document.getElementById('hud-track-inner').innerHTML =
-    '<div class="hud-track">'+
-      '<div class="hud-track-cur">'+
-        '<div class="hud-track-hex" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 16px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
-          '<span id="_hud-track-nivel">1</span>'+
-        '</div>'+
-        '<div class="hud-track-cur-info">'+
-          '<span class="hud-track-cur-l">Nivel actual</span>'+
-          '<span id="_hud-track-xp" class="hud-track-cur-v" style="color:#A78BFA;text-shadow:0 0 8px '+_rgba('#A78BFA',0.45)+'">0 / 1,000 XP</span>'+
-        '</div>'+
+    '<div class="hud-card">'+
+      '<div class="hud-card-ico-hex" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 16px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
+        '<span id="_hud-track-nivel">1</span>'+
       '</div>'+
-      '<div class="hud-track-mid"><div id="_hud-track-stops" style="display:flex;align-items:center;gap:6px"></div></div>'+
-      '<div style="flex-shrink:0"><i class="fas fa-trophy" style="font-size:20px;color:#A78BFA;filter:drop-shadow(0 0 6px '+_rgba('#A78BFA',0.55)+')"></i></div>'+
+      '<div class="hud-card-c">'+
+        '<div class="hud-card-h">'+
+          '<span class="hud-card-l" style="color:#A78BFA;text-shadow:0 0 6px '+_rgba('#A78BFA',0.40)+'">Nivel actual</span>'+
+          '<span id="_hud-track-xp" class="hud-card-r" style="color:#A78BFA">0 / 1,000 XP</span>'+
+        '</div>'+
+        '<div id="_hud-track-stops" class="hud-track-stops-inline"></div>'+
+      '</div>'+
+      '<span class="hud-card-end" style="color:#A78BFA;text-shadow:0 0 6px '+_rgba('#A78BFA',0.40)+'"><i class="fas fa-trophy"></i></span>'+
     '</div>';
 
   // ── _pMision: Misión Diaria (bottom-left) ──
@@ -1487,7 +1518,7 @@ function _crearDialOverlay(){
   _p4._side='right-1';  _p4._order=0;   // Financiero
   _p8._side='right-1';  _p8._order=1;   // Variables
   _p5._side='right-2';  _p5._order=0;   // Activity+Logros
-  _pTrack._side='bottom-track';   _pTrack._order=0;
+  _pTrack._side='bottom-2nd';     _pTrack._order=0;
   _pMision._side='bottom-left';   _pMision._order=0;
   _pLogro._side='bottom-center';  _pLogro._order=0;
   _pNivel._side='bottom-right';   _pNivel._order=0;
@@ -1501,25 +1532,24 @@ function _crearDialOverlay(){
   ];
 
   // ── Calcular tamaño dinámico del dial ──
-  // Reglas:
-  //   1. Nunca mayor a 836px (DIAL_MAX).
-  //   2. El sub-ring (radio dial * 0.913) NO debe pasarse de la fila top
-  //      con un margen de respiro (MARGEN_SR_TOP). Esto fija la cota por
-  //      altura: dial_radio <= (vH/2 - reservaTop - MARGEN_SR_TOP) / 0.913
-  //   3. Nunca más de 45% del ancho del viewport.
-  // Reserva top en v5.115: el ribbon top (USER+Sim+Stats) ya no tiene cap
-  // de 220. Sim banda mide ~170px naturalmente (2 renglones: tabs +
-  // 9 needs). USER y Stats son ribbon delgados centrados verticalmente
-  // dentro del Sim. Usamos 170 como estimación + topPad 22 = 192.
+  // En v5.116 el track se eliminó. La fila bottom solo tiene 4 cards
+  // (~80px alto). Esto libera ~72px de espacio vertical.
+  // El dial respeta DOS cotas verticales:
+  //   1) Sub-ring no se mete en la fila top (USER stack + Sim banda).
+  //   2) Sub-ring no se mete en la fila bottom (4 cards).
+  // Ambas son: dial_radio <= (vH/2 - reserva - margen) / 0.913
   function _calcDialSize(){
     var DIAL_MAX = 836;
     var SR_RATIO = 0.913;
-    var RESERVA_TOP = 192;
-    var MARGEN_SR_TOP = 30;
+    var MARGEN = 30;
+    var RESERVA_TOP = 192; // topPad(22) + altura Sim banda estimada (170)
+    var RESERVA_BOT = 102; // botPad(22) + altura card bottom estimada (80)
     var vW = window.innerWidth;
     var vH = window.innerHeight;
-    var radioMaxAlto = (vH / 2 - RESERVA_TOP - MARGEN_SR_TOP) / SR_RATIO;
-    var diametroMaxAlto = Math.max(280, radioMaxAlto * 2);
+    var radioMaxTop = (vH / 2 - RESERVA_TOP - MARGEN) / SR_RATIO;
+    var radioMaxBot = (vH / 2 - RESERVA_BOT - MARGEN) / SR_RATIO;
+    var radioMax = Math.min(radioMaxTop, radioMaxBot);
+    var diametroMaxAlto = Math.max(280, radioMax * 2);
     var diametroMaxAncho = vW * 0.45;
     var dial = Math.min(DIAL_MAX, diametroMaxAlto, diametroMaxAncho);
     return Math.round(dial);
@@ -1685,7 +1715,7 @@ function _crearDialOverlay(){
       var pMisionEx = getTop('bottom-left')[0];
       var pLogroEx  = getTop('bottom-center')[0];
       var pNivelEx  = getTop('bottom-right')[0];
-      var pTrackEx  = getTop('bottom-track')[0];
+      var pTrackEx  = getTop('bottom-2nd')[0];
       var botYEx = vH - 90;
       if(pMisionEx){
         pMisionEx.el.style.transition = 'all .42s cubic-bezier(.4,1.4,.5,1)';
@@ -1838,21 +1868,27 @@ function _crearDialOverlay(){
     var topBarEndX   = rightX + rightW;
     var topBarTotalW = topBarEndX - topBarStartX;
 
-    // USER ocupa el ancho de la columna izquierda; Stats el de la derecha;
-    // Sim ocupa el centro restante.
-    var wUser  = leftW;
-    var wStats = rightW;
-    var wSim   = topBarTotalW - wUser - wStats;
-    if(wSim < 300){
-      // Fallback: encoger USER y Stats si Sim queda muy estrecho
+    // v5.116: USER+Stats fusionados en _pUser (2 renglones). _pStats queda
+    // oculto pero permanece en el DOM para que el DnD no se rompa.
+    // wUser = COL_W (col-A), wSim = el resto (desde fin de col-A hasta fin
+    // de col-D), wStats = 0 (oculto).
+    var wUser, wStats;
+    if(fourCols){
+      wUser  = COL_W;
+      wStats = 0;
+    } else {
+      wUser  = leftW;
+      wStats = 0;
+    }
+    var wSim = topBarTotalW - wUser;
+    // Salvaguarda: Sim banda nunca demasiado estrecho
+    if(wSim < 400){
       wUser = Math.min(180, wUser);
-      wStats = Math.min(280, wStats);
-      wSim = topBarTotalW - wUser - wStats;
+      wSim = topBarTotalW - wUser;
     }
 
     if(pUser && wUser>0){
       pUser.el.style.width = wUser+'px';
-      // Solo hacer visible si NO está en cascada de entrada
       if(!pUser.el._animatingEntry){
         pUser.el.style.visibility='visible';
         pUser.el.style.opacity='';
@@ -1863,16 +1899,13 @@ function _crearDialOverlay(){
       pUser.el.style.visibility='hidden';
     }
     if(pSim){ pSim.el.style.width = wSim+'px'; }
-    if(pStats && wStats>0){
-      pStats.el.style.width = wStats+'px';
-      if(!pStats.el._animatingEntry){
-        pStats.el.style.visibility='visible';
-        pStats.el.style.opacity='';
-      }
-    } else if(pStats){
+    // _pStats oculto en v5.116 (su contenido ahora vive dentro de _pUser).
+    // Aún así reservamos el slot por compatibilidad con el DnD.
+    if(pStats){
       pStats.el.style.width='0px';
       pStats.el.style.opacity='0';
       pStats.el.style.visibility='hidden';
+      pStats.el.style.pointerEvents='none';
     }
 
     // Medir altura natural de cada panel top de forma independiente.
@@ -1926,89 +1959,81 @@ function _crearDialOverlay(){
     }
 
     // ══════════════════════════════════════════
-    //  ZONA INFERIOR — track + 3 cards
+    //  ZONA INFERIOR — 4 cards en UNA SOLA fila
+    //  Misión (col-A) | Nivel Actual (col-B) | Logro (col-C) | Siguiente (col-D)
+    //  El track horizontal se eliminó; su contenido vive en _pTrack
+    //  reubicado en 'bottom-2nd' como una card más.
     // ══════════════════════════════════════════
-    var pTrack  = getTop('bottom-track')[0];
-    var pMision = getTop('bottom-left')[0];
-    var pLogro  = getTop('bottom-center')[0];
-    var pNivel  = getTop('bottom-right')[0];
+    var pTrack       = getTop('bottom-2nd')[0];   // ← antes era 'bottom-track', ahora card normal
+    var pMision      = getTop('bottom-left')[0];
+    var pLogro       = getTop('bottom-center')[0];
+    var pNivel       = getTop('bottom-right')[0];
 
     var botPad  = GAP;
-    var botGap  = 12;
+    var botGap  = GAP;  // mismo gap entre cards bottom que entre cards laterales
 
-    // v5.115: Misión usa ancho de col-A (leftW), Nivel usa ancho de col-D
-    // (rightW), Logro al ancho del dial. Esto alinea las columnas
-    // verticalmente: USER↔Patrimonio↔Misión a la izquierda; Stats↔Activity↔
-    // Nivel a la derecha; Sim↔(dial)↔Logro en el centro.
-    var wMision = leftW;
-    var wNivel  = rightW;
-    var wLogro  = Math.round(r.width);
-    // Si el bloque centrado excede el ancho disponible, comprime
-    var availBotTotal = vW - botPad*2;
-    if(wMision + wLogro + wNivel + botGap*2 > availBotTotal){
-      var availBot = availBotTotal - botGap*2;
-      wMision = Math.round(availBot * 0.22);
-      wNivel  = Math.round(availBot * 0.22);
-      wLogro  = availBot - wMision - wNivel;
+    // Alinear cada card con su columna respectiva.
+    if(fourCols){
+      // Misión = col-A
+      if(pMision){
+        pMision.el.style.width = COL_W+'px';
+        pMision.el.style.left  = colA_X+'px';
+      }
+      // Nivel Actual (track reusado) = col-B
+      if(pTrack){
+        pTrack.el.style.width = COL_W+'px';
+        pTrack.el.style.left  = colB_X+'px';
+      }
+      // Logro = col-C
+      if(pLogro){
+        pLogro.el.style.width = COL_W+'px';
+        pLogro.el.style.left  = colC_X+'px';
+      }
+      // Nivel Siguiente = col-D
+      if(pNivel){
+        pNivel.el.style.width = COL_W+'px';
+        pNivel.el.style.left  = colD_X+'px';
+      }
+    } else {
+      // Modo compacto (2 cols): 2 cards por lado
+      var halfL = Math.floor((leftW - botGap)/2);
+      var halfR = Math.floor((rightW - botGap)/2);
+      if(pMision){
+        pMision.el.style.width = halfL+'px';
+        pMision.el.style.left  = leftX+'px';
+      }
+      if(pTrack){
+        pTrack.el.style.width = halfL+'px';
+        pTrack.el.style.left  = (leftX + halfL + botGap)+'px';
+      }
+      if(pLogro){
+        pLogro.el.style.width = halfR+'px';
+        pLogro.el.style.left  = rightX+'px';
+      }
+      if(pNivel){
+        pNivel.el.style.width = halfR+'px';
+        pNivel.el.style.left  = (rightX + halfR + botGap)+'px';
+      }
     }
-    var totalCards = wMision + wLogro + wNivel + botGap*2;
 
-    if(pMision){ pMision.el.style.width = wMision+'px'; }
-    if(pLogro){ pLogro.el.style.width = wLogro+'px'; }
-    if(pNivel){ pNivel.el.style.width = wNivel+'px'; }
-
-    // Track: ancho EXACTO del dial
-    var trackW = Math.round(r.width);
-    if(pTrack){ pTrack.el.style.width = trackW+'px'; }
-
+    // Medir altura natural de las 4 cards
     var botH = 0;
-    [pMision,pLogro,pNivel].forEach(function(hp){
+    [pMision,pTrack,pLogro,pNivel].forEach(function(hp){
       if(hp && hp.el){
         var h = hp.el.scrollHeight || hp.el.offsetHeight || 80;
-        // DEBUG TEMP v5.106
-        if(window._hudReturningFromExpand){
-          console.log('[REPOS DEBUG BOT]', hp.el.id, 'width=', hp.el.style.width,
-            'scrollHeight=', hp.el.scrollHeight, 'offsetHeight=', hp.el.offsetHeight);
-        }
         if(h>botH) botH = h;
       }
     });
     if(botH===0) botH = 80;
-    var trackH = (pTrack && pTrack.el) ? (pTrack.el.scrollHeight || pTrack.el.offsetHeight || 64) : 64;
-    if(window._hudReturningFromExpand){
-      console.log('[REPOS DEBUG BOT] botH=', botH, 'trackH=', trackH, 'vH=', vH);
-    }
 
     var botY = vH - botPad - botH;
-    var trackY = botY - trackH - 8;
 
-    if(pTrack){
-      pTrack.el.style.left = Math.round((vW - trackW)/2)+'px';
-      pTrack.el.style.top  = trackY+'px';
-      pTrack.el.style.clipPath = chamferRect;
-    }
-    // Bottom cards alineadas con sus columnas:
-    //   Misión → leftX (mismo X que col-A)
-    //   Logro  → centrado bajo el dial
-    //   Nivel  → rightX + (rightW - wNivel) → alineado a la derecha como Stats
-    if(pMision){
-      pMision.el.style.left = leftX + 'px';
-      pMision.el.style.top  = botY + 'px';
-      pMision.el.style.clipPath = chamferRect;
-    }
-    if(pLogro){
-      // Centrar Logro bajo el dial (su ancho == ancho del dial)
-      var logroX = Math.round(r.left + (r.width - wLogro)/2);
-      pLogro.el.style.left = logroX + 'px';
-      pLogro.el.style.top  = botY + 'px';
-      pLogro.el.style.clipPath = chamferRect;
-    }
-    if(pNivel){
-      // Nivel: alinear borde derecho con borde derecho de col-D (rightX+rightW)
-      pNivel.el.style.left = (rightX + rightW - wNivel) + 'px';
-      pNivel.el.style.top  = botY + 'px';
-      pNivel.el.style.clipPath = chamferRect;
-    }
+    [pMision,pTrack,pLogro,pNivel].forEach(function(hp){
+      if(hp && hp.el){
+        hp.el.style.top      = botY + 'px';
+        hp.el.style.clipPath = chamferRect;
+      }
+    });
 
     // ══════════════════════════════════════════
     //  COLUMNAS LATERALES — entre fila top y track
@@ -2016,7 +2041,7 @@ function _crearDialOverlay(){
     //  NOTA: leftX/rightX/leftW/rightW ya fueron calculados arriba (zona top los necesitaba).
     // ══════════════════════════════════════════
     var colTopY    = topY + topMaxH + 8;
-    var colBotY    = trackY - 8;
+    var colBotY    = botY - 8;  // antes restaba trackY; v5.116: track eliminado
     var colVAvail  = Math.max(200, colBotY - colTopY);
 
     // Exportar posiciones de columnas para que DnD pueda dibujar slots
@@ -3219,7 +3244,7 @@ function _crearDialOverlay(){
         hp.el.style.transform     = '';
         hp.el.style.clipPath      = '';
         // Logro y Track tenían opacity:0 + pointer-events:none en modo expandido
-        if(side === 'bottom-center' || side === 'bottom-track'){
+        if(side === 'bottom-center' || side === 'bottom-2nd'){
           hp.el.style.opacity       = '';
           hp.el.style.pointerEvents = '';
         }
@@ -4394,9 +4419,9 @@ function abrirDial(){
         case 'left-2':         return 'translate(-22px,0)';
         case 'right-1':        return 'translate(22px,0)';
         case 'right-2':        return 'translate(32px,0)';
-        case 'bottom-track':   return 'translate(0,22px)';
+        case 'bottom-2nd':     return 'translate(-12px,22px)';
         case 'bottom-left':    return 'translate(-22px,18px)';
-        case 'bottom-center':  return 'translate(0,22px)';
+        case 'bottom-center':  return 'translate(12px,22px)';
         case 'bottom-right':   return 'translate(22px,18px)';
         default:               return 'translate(0,16px) scale(0.94)';
       }
