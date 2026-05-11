@@ -1,19 +1,26 @@
-/* RAW Entry — Overlay v.5.110
-   Cambios desde v5.109:
-   - QUITAR SCROLL VERTICAL en las cards laterales. v5.109 había agregado
-     maxHeight + overflowY:auto para evitar el encimado, pero eso introdujo
-     scroll interno feo en Patrimonio/Necesidades/Bitácora/Financiero. El
-     usuario prefiere ver el contenido natural completo aunque dos paneles
-     de la misma columna se solapen ligeramente con el track.
-     Ahora: positionCol limpia maxHeight/overflowY/height en cada pasada y
-     deja que cada panel tome su altura natural. Si la suma excede colVAvail,
-     se reduce el gap entre paneles (min 8px) para minimizar overflow.
-   - FIX zoom in/out → 100% no regresa al estado original. Causa: el inner
-     del panel top retenía minHeight de pasadas anteriores, y scrollHeight
-     en pasadas siguientes lo medía considerando ese valor, auto-
-     perpetuándolo. Fix: limpiar inner.style.minHeight ANTES de medir
-     topMaxH (no solo el panel). Garantiza que cada _reposicionarHUD mida
-     el natural real, no el residual.
+/* RAW Entry — Overlay v.5.111
+   Cambios desde v5.110:
+   - DIAL 10% MÁS PEQUEÑO. El sub-ring (segundo anillo que aparece al
+     activar una opción del dial) se extiende a R_SO=420 del centro
+     (radio 0.913 del dial completo). En el tamaño anterior min(836,57vw),
+     el sub-ring alcanzaba y≈922 en vH=1080, encimándose con el track
+     que está en y≈906. También las cards bottom (Misión/Logro/Nivel)
+     quedaban apretadas contra el dial.
+     Fix: dial cambia a min(752px, 51vw) (≈10% menos en ambas dimensiones).
+     Aplica a 4 lugares: _dialCanvas.style.cssText, SVG del aro pulsante,
+     override de r en _hudReturningFromExpand, override de r en _hayApertura,
+     y reset width/height en rama de regreso.
+     Con dial=752 en vH=1080:
+       · Sub-ring bottom: 540 + 343 = 883
+       · Track top:       906
+       · Margen libre:    23px ✓ (antes -16px, encimado)
+     El canvas INTERNO sigue siendo 920x920 (resolución de dibujo), solo
+     cambia el display size CSS. Iconos y textos se ven igual de nítidos.
+
+   ── Heredado v5.110 ──
+   Sin scroll vertical en cards laterales. Limpieza preventiva de
+   maxHeight/overflowY/height en cada pasada de positionCol. inner.minHeight
+   limpiado antes de medir topMaxH para garantizar que el zoom recupere.
 
    ── Heredado v5.109 ──
    FIX BUG "todo encimado, paneles de la columna interna no se ven, zoom
@@ -597,7 +604,7 @@ function _crearDialOverlay(){
   _dialCanvas = document.createElement('canvas');
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
-  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(836px,57vw);height:min(836px,57vw);position:relative;pointer-events:auto;z-index:1';
+  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(752px,51vw);height:min(752px,51vw);position:relative;pointer-events:auto;z-index:1';
   _dialCtx = _dialCanvas.getContext('2d');
 
   _dialOverlay.style.cssText = [
@@ -639,7 +646,7 @@ function _crearDialOverlay(){
     'opacity:0',
   ].join(';');
   _ringEl.innerHTML =
-    '<svg viewBox="0 0 600 600" style="width:min(836px,57vw);height:min(836px,57vw);overflow:visible">'+
+    '<svg viewBox="0 0 600 600" style="width:min(752px,51vw);height:min(752px,51vw);overflow:visible">'+
       // Aro principal
       '<circle cx="300" cy="300" r="280" fill="none" stroke="rgba(167,139,250,0.55)" stroke-width="1.5" '+
         'style="filter:drop-shadow(0 0 12px rgba(167,139,250,0.55));animation:dialRingPulse 3s ease-in-out infinite"/>'+
@@ -1474,7 +1481,7 @@ function _crearDialOverlay(){
     // calculamos el rect final del dial centrado en el viewport.
     var _hayApertura = !window._hudExpanded && window._hudPanels.some(function(hp){ return hp.el && hp.el._animatingEntry; });
     if(window._hudReturningFromExpand && !window._hudExpanded){
-      var _fSize = Math.min(836, vW * 0.57);
+      var _fSize = Math.min(752, vW * 0.51);
       var _fLeft = Math.round((vW - _fSize) / 2);
       var _fTop  = Math.round((vH - _fSize) / 2);
       r = {
@@ -1488,7 +1495,7 @@ function _crearDialOverlay(){
     } else if(_hayApertura){
       // Durante la apertura inicial el dial tiene scale(0.85) y boundingClientRect
       // devuelve un rect chico. Usar el rect final del dial al tamaño normal.
-      var _fSize2 = Math.min(836, vW * 0.57);
+      var _fSize2 = Math.min(752, vW * 0.51);
       var _fLeft2 = Math.round((vW - _fSize2) / 2);
       var _fTop2  = Math.round((vH - _fSize2) / 2);
       r = {
@@ -1652,8 +1659,8 @@ function _crearDialOverlay(){
     _dialCanvas.style.boxShadow   = '';
     _dialCanvas.style.borderRadius = '';
     _dialCanvas.style.transform   = '';
-    _dialCanvas.style.width       = 'min(836px,57vw)';
-    _dialCanvas.style.height      = 'min(836px,57vw)';
+    _dialCanvas.style.width       = 'min(752px,51vw)';
+    _dialCanvas.style.height      = 'min(752px,51vw)';
     _dialCanvas.title             = '';
 
     // Limpiar height/minHeight/opacity/pointer-events forzados, pero
