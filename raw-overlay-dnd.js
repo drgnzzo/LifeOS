@@ -520,13 +520,16 @@
       window._reposicionarHUD._dndHooked = true;
     }
 
+    // Nota: el listener de resize/zoom lo maneja raw-overlay.js (con
+    // _resetDuroLayout + _reposicionarHUD). Aquí solo escuchamos para
+    // reconstruir los slots vacíos después de que las posiciones queden
+    // estabilizadas. Debounce más largo para esperar al overlay.
     var resizeT;
     window.addEventListener('resize', function(){
       clearTimeout(resizeT);
       resizeT = setTimeout(function(){
-        if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
-        buildGhostSlots();
-      }, 250);
+        if(!_state.dragEl) buildGhostSlots();
+      }, 300);
     });
 
     _state.initialized = true;
