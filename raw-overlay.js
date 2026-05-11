@@ -1,5 +1,19 @@
-/* RAW Entry — Overlay v.5.106
-   Cambios desde v5.105:
+/* RAW Entry — Overlay v.5.107
+   Cambios desde v5.106:
+   - APERTURA RALENTIZADA (a petición). El dial sentía un "pop" demasiado
+     rápido y la cascada se veía apurada. Ajustes:
+     · Cascada: T_CASCADA_DUR 2800ms → 4200ms (más separación entre cards).
+     · Cards: transición individual 1200/1300ms → 1800/1900ms (cada card se
+       revela más despacio, con más blur→nítido visible).
+     · Aro pulsante: 1400ms → 1800ms.
+     · Dial: opacity 1700/transform 1900 → opacity 3200/transform 3400
+       (casi el doble; el dial ahora es claramente el más lento del
+       timeline, "que se revele más lento que las demás cosas").
+     · T_SLOTS_IN: 4500 → 5900.
+     · T_DIAL_IN: 6000 → 7700 (pausa post-slots ~1.8s).
+     · T_CLEANUP: 8100 → 11200 (espera a que termine el fade lento).
+
+   ── Heredado v5.106 ──
    - APERTURA: pausa de 1.5s entre cascada de cards y entrada del dial
      (T_DIAL_IN = T_SLOTS_IN + 1500). Esto da el "respiro" pedido:
      primero se asientan las cards, luego entra el dial.
@@ -4212,30 +4226,30 @@ function abrirDial(){
 
   if(window._hudPanels && window.innerWidth>=900){
     // ═══════════════════════════════════════════════════════════════
-    //  TIMELINE DE APERTURA — orden estricto (v5.106 con pausa antes
-    //  del dial para que se sienta el respiro entre cascada y dial):
-    //   t = 450ms  → FASE 1: aro circular del breathing aparece
-    //   t = 1700ms → FASE 2: empieza cascada de paneles (todos al azar)
-    //   t = 4500ms → FASE 2b: aparecen slots vacíos punteados
-    //   t = 6000ms → FASE 3: aparece el dial canvas (PAUSA 1.5s post-slots)
-    //   t = 8100ms → limpieza final + vida (breathing/scan al azar)
+    //  TIMELINE DE APERTURA — orden estricto (v5.107, ralentizado):
+    //   t = 450ms   → FASE 1: aro circular del breathing aparece (1800ms)
+    //   t = 1700ms  → FASE 2: empieza cascada de paneles (1800ms c/u)
+    //   t = 5900ms  → FASE 2b: aparecen slots vacíos punteados
+    //   t = 7700ms  → FASE 3: aparece el dial canvas con fade muy lento
+    //                 (3200ms — pausa 1.8s post-slots)
+    //   t = 11200ms → limpieza final + vida (breathing/scan al azar)
     // ═══════════════════════════════════════════════════════════════
 
     var T_RING_IN       = 450;
     var T_CASCADA_START = 1700;
-    var T_CASCADA_DUR   = 2800; // ventana de la cascada
-    var T_SLOTS_IN      = T_CASCADA_START + T_CASCADA_DUR; // 4500
-    var T_DIAL_IN       = T_SLOTS_IN + 1500;               // 6000 (antes 5100)
-    var T_CLEANUP       = T_DIAL_IN + 2100;                // 8100
+    var T_CASCADA_DUR   = 4200; // ventana de la cascada (antes 2800 — mucho más lenta)
+    var T_SLOTS_IN      = T_CASCADA_START + T_CASCADA_DUR; // 5900
+    var T_DIAL_IN       = T_SLOTS_IN + 1800;               // 7700 (pausa 1.8s post-slots)
+    var T_CLEANUP       = T_DIAL_IN + 3500;                // 11200 (espera fade lento del dial)
 
-    // ── FASE 1: aro circular aparece (más suave: 1400ms) ──
+    // ── FASE 1: aro circular aparece (más suave: 1800ms) ──
     setTimeout(function(){
       if(glowEl){
-        glowEl.style.transition = 'opacity 1400ms cubic-bezier(.16,1,.3,1)';
+        glowEl.style.transition = 'opacity 1800ms cubic-bezier(.16,1,.3,1)';
         glowEl.style.opacity = '1';
       }
       if(ringEl){
-        ringEl.style.transition = 'opacity 1400ms cubic-bezier(.16,1,.3,1),transform 1400ms cubic-bezier(.16,1,.3,1)';
+        ringEl.style.transition = 'opacity 1800ms cubic-bezier(.16,1,.3,1),transform 1800ms cubic-bezier(.16,1,.3,1)';
         ringEl.style.opacity = '1';
         ringEl.style.transform = '';
       }
@@ -4260,7 +4274,7 @@ function abrirDial(){
     }
     window._hudPanels.forEach(function(hp){
       hp.el.style.transform = _slideOrigin(hp.el._side);
-      hp.el.style.transition = 'opacity 1200ms cubic-bezier(.16,1,.3,1),transform 1300ms cubic-bezier(.16,1,.3,1),filter 1200ms ease';
+      hp.el.style.transition = 'opacity 1800ms cubic-bezier(.16,1,.3,1),transform 1900ms cubic-bezier(.16,1,.3,1),filter 1800ms ease';
       hp.el.style.filter = 'brightness(0.4) blur(2px)';
     });
     var nPanels = window._hudPanels.length;
@@ -4303,16 +4317,18 @@ function abrirDial(){
       }
     }, T_SLOTS_IN);
 
-    // ── FASE 3: dial canvas aparece (MUCHO más suave: 1700ms) ──
+    // ── FASE 3: dial canvas aparece (MUCHO más suave: 3200ms — el último
+    //    en revelarse y el más lento de toda la apertura, casi el doble que
+    //    las cards. Lectura: "que se revele más lento que las demás cosas") ──
     setTimeout(function(){
       if(_dialCanvas){
-        _dialCanvas.style.transition = 'opacity 1700ms cubic-bezier(.16,1,.3,1),transform 1900ms cubic-bezier(.16,1,.3,1)';
+        _dialCanvas.style.transition = 'opacity 3200ms cubic-bezier(.16,1,.3,1),transform 3400ms cubic-bezier(.16,1,.3,1)';
         _dialCanvas.style.opacity = '1';
         _dialCanvas.style.transform = '';
       }
       // El aro pulsante se atenúa para no competir con el dial
       if(ringEl){
-        ringEl.style.transition = 'opacity 1400ms ease';
+        ringEl.style.transition = 'opacity 1800ms ease';
         ringEl.style.opacity = '0.18';
       }
     }, T_DIAL_IN);
