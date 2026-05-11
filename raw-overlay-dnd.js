@@ -1,5 +1,33 @@
-/* RAW Entry — Overlay Drag & Drop v.5.087
+/* RAW Entry — Overlay Drag & Drop v.5.107
 
+   Cambios desde v5.087:
+   - FIX BUG "layout se rompe al soltar una card". Causa raíz: 3 bugs
+     combinados en persistencia y reordenamiento:
+     1. saveLayout iteraba en orden de declaración de _hudPanels en lugar
+        de ordenar por _order. Resultado: el array guardado quedaba
+        desordenado respecto al estado real, así que al recargar quedaba
+        mal.
+     2. restoreLayout usaba `idx` del array (orden de iteración) en lugar
+        de `entry.order`, pisando el orden correcto guardado.
+     3. Al cambiar de side durante un drop, el código mutaba _side y _order
+        del oldSide pero podía dejar el dragEl con un _order viejo o
+        colisionando con otro panel del newSide hasta que applyReorder
+        corriera. Si applyReorder fallaba o devolvía insertAt fuera de
+        rango, quedaba estado inconsistente.
+   - FIX: nuevo _normalizarOrders() que recorre TODAS las zonas y reasigna
+     _order=0..N-1 secuencialmente. Se llama al final de cada drop (en
+     onUp) y antes de saveLayout y restoreLayout. Garantía: el estado
+     interno siempre es consistente.
+   - saveLayout ahora ordena por _order antes de push al array guardado.
+   - restoreLayout ahora valida que todos los IDs del layout guardado
+     existan en _hudPanels actuales; si encuentra basura, descarta todo
+     el localStorage para empezar limpio.
+   - onUp: el transform inline del dragEl se limpia DESPUÉS del cambio
+     de estado y junto con el _reposicionarHUD, no antes. Esto elimina
+     el "salto visual" donde el panel volvía a su pos vieja y luego se
+     movía a la nueva.
+
+   ── Heredado v5.087 ──
    Cambios desde v5.086:
    - Slots vacíos: z-index 9001 (antes 8995, debajo del overlay y por eso
      no se veían). Border 2px dashed @35 (antes @22), fondo @04 (antes @025).
@@ -86,15 +114,50 @@
       return JSON.parse(raw);
     } catch(e){ return null; }
   }
-  function saveLayout(){
+  // Normaliza _order de todos los paneles en cada zona para que sean
+  // 0..N-1 secuenciales sin huecos ni colisiones. Llamar después de cualquier
+  // cambio (drop) para que el estado quede siempre consistente.
+  function _normalizarOrders(){
     if(!window._hudPanels) return;
-    var layout = { 'left-1':[], 'left-2':[], 'right-1':[], 'right-2':[], bottom:[] };
+    var zonas = {};
     window._hudPanels.forEach(function(hp){
       var side = hp.el._side;
-      if(isAllowedSide(side)){
+      if(!isAllowedSide(side)) return;
+      if(!zonas[side]) zonas[side] = [];
+      zonas[side].push(hp);
+    });
+    Object.keys(zonas).forEach(function(side){
+      var arr = zonas[side];
+      // Ordenar por _order actual (si hay empate, mantener orden de _hudPanels).
+      arr.sort(function(a,b){
+        var oa = (typeof a.el._order === 'number') ? a.el._order : 999;
+        var ob = (typeof b.el._order === 'number') ? b.el._order : 999;
+        return oa - ob;
+      });
+      arr.forEach(function(hp, idx){ hp.el._order = idx; });
+    });
+  }
+  function saveLayout(){
+    if(!window._hudPanels) return;
+    // PRIMERO normalizar para garantizar que guardamos un estado consistente.
+    _normalizarOrders();
+    var layout = { 'left-1':[], 'left-2':[], 'right-1':[], 'right-2':[], bottom:[] };
+    // Construir un array de todos los paneles allowed, agrupados por side,
+    // ORDENADOS por su _order (no por su orden en _hudPanels, que es el
+    // orden de declaración).
+    var grupos = {};
+    window._hudPanels.forEach(function(hp){
+      var side = hp.el._side;
+      if(!isAllowedSide(side)) return;
+      if(!grupos[side]) grupos[side] = [];
+      grupos[side].push(hp);
+    });
+    Object.keys(grupos).forEach(function(side){
+      grupos[side].sort(function(a,b){ return a.el._order - b.el._order; });
+      grupos[side].forEach(function(hp){
         var key = side.indexOf('bottom-') === 0 ? 'bottom' : side;
         layout[key].push({ id: hp.el.id, side: side, order: hp.el._order });
-      }
+      });
     });
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)); } catch(e){}
   }
@@ -103,9 +166,32 @@
     if(!saved || !window._hudPanels) return;
     var byId = {};
     window._hudPanels.forEach(function(hp){ byId[hp.el.id] = hp; });
+
+    // Validar que el layout guardado solo contenga IDs de paneles existentes.
+    // Si encontramos un ID inválido, descartamos el layout entero (puede estar
+    // corrupto por cambios de versión).
+    var todoOk = true;
     ['left-1','left-2','right-1','right-2','bottom'].forEach(function(zone){
       var entries = saved[zone];
       if(!Array.isArray(entries)) return;
+      entries.forEach(function(entry){
+        if(!entry || !entry.id || !byId[entry.id]) todoOk = false;
+        // Si el side guardado no es válido, también es corrupto
+        if(entry && entry.side && !isAllowedSide(entry.side)) todoOk = false;
+      });
+    });
+    if(!todoOk){
+      try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+      return;
+    }
+
+    // Aplicar: para cada zona, ordenar por entry.order (NO por idx del array),
+    // y reasignar _order de manera secuencial 0..N-1 al final.
+    ['left-1','left-2','right-1','right-2','bottom'].forEach(function(zone){
+      var entries = (saved[zone] || []).slice();
+      entries.sort(function(a,b){
+        return (a.order||0) - (b.order||0);
+      });
       entries.forEach(function(entry, idx){
         var hp = byId[entry.id];
         if(!hp) return;
@@ -113,6 +199,9 @@
         hp.el._order = idx;
       });
     });
+    // Normalizar al final por si quedaron paneles fuera del layout guardado
+    // (ej. paneles nuevos agregados en una versión nueva del overlay).
+    _normalizarOrders();
   }
 
   // ═══ Slots vacíos ═══
@@ -318,11 +407,24 @@
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       panelEl.classList.remove('hud-dragging');
-      panelEl.style.transform = '';
       document.body.style.cursor = '';
       hideDropIndicator();
 
+      // NO limpiamos transform aún — eso causa un "salto visual" donde el
+      // panel regresa a su pos vieja y luego _reposicionarHUD lo mueve a la
+      // nueva. En su lugar: detectar zona, aplicar cambios, limpiar transform
+      // junto con el reposicionamiento (que da la posición final correcta).
+
+      // Para detectZoneAt necesitamos quitar el transform temporalmente,
+      // porque getBoundingClientRect del panel arrastrado incluye el offset
+      // de translate y podría devolverse a sí mismo como hover (aunque está
+      // excluido del bucle de panels, sus bounds podrían afectar el detect
+      // de slots si se solapan).
+      var savedTransform = panelEl.style.transform;
+      panelEl.style.transform = '';
       var hover = detectZoneAt(e.clientX, e.clientY);
+      panelEl.style.transform = savedTransform;
+
       if(hover){
         if(hover.type === 'slot'){
           moveToSlot(panelEl, hover.el);
@@ -342,7 +444,19 @@
           applyReorder(hover.side, panelEl, target.insertAt);
         }
       }
+
+      // GARANTÍA DE CONSISTENCIA: normalizar TODOS los orders de TODAS las
+      // zonas después del cambio. Esto elimina cualquier colisión de _order
+      // (dos paneles con mismo side+order) o hueco que pueda haber quedado
+      // por mutaciones intermedias.
+      _normalizarOrders();
+
       clearGhostSlots();
+
+      // Ahora sí limpiamos transform — _reposicionarHUD aplicará la posición
+      // nueva (left/top) y el panel "aterriza" directamente sin saltar.
+      panelEl.style.transform = '';
+
       if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
       saveLayout();
       requestAnimationFrame(function(){ buildGhostSlots(); });
