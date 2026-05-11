@@ -1,27 +1,34 @@
-/* RAW Entry — Overlay v.5.113
-   Cambios desde v5.112:
-   - DIAL MÁS PEQUEÑO TODAVÍA. El sub-ring del dial (LIBROS, MOVIES,
-     PENDIENTES, etc) aún pegaba contra la fila top (Sim banda) cuando
-     se activaba una opción del dial. Necesita más respiro vertical.
-     Fix: dial pasa de min(752,51vw) → min(580px, 40vw). Eso es ~23%
-     menos que el tamaño anterior y ~31% menos que el original 836.
-     Cálculo con vH=1080, dial=580:
-       · Dial center_y: 540, top: 250, bottom: 830
-       · Sub-ring radio visual: 580/2 * 0.913 = 265
-       · Sub-ring top: 540 - 265 = 275
-       · Fila top termina en: 22 + 220 = 242
-       · MARGEN sub-ring vs fila top: 33px ✓ (antes solo 6px, encimado)
-       · Track top: 906
-       · MARGEN sub-ring vs track: 101px ✓ (mucho respiro)
-     BONUS: con dial más chico (580 vs 752), leftSpace en 1920px ahora
-     es 670 (antes 584), que supera el umbral para COL_W=288 (necesita
-     leftSpace>=642). Ahora las cards laterales se muestran con su ancho
-     "20% más ancho" en pantallas estándar.
+/* RAW Entry — Overlay v.5.114
+   Cambios desde v5.113:
+   - DIAL DINÁMICO RESPONSIVO. Fijo en 580 era demasiado chico para tu
+     pantalla grande (2280×1350) donde se veía perdido en el centro y a
+     la vez justo en 1920×1080. La solución correcta no es un tamaño
+     fijo sino una fórmula que respete:
+       1. Que el sub-ring (radio dial * 0.913) respire de la fila top
+          con un margen de 30px.
+       2. Que no exceda 836 (cap absoluto, para que no se vea desproporcionado).
+       3. Que no abarque más del 45% del ancho del viewport.
+     Nueva función _calcDialSize() corre en cada _reposicionarHUD y
+     calcula:
+       radioMax = (vH/2 - 242 - 30) / 0.913
+       diametro = min(836, radioMax*2, vW*0.45)
+     Resultados por viewport:
+       · 1366×768  → dial 245px
+       · 1920×1080 → dial 586px
+       · 2280×1350 → dial 836px  (tu pantalla, vuelve al tamaño original)
+       · 2560×1440 → dial 836px
+     Aplicado en 4 lugares: bloque inicial de _reposicionarHUD (aplica
+     style.width/height al canvas y al SVG del aro), override en
+     _hudReturningFromExpand, override en _hayApertura, y reset en rama
+     de regreso de modo expandido.
+
+   ── Heredado v5.113 ──
+   Primer intento dial fijo en 580 para respiro del sub-ring. Funcionaba
+   bien en 1920 pero ridículo en pantalla grande del usuario.
 
    ── Heredado v5.112 ──
-   FIX DEFINITIVO del bug "zoom no regresa al 100%": _resetDuroLayout()
-   limpia TODOS los inline styles antes de cada _reposicionarHUD de un
-   resize. raw-overlay-dnd.js ya no llama a _reposicionarHUD.
+   FIX bug "zoom no regresa al 100%": _resetDuroLayout() limpia inline
+   styles antes de cada _reposicionarHUD por resize.
 
    ── Heredado v5.111 ──
    Primer intento dial 10% más chico: min(836,57vw) → min(752,51vw).
@@ -1471,9 +1478,56 @@ function _crearDialOverlay(){
     {el:_pMision},{el:_pLogro},{el:_pNivel},
   ];
 
+  // ── Calcular tamaño dinámico del dial ──
+  // Reglas:
+  //   1. Nunca mayor a 836px (DIAL_MAX).
+  //   2. El sub-ring (radio dial * 0.913) NO debe pasarse de la fila top
+  //      con un margen de respiro (MARGEN_SR_TOP). Esto fija la cota por
+  //      altura: dial_radio <= (vH/2 - reservaTop - MARGEN_SR_TOP) / 0.913
+  //   3. Nunca más de 45% del ancho del viewport (estética, evita que en
+  //      pantallas anchas se vea sobredimensionado).
+  // Reserva top fija: topPad(22) + topMaxH cap(220) = 242
+  // Reserva bot fija: botPad(22) + botH(80) + trackH(64) + gap(8) = 174
+  //
+  // En tu pantalla grande (vW=2280, vH=1350): cota altura permite ~882 →
+  // cap a 836. Dial vuelve a su tamaño "completo".
+  // En 1920×1080: cota altura ≈ 586 → dial se achica. Sub-ring respira.
+  // En 1366×768: cota altura ≈ 245 → dial bien proporcionado.
+  function _calcDialSize(){
+    var DIAL_MAX = 836;
+    var SR_RATIO = 0.913; // radio del sub-ring / radio del dial (R_SO/center)
+    var RESERVA_TOP = 242;
+    var MARGEN_SR_TOP = 30;
+    var vW = window.innerWidth;
+    var vH = window.innerHeight;
+    // Cota por altura: que el sub-ring respire contra la fila top.
+    var radioMaxAlto = (vH / 2 - RESERVA_TOP - MARGEN_SR_TOP) / SR_RATIO;
+    var diametroMaxAlto = Math.max(280, radioMaxAlto * 2);
+    // Cota por ancho: dial nunca abarca más del 45% del ancho.
+    var diametroMaxAncho = vW * 0.45;
+    var dial = Math.min(DIAL_MAX, diametroMaxAlto, diametroMaxAncho);
+    return Math.round(dial);
+  }
+  window._calcDialSize = _calcDialSize;
+
   // ── Reposicionar HUD ──
   function _reposicionarHUD(){
     if(!_dialCanvas||!window._hudPanels) return;
+    // Aplicar tamaño dinámico del dial ANTES de medir su rect, para que
+    // getBoundingClientRect refleje ya el tamaño correcto para el viewport
+    // actual. Solo aplica en modo normal (no expandido), porque en modo
+    // expandido el dial se transforma a "mini" con tamaño fijo.
+    if(!window._hudExpanded){
+      var _dynSize = _calcDialSize();
+      _dialCanvas.style.width  = _dynSize + 'px';
+      _dialCanvas.style.height = _dynSize + 'px';
+      // El aro pulsante (dial-ring-breath) también debe escalar:
+      var _ringSvg = document.querySelector('#dial-ring-breath svg');
+      if(_ringSvg){
+        _ringSvg.style.width  = _dynSize + 'px';
+        _ringSvg.style.height = _dynSize + 'px';
+      }
+    }
     var r   = _dialCanvas.getBoundingClientRect();
     var vW  = window.innerWidth;
     var vH  = window.innerHeight;
@@ -1490,7 +1544,7 @@ function _crearDialOverlay(){
     // calculamos el rect final del dial centrado en el viewport.
     var _hayApertura = !window._hudExpanded && window._hudPanels.some(function(hp){ return hp.el && hp.el._animatingEntry; });
     if(window._hudReturningFromExpand && !window._hudExpanded){
-      var _fSize = Math.min(580, vW * 0.40);
+      var _fSize = _calcDialSize();
       var _fLeft = Math.round((vW - _fSize) / 2);
       var _fTop  = Math.round((vH - _fSize) / 2);
       r = {
@@ -1504,7 +1558,7 @@ function _crearDialOverlay(){
     } else if(_hayApertura){
       // Durante la apertura inicial el dial tiene scale(0.85) y boundingClientRect
       // devuelve un rect chico. Usar el rect final del dial al tamaño normal.
-      var _fSize2 = Math.min(580, vW * 0.40);
+      var _fSize2 = _calcDialSize();
       var _fLeft2 = Math.round((vW - _fSize2) / 2);
       var _fTop2  = Math.round((vH - _fSize2) / 2);
       r = {
@@ -1668,8 +1722,8 @@ function _crearDialOverlay(){
     _dialCanvas.style.boxShadow   = '';
     _dialCanvas.style.borderRadius = '';
     _dialCanvas.style.transform   = '';
-    _dialCanvas.style.width       = 'min(580px,40vw)';
-    _dialCanvas.style.height      = 'min(580px,40vw)';
+    _dialCanvas.style.width       = _calcDialSize() + 'px';
+    _dialCanvas.style.height      = _calcDialSize() + 'px';
     _dialCanvas.title             = '';
 
     // Limpiar height/minHeight/opacity/pointer-events forzados, pero
