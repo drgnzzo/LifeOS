@@ -1,6 +1,23 @@
-/* RAW Entry — Overlay v.5.105
-   Cambios desde v5.104:
-   - FIX BUG "al regresar del modo expandido el layout queda destruido":
+/* RAW Entry — Overlay v.5.106
+   Cambios desde v5.105:
+   - APERTURA: pausa de 1.5s entre cascada de cards y entrada del dial
+     (T_DIAL_IN = T_SLOTS_IN + 1500). Esto da el "respiro" pedido:
+     primero se asientan las cards, luego entra el dial.
+   - CARDS 20% MÁS ANCHAS cuando hay espacio: COL_W ahora es dinámico,
+     288px si el viewport lo permite (4 cols a 288 con sus gaps caben en
+     leftSpace y rightSpace), 240px en pantallas más chicas como fallback.
+   - FIX BUG regreso de modo expandido (radical):
+       a) display:none → forzar reflow → display:'' en TODOS los paneles
+          ANTES del reposicionamiento. Limpia cualquier dimensión cacheada
+          que el navegador haya guardado de cuando los paneles estaban en
+          modo expandido (scrollHeight grande, anchos heredados, etc.).
+       b) CAP de seguridad: topMaxH nunca puede exceder 220px. Si la
+          medición de scrollHeight devuelve algo mayor (típicamente por
+          un estado de medición intermedio), se trunca para evitar las
+          columnas verticales gigantes que se veían en v5.105.
+
+   ── Heredado v5.105 ──
+   FIX BUG regreso modo expandido (PARCIAL — bug persistía).
      Track aparecía dentro de la fila top, USER/Sim/Stats con alturas
      desmedidas, Misión/Logro/Nivel a media pantalla, columnas amontonadas.
      CAUSA: la rama expandida de _reposicionarHUD modifica width/top/left
@@ -9,7 +26,7 @@
      contaminando el reposicionamiento normal: las mediciones de
      scrollHeight para topMaxH/botH salían incorrectas y las transitions
      a medio camino capturaban posiciones intermedias.
-     FIX:
+     FIX (v5.105, todavía vigente):
        1. Limpiar SELECTIVAMENTE los inline styles que la rama expandida
           puso (width, height, minHeight, transform, clipPath de todos;
           opacity y pointer-events solo de Logro/Track).
@@ -1622,8 +1639,17 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════
     var leftSpace  = r.left;          // espacio total a la izquierda del dial
     var rightSpace = vW - r.right;    // espacio total a la derecha del dial
-    var COL_W = 240;                  // ancho fijo de cada columna
+    // COL_W dinámico: 288 (20% más ancho) si la pantalla tiene espacio para
+    // 4 columnas a ese tamaño; si no, fallback a 240. Esto cubre tanto
+    // pantallas grandes (>=2100px aprox) como pantallas estándar 1920px.
     var COL_GAP = GAP;                // gap entre columnas dentro del mismo lado
+    var COL_W;
+    if((leftSpace  >= (288 * 2 + COL_GAP * 3)) &&
+       (rightSpace >= (288 * 2 + COL_GAP * 3))){
+      COL_W = 288;
+    } else {
+      COL_W = 240;
+    }
 
     // Si hay espacio para 2 columnas + gap a cada lado, usar 4 columnas.
     // Si no, fallback a 1 columna (modo compacto).
@@ -1731,6 +1757,11 @@ function _crearDialOverlay(){
       }
     });
     if(topMaxH===0) topMaxH = 130;
+    // CAP de seguridad: los paneles top jamás deben ser más altos que 220px.
+    // Si la medición devuelve algo mayor, es porque el navegador midió en un
+    // estado intermedio (transición del dial, panel sin width aplicado, etc.).
+    // Limitar evita columnas verticales gigantes que rompen el layout.
+    if(topMaxH > 220) topMaxH = 220;
     // Forzar altura uniforme para alinearse como UNA barra
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
@@ -1799,11 +1830,19 @@ function _crearDialOverlay(){
     [pMision,pLogro,pNivel].forEach(function(hp){
       if(hp && hp.el){
         var h = hp.el.scrollHeight || hp.el.offsetHeight || 80;
+        // DEBUG TEMP v5.106
+        if(window._hudReturningFromExpand){
+          console.log('[REPOS DEBUG BOT]', hp.el.id, 'width=', hp.el.style.width,
+            'scrollHeight=', hp.el.scrollHeight, 'offsetHeight=', hp.el.offsetHeight);
+        }
         if(h>botH) botH = h;
       }
     });
     if(botH===0) botH = 80;
     var trackH = (pTrack && pTrack.el) ? (pTrack.el.scrollHeight || pTrack.el.offsetHeight || 64) : 64;
+    if(window._hudReturningFromExpand){
+      console.log('[REPOS DEBUG BOT] botH=', botH, 'trackH=', trackH, 'vH=', vH);
+    }
 
     var botY = vH - botPad - botH;
     var trackY = botY - trackH - 8;
@@ -3076,6 +3115,25 @@ function _crearDialOverlay(){
     // PASO 2: Reposicionar después de un rAF para que el browser haga
     // reflow tras la limpieza de inline styles. Hacemos DOS pasadas
     // (segunda confirma mediciones limpias después del primer reflow).
+    //
+    // FIX v5.106: ANTES del reposicionamiento, forzamos un reset completo
+    // de medidas haciendo display:none → forzar reflow → display:'' a TODOS
+    // los paneles. Esto elimina cualquier dimensión cacheada por el navegador
+    // del modo expandido (scrollHeight grande, anchos heredados, etc.) y
+    // garantiza que `_reposicionarHUD` mida dimensiones limpias.
+    if(window._hudPanels){
+      window._hudPanels.forEach(function(hp){
+        if(!hp.el) return;
+        hp.el.style.display = 'none';
+      });
+      // Forzar reflow leyendo offsetHeight de un elemento conocido
+      void document.body.offsetHeight;
+      window._hudPanels.forEach(function(hp){
+        if(!hp.el) return;
+        hp.el.style.display = '';
+      });
+    }
+
     if(!sinReposicionar && typeof _reposicionarHUD === 'function'){
       requestAnimationFrame(function(){
         _reposicionarHUD();
@@ -4154,20 +4212,21 @@ function abrirDial(){
 
   if(window._hudPanels && window.innerWidth>=900){
     // ═══════════════════════════════════════════════════════════════
-    //  TIMELINE DE APERTURA — orden estricto (v5.104 ralentizado ~1.5x):
+    //  TIMELINE DE APERTURA — orden estricto (v5.106 con pausa antes
+    //  del dial para que se sienta el respiro entre cascada y dial):
     //   t = 450ms  → FASE 1: aro circular del breathing aparece
     //   t = 1700ms → FASE 2: empieza cascada de paneles (todos al azar)
     //   t = 4500ms → FASE 2b: aparecen slots vacíos punteados
-    //   t = 5100ms → FASE 3: aparece el dial canvas (transición 1500ms muy suave)
-    //   t = 7200ms → limpieza final + vida (breathing/scan al azar)
+    //   t = 6000ms → FASE 3: aparece el dial canvas (PAUSA 1.5s post-slots)
+    //   t = 8100ms → limpieza final + vida (breathing/scan al azar)
     // ═══════════════════════════════════════════════════════════════
 
     var T_RING_IN       = 450;
     var T_CASCADA_START = 1700;
-    var T_CASCADA_DUR   = 2800; // ventana de la cascada (antes 1800)
+    var T_CASCADA_DUR   = 2800; // ventana de la cascada
     var T_SLOTS_IN      = T_CASCADA_START + T_CASCADA_DUR; // 4500
-    var T_DIAL_IN       = T_SLOTS_IN + 600;                // 5100
-    var T_CLEANUP       = T_DIAL_IN + 2100;                // 7200
+    var T_DIAL_IN       = T_SLOTS_IN + 1500;               // 6000 (antes 5100)
+    var T_CLEANUP       = T_DIAL_IN + 2100;                // 8100
 
     // ── FASE 1: aro circular aparece (más suave: 1400ms) ──
     setTimeout(function(){
