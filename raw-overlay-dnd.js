@@ -56,7 +56,7 @@
     bottom:    3,
   };
   // Lados válidos para drag-and-drop
-  var ALLOWED_SIDES = ['left-1','left-2','right-1','right-2','bottom-left','bottom-center','bottom-right'];
+  var ALLOWED_SIDES = ['left-1','left-2','right-1','right-2','bottom-left','bottom-2nd','bottom-center','bottom-right'];
   function isAllowedSide(s){ return ALLOWED_SIDES.indexOf(s) !== -1; }
 
   var _state = {
