@@ -1,28 +1,26 @@
-/* RAW Entry — Overlay v.5.125
-   ELIMINADO el "modo apertura rápida". +Nueva ahora ejecuta IDÉNTICO
-   flujo a DOMContentLoaded (cascada larga). El usuario tuvo razón:
-   intentar tener un flujo paralelo solo causaba desfases.
+/* RAW Entry — Overlay v.5.126
+   FIX: cards laterales conservan su ancho original al entrar a modo expandido.
 
-   ── Estrategia v5.125 ──
-   1) toggleEntradaDropdown ahora destruye el _dialOverlay del DOM y
-      resetea _dialOverlay/_dialCanvas/_dialCtx a null antes de llamar
-      abrirDial. Eso hace que _crearDialOverlay recree el overlay desde
-      cero, igual que en la primera carga.
-   2) Los paneles flotantes (_pUser, _pSim, etc., que están en
-      document.body separados del _dialOverlay) NO se eliminan porque
-      su HTML interno es correcto. Pero sus inline styles SÍ se limpian
-      (cssText='' + estilos base reaplicados) para que abrirDial parta
-      del mismo estado que en la primera carga.
-   3) Reflow forzado antes de abrirDial para asegurar que el reset se
-      aplica.
-   4) Eliminado todo el código de "modo rápido" (v5.122-v5.124) que
-      causaba el desfase.
+   ── Bug ──
+   Al expandir una card (ej. Patrimonio), las demás cards laterales se
+   movían a los extremos como "tabs" pero forzaban su ancho a 240px
+   hardcodeado. En pantallas donde COL_W normal es 270, 300 o 340, eso
+   las hacía verse más angostas que en el overlay normal.
 
-   ── Heredado v5.124 ──
-   (revertido: modo rápido eliminado)
+   ── Fix ──
+   En el bloque `if(expandedEl)` de _reposicionarHUD, calcular COL_W_exp
+   con la misma lógica de escalones (340/300/270/240/210) que usa el
+   overlay normal, basándose en r.left (que mide el espacio disponible).
+   Aplicar ese ancho a las cards laterales en lugar de 240 fijo.
+   También ajustar centerW (ancho del panel expandido) para reservar el
+   espacio correcto basado en COL_W_exp: reservaLat = (COL_W_exp+GAP*2)*2.
+
+   ── Heredado v5.125 ──
+   +Nueva destruye overlay y reusa el mismo flujo que DOMContentLoaded.
+   Modo rápido eliminado.
 
    ── Heredado v5.121 ──
-   Eliminar paneles huérfanos creados por raw-core (mismo ID).
+   Eliminar paneles huérfanos creados por raw-core.
 
    ── Heredado v5.120 ──
    _refrescarEspejos → re-reposicionar (paneles crecen con datos reales).
@@ -1671,7 +1669,26 @@ function _crearDialOverlay(){
       var dialMiniReserva = 80 + GAP*2;
       var zonaH = Math.max(280, botYAvail - dialMiniReserva - topRowBottom);
 
-      var centerW = Math.min(1100, vW - 480);
+      // v5.126: el COL_W expandido se calcula PRIMERO porque centerW
+      // depende de él (reservar espacio para 1 columna lateral por lado
+      // + gaps). Se calcula igual que en el overlay normal para que las
+      // cards laterales conserven su ancho original.
+      var _leftSpace_exp  = r.left;
+      var _rightSpace_exp = vW - r.right;
+      var _candidates_exp = [340, 300, 270, 240, 210];
+      var COL_W_exp = 210;
+      for(var _ci=0; _ci<_candidates_exp.length; _ci++){
+        var _w = _candidates_exp[_ci];
+        if((_leftSpace_exp  >= (_w * 2 + GAP * 3)) &&
+           (_rightSpace_exp >= (_w * 2 + GAP * 3))){
+          COL_W_exp = _w; break;
+        }
+      }
+      // Reservar 1 columna lateral por lado + 2 GAPs por lado (margen
+      // exterior + separación con la card central) para el ancho del
+      // panel expandido en el centro.
+      var reservaLat = (COL_W_exp + GAP*2) * 2;
+      var centerW = Math.min(1100, vW - reservaLat);
       var centerX = Math.round((vW - centerW) / 2);
 
       // Provisional: asignar zona completa centrada (sin medir contenido aún).
@@ -1716,7 +1733,7 @@ function _crearDialOverlay(){
       });
 
       var leftX  = GAP;
-      var rightX = vW - 240 - GAP;
+      var rightX = vW - COL_W_exp - GAP;
       function placeColExpanded(panels, x){
         // En modo expandido: ordenar dando preferencia a left-1/right-1 sobre left-2/right-2
         panels.sort(function(a,b){
@@ -1730,7 +1747,7 @@ function _crearDialOverlay(){
           hp.el.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1)';
           hp.el.style.left = x + 'px';
           hp.el.style.top  = y + 'px';
-          hp.el.style.width = '240px';
+          hp.el.style.width = COL_W_exp + 'px';
           hp.el.style.height = '';
           hp.el.style.minHeight = '';
           hp.el.style.clipPath = chamferRect;
