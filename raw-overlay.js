@@ -1,46 +1,30 @@
-/* RAW Entry — Overlay v.5.124
-   REESCRITURA del modo apertura rápida como flujo INDEPENDIENTE.
+/* RAW Entry — Overlay v.5.125
+   ELIMINADO el "modo apertura rápida". +Nueva ahora ejecuta IDÉNTICO
+   flujo a DOMContentLoaded (cascada larga). El usuario tuvo razón:
+   intentar tener un flujo paralelo solo causaba desfases.
 
-   ── Causa raíz identificada ──
-   En v5.123 el modo rápido compartía el inicio de abrirDial con el modo
-   normal: reset duro → FASE 0 (aplica scale(0.85) + opacity:0 + 
-   _animatingEntry=true al dial canvas) → doble-rAF → _reposicionarHUD.
-   
-   El problema: en ese primer _reposicionarHUD, el dial canvas tenía
-   transform: scale(0.85) aplicado. getBoundingClientRect() devuelve el
-   rect ESCALADO, no el real. Resultado:
-     · r.width = dialSize * 0.85 (más chico de lo real)
-     · r.left  = (vW - dialSize*0.85)/2 (más grande)
-     · leftSpace inflado → COL_W incorrecto
-     · colA_X/colB_X mal calculados
-     · Cards posicionadas DESFASADAS hacia abajo y hacia el centro
-   
-   Luego el modo rápido limpiaba el scale y llamaba _reposicionarHUD
-   otra vez, pero algunas posiciones ya quedaron mal aplicadas y el
-   re-cálculo no las corregía completamente.
+   ── Estrategia v5.125 ──
+   1) toggleEntradaDropdown ahora destruye el _dialOverlay del DOM y
+      resetea _dialOverlay/_dialCanvas/_dialCtx a null antes de llamar
+      abrirDial. Eso hace que _crearDialOverlay recree el overlay desde
+      cero, igual que en la primera carga.
+   2) Los paneles flotantes (_pUser, _pSim, etc., que están en
+      document.body separados del _dialOverlay) NO se eliminan porque
+      su HTML interno es correcto. Pero sus inline styles SÍ se limpian
+      (cssText='' + estilos base reaplicados) para que abrirDial parta
+      del mismo estado que en la primera carga.
+   3) Reflow forzado antes de abrirDial para asegurar que el reset se
+      aplica.
+   4) Eliminado todo el código de "modo rápido" (v5.122-v5.124) que
+      causaba el desfase.
 
-   ── Fix v5.124: flujo independiente para modo rápido ──
-   El modo rápido ahora tiene su PROPIO flujo MINIMAL al inicio de
-   abrirDial, antes de cualquier código compartido. Hace SOLO:
-     1) Reset duro (limpia inline styles, _animatingEntry=false)
-     2) Dial canvas SIN scale residual (transform='')
-     3) Mostrar overlay con fade
-     4) Render Sim banda y _refrescarEspejos
-     5) Doble rAF → _reposicionarHUD (con dial al tamaño REAL)
-     6) Fade in cards + dial
-     7) return (no toca el flujo de cascada larga)
-
-   La cascada larga sigue intacta para DOMContentLoaded.
-
-   ── Heredado v5.123 ──
-   Reset duro forzoso ahora aplica SOLO al modo normal (en el flujo
-   independiente del modo rápido aplica su propio reset).
-
-   ── Heredado v5.122 ──
-   Modo apertura rápida desde +Nueva. Orden síncrono de pre-cargas.
+   ── Heredado v5.124 ──
+   (revertido: modo rápido eliminado)
 
    ── Heredado v5.121 ──
-   Eliminar paneles huérfanos creados por raw-core.
+   Eliminar paneles huérfanos creados por raw-core (mismo ID).
+
+   ── Heredado v5.120 ──
    _refrescarEspejos → re-reposicionar (paneles crecen con datos reales).
    window.abrirDial/cerrarDial expuestos. Cache bust.
 
@@ -4317,13 +4301,64 @@ function _confirmarEditarId(){
 }
 
 function toggleEntradaDropdown(){
-  // v5.122: +Nueva activa modo de apertura RÁPIDA del overlay.
-  // En lugar de la cascada larga (11.2s) que usa DOMContentLoaded, en
-  // +Nueva queremos solo 2 fases:
-  //   1) Todas las cards aparecen de golpe con fade suave (~700ms)
-  //   2) Dial aparece después con su fade existente (3200ms)
-  window._modoAperturaRapida = true;
-  if(_dialVisible) cerrarDial(); else abrirDial();
+  if(_dialVisible){
+    cerrarDial();
+    return;
+  }
+  // v5.125: hacer que +Nueva ejecute EXACTAMENTE el mismo flujo de
+  // apertura que DOMContentLoaded. La clave: que abrirDial vea el mismo
+  // estado inicial que ve en la primera carga.
+  //
+  // En la PRIMERA carga: _dialOverlay=null, paneles existen recién creados
+  // sin estilos inline aplicados (solo los iniciales de _mkFloatPanel:
+  // opacity:0, visibility:hidden, transition:opacity 500ms).
+  //
+  // En +Nueva: _dialOverlay existe, paneles existen pero tienen estilos
+  // inline aplicados de cierres/aperturas previos (left/top/width/etc).
+  // Eso contaminaba el primer _reposicionarHUD.
+  //
+  // Solución: ELIMINAR el _dialOverlay del DOM y resetear sus referencias.
+  // Cuando abrirDial corra _crearDialOverlay, recreará canvas+glow+ring
+  // desde cero. Y al estar el canvas recién creado SIN style.width inline
+  // y SIN transform residual, getBoundingClientRect medirá igual que en
+  // la primera carga. Los paneles (en document.body) los conservamos
+  // porque su HTML interno es correcto; solo limpiamos sus inline styles.
+  if(_dialOverlay && _dialOverlay.parentNode){
+    _dialOverlay.parentNode.removeChild(_dialOverlay);
+  }
+  _dialOverlay = null;
+  _dialCanvas  = null;
+  _dialCtx     = null;
+  if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
+  // Limpiar inline styles de TODOS los paneles para que abrirDial parta
+  // del mismo estado que en la carga inicial.
+  if(window._hudPanels){
+    window._hudPanels.forEach(function(hp){
+      if(!hp.el) return;
+      hp.el._animatingEntry = false;
+      hp.el.style.cssText = '';
+      // Re-aplicar los estilos base de _mkFloatPanel (lo crítico: position
+      // fixed, transition opacity, opacity 0, visibility hidden). Como no
+      // tenemos _mkFloatPanel a mano aquí, reseteamos a los valores
+      // mínimos que sabemos que son correctos.
+      hp.el.style.position    = 'fixed';
+      hp.el.style.zIndex      = '9001';
+      hp.el.style.opacity     = '0';
+      hp.el.style.visibility  = 'hidden';
+      hp.el.style.transition  = 'opacity 500ms ease-out';
+      hp.el.style.borderRadius= '14px';
+      hp.el.style.overflow    = 'hidden';
+      hp.el.classList.remove('hud-breathing','hud-scan','hud-scan-2');
+      var inner = hp.el.querySelector(':scope > [id$="-inner"]');
+      if(inner){
+        inner.style.minHeight       = '';
+        inner.style.justifyContent  = '';
+      }
+    });
+  }
+  // Forzar reflow para asegurar que los resets se aplican antes de abrirDial
+  void document.body.offsetHeight;
+  abrirDial();
 }
 
 // P-D: Aplicar animaciones de "vida" a TODOS los paneles del overlay:
@@ -4391,145 +4426,10 @@ function abrirDial(){
   _crearDialOverlay();
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
 
-  // v5.124: MODO APERTURA RÁPIDA — flujo independiente y MÍNIMO
-  // Si viene de +Nueva, ejecuta SOLO lo necesario sin cascada. No usa
-  // _animatingEntry ni transforms iniciales de dial. Solo:
-  //   1) Reset duro (limpiar inline styles)
-  //   2) Mostrar overlay
-  //   3) Render Sim + _refrescarEspejos
-  //   4) doble-rAF → _reposicionarHUD (mide con todo limpio)
-  //   5) Fade in las cards y el dial
-  if(window._modoAperturaRapida && window._hudPanels && window.innerWidth>=900){
-    window._modoAperturaRapida = false; // consumido
+  // v5.125: el modo rápido fue eliminado. +Nueva ahora destruye el
+  // overlay y deja que abrirDial corra IGUAL que en DOMContentLoaded.
 
-    // (1) Reset duro: limpiar TODO estado inline previo
-    window._hudPanels.forEach(function(hp){
-      if(!hp.el) return;
-      hp.el._animatingEntry = false;
-      hp.el.style.left       = '';
-      hp.el.style.top        = '';
-      hp.el.style.width      = '';
-      hp.el.style.height     = '';
-      hp.el.style.minHeight  = '';
-      hp.el.style.maxHeight  = '';
-      hp.el.style.overflowY  = '';
-      hp.el.style.transform  = '';
-      hp.el.style.transition = '';
-      hp.el.style.filter     = '';
-      hp.el.style.clipPath   = '';
-      hp.el.style.opacity    = '0';
-      hp.el.style.visibility = 'hidden';
-      hp.el.classList.remove('hud-breathing','hud-scan','hud-scan-2');
-      var inner = hp.el.querySelector(':scope > [id$="-inner"]');
-      if(inner){
-        inner.style.minHeight       = '';
-        inner.style.justifyContent  = '';
-      }
-    });
-    // Dial canvas SIN scale residual (causa rect chico en getBoundingClientRect)
-    if(_dialCanvas){
-      _dialCanvas.style.transform  = '';
-      _dialCanvas.style.transition = 'none';
-      _dialCanvas.style.opacity    = '0';
-    }
-    var glowR = document.getElementById('dial-ambient');
-    if(glowR){ glowR.style.transition='none'; glowR.style.opacity='0'; }
-    var ringR = document.getElementById('dial-ring-breath');
-    if(ringR){ ringR.style.transition='none'; ringR.style.opacity='0'; ringR.style.transform=''; }
-    void document.body.offsetHeight; // reflow
-
-    // (2) Mostrar overlay
-    _dialOverlay.style.opacity = '0';
-    _dialOverlay.style.display = 'flex';
-    _dialOverlay.style.pointerEvents = 'auto';
-    _dialVisible = true;
-    window._hudCascadaEnCurso = false;
-    requestAnimationFrame(function(){
-      _dialOverlay.style.transition = 'opacity 600ms cubic-bezier(.16,1,.3,1)';
-      _dialOverlay.style.opacity = '1';
-    });
-
-    // (3) Render Sim + datos en DOM
-    if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
-    if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
-    if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
-
-    // Bloquear overflow durante el posicionamiento
-    var _bodyOverflowPrev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    // (4) Doble rAF → reposicionar con todo limpio (dial sin scale,
-    //     animatingEntry=false, transforms vacíos)
-    requestAnimationFrame(function(){
-      requestAnimationFrame(function(){
-        if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
-
-        // (5) Fade in cards y dial
-        window._hudPanels.forEach(function(hp){
-          if(!hp.el) return;
-          hp.el.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1)';
-          hp.el.style.visibility = 'visible';
-        });
-        // rAF adicional para que opacity transitione (estado inicial 0 ya aplicado)
-        requestAnimationFrame(function(){
-          window._hudPanels.forEach(function(hp){
-            if(hp.el) hp.el.style.opacity = '1';
-          });
-          if(glowR){
-            glowR.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1)';
-            glowR.style.opacity = '1';
-          }
-          if(ringR){
-            ringR.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1)';
-            ringR.style.opacity = '0.18';
-          }
-        });
-
-        // Dial aparece 800ms después con fade lento
-        setTimeout(function(){
-          if(_dialCanvas){
-            _dialCanvas.style.transition = 'opacity 3200ms cubic-bezier(.16,1,.3,1)';
-            _dialCanvas.style.opacity = '1';
-          }
-        }, 800);
-
-        // Restaurar overflow después del primer pase
-        setTimeout(function(){
-          document.body.style.overflow = _bodyOverflowPrev;
-        }, 100);
-
-        // Construir slots vacíos del DnD
-        setTimeout(function(){
-          if(window._overlayDnd && typeof window._overlayDnd.buildGhostSlots === 'function'){
-            window._overlayDnd.buildGhostSlots();
-          }
-        }, 750);
-
-        // Limpieza final (4200ms): limpiar transitions, aplicar vida
-        setTimeout(function(){
-          window._hudPanels.forEach(function(hp){
-            if(hp.el) hp.el.style.transition = '';
-          });
-          if(_dialCanvas) _dialCanvas.style.transition = '';
-          if(typeof _aplicarVidaPaneles==='function') _aplicarVidaPaneles();
-          if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
-        }, 4200);
-      });
-    });
-
-    if(!_dialBreathRAF){
-      (function _breathLoop(){
-        _dialBreathT++;
-        _dialDraw();
-        _dialBreathRAF = requestAnimationFrame(_breathLoop);
-      })();
-    }
-    var btnR = document.getElementById('btn-nueva-entrada');
-    if(btnR) btnR.classList.add('active');
-    return; // FIN del flujo de modo rápido
-  }
-
-  // ── FLUJO NORMAL (DOMContentLoaded con cascada larga) ──
+  // ── FLUJO NORMAL (cascada larga, igual para DOMContentLoaded y +Nueva) ──
 
   if(!_dialBreathRAF){
     (function _breathLoop(){
