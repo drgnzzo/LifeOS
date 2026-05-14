@@ -1550,12 +1550,23 @@ function renderEntes(data){
   }).join('')+(hayExcluidos?'<div class="ente-excluido-nota">* excluido del total</div>':'');
 }
 function togEnteEdit(fila){
-  const ee=document.getElementById('ee-'+fila); if(!ee) return;
+  // v5.131 DEBUG: ver si la función se llama y por qué retorna
+  console.log('🔧 togEnteEdit llamado con fila=', fila, 'tipo=', typeof fila);
+  const ee=document.getElementById('ee-'+fila);
+  if(!ee){
+    console.warn('❌ togEnteEdit: no encuentra ee-'+fila+'. ¿Existe en el DOM?',
+      'Todos los ee-*:', Array.from(document.querySelectorAll('[id^="ee-"]')).map(e=>e.id));
+    return;
+  }
+  console.log('✓ togEnteEdit: ee-'+fila+' encontrado, abriendo editor');
   const isOpen=ee.classList.contains('open');
   document.querySelectorAll('.ente-edit').forEach(e=>e.classList.remove('open'));
   if(!isOpen){ee.classList.add('open');document.getElementById('ei-'+fila).focus();}
 }
+window.togEnteEdit = togEnteEdit; // v5.131: garantizar acceso desde onclick=
+
 function guardarEnte(fila){
+  console.log('💾 guardarEnte llamado fila=', fila);
   const inp=document.getElementById('ei-'+fila);
   const val=parseFloat(inp.value);
   if(isNaN(val))return;
@@ -1577,6 +1588,7 @@ function guardarEnte(fila){
     }
   }).catch(()=>{ico.className='fas fa-check';});
 }
+window.guardarEnte = guardarEnte; // v5.131: garantizar acceso desde onclick=
 
 // ══════════════════════════════════════════
 //  SOS
