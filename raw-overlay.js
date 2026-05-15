@@ -1,34 +1,24 @@
-/* RAW Entry — Overlay v.5.134
-   FIX clicks rotos en +Nueva — causa raíz definitiva.
+/* RAW Entry — Overlay v.5.135
+   FIX clicks en +Nueva — solución simple y robusta.
 
    ── Bug ──
-   En +Nueva, toggleEntradaDropdown destruye el _dialOverlay y
-   _crearDialOverlay lo recrea con document.body.appendChild. Eso lo
-   inserta AL FINAL del body — DESPUÉS de los paneles flotantes en
-   orden DOM (los paneles se crearon en la primera carga y persisten).
+   El _dialOverlay con backdrop-filter creaba un stacking context que
+   capturaba todos los clicks aunque los paneles tuvieran z-index mayor.
+   v5.134 intentó arreglar reordenando el DOM (insertBefore), pero no fue
+   suficiente.
 
-   Combinación letal:
-     · _dialOverlay tiene backdrop-filter:blur(28px) saturate(160%)
-       brightness(0.68) → crea stacking context independiente
-     · _dialOverlay z-index:9000, paneles z-index:9001
-     · Overlay aparece DESPUÉS en orden DOM
-     · Resultado: aunque z-index del panel es mayor, el stacking context
-       creado por backdrop-filter combinado con orden DOM hace que
-       document.elementFromPoint() retorne dial-overlay sobre los paneles
-     · Clicks llegan al overlay (que tiene pointer-events:auto para el
-       "click fuera para cerrar"), no a los paneles
-     · Solo Sim banda (megatabs) seguía funcionando porque... no sé,
-       quizás su posición coincide con un área del overlay donde el
-       stacking diverge.
+   ── Fix v5.135 ──
+   Cambiar _dialOverlay.style.pointerEvents = 'auto' a 'none' al abrir.
+   Los paneles flotantes (con pointer-events:auto explícito) reciben los
+   clicks ya que el overlay deja de capturarlos.
+   El dial canvas DENTRO del overlay tiene pointer-events:auto explícito
+   en su cssText, por lo que sigue capturando clicks (los hijos con auto
+   superan al padre con none en CSS pointer-events).
+   Se PIERDE: "click en zona vacía del overlay para cerrar". Quedan
+   alternativas: ESC, botón close, click en centro del dial.
 
-   ── Fix ──
-   En _crearDialOverlay, en lugar de document.body.appendChild(_dialOverlay),
-   usar document.body.insertBefore(_dialOverlay, primerPanel). Esto pone
-   el overlay ANTES de los paneles en orden DOM. Ahora los paneles ganan
-   por z-index (9001>9000) Y por orden DOM (vienen después).
-
-   ── Heredado v5.129 ──
-   Forzar z-index:9001 y pointer-events:auto en paneles tras reset.
+   ── Heredado v5.134 ──
+   insertBefore del overlay (aún útil para orden DOM correcto).
 
    ── Heredado v5.127 ──
    Limpieza quirúrgica en toggleEntradaDropdown.
@@ -4534,7 +4524,17 @@ function abrirDial(){
 
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
-  _dialOverlay.style.pointerEvents = 'auto';
+  // v5.135: pointer-events:none en el overlay para que los clicks pasen a
+  // los paneles flotantes que están a sus lados. El backdrop-filter del
+  // overlay crea un stacking context que capturaba clicks aunque z-index
+  // de paneles fuera mayor. Con pointer-events:none, los clicks atraviesan
+  // y los paneles los reciben.
+  // El dial canvas dentro del overlay TIENE pointer-events:auto explícito,
+  // así que sigue capturando clicks normalmente (los hijos con auto superan
+  // al padre con none).
+  // Se pierde la capacidad de "click fuera del dial = cerrar". Para cerrar
+  // queda: ESC, botón close, click en centro del dial.
+  _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = true;
 
   // ═══ FASE 0 — Estado inicial: TODO oculto ═══
