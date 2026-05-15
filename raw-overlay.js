@@ -1,39 +1,33 @@
-/* RAW Entry — Overlay v.5.136
-   FIX clicks en +Nueva — versión definitiva.
+/* RAW Entry — Overlay v.5.137
+   Fix bundle: expand buttons en +Nueva, drag handles, scroll Necesidades.
 
-   ── Diagnóstico final ──
-   El _dialOverlay tiene backdrop-filter:blur(28px) que crea un stacking
-   context independiente. Aunque z-index de paneles (9001) > overlay
-   (9000), document.elementFromPoint() retorna el overlay sobre los
-   paneles. Eso hacía que TODOS los clicks dentro del área del overlay
-   se los comiera él (su listener "click fuera = cerrar" no detenía
-   propagación, pero capturaba el target antes que los paneles).
+   ── 3 fixes en este commit ──
 
-   Solo Sim banda (megatabs) funcionaba porque por alguna razón su
-   stacking se resuelve diferente — quizás por estar en el top sin
-   solaparse con el dial central.
+   1) BOTONES EXPAND no funcionaban en +Nueva
+      El listener delegado en document seguía vivo pero por alguna razón
+      no atrapaba clicks en +Nueva (probablemente el click no llegaba a
+      document por interferencia del overlay recreado). Fix: agregar
+      onclick inline al botón expand y al cta. No depende del listener
+      delegado.
 
-   ── Fix ──
-   _dialOverlay.style.pointerEvents = 'none' al abrir el dial.
-   · Paneles flotantes (pointer-events:auto default): reciben clicks ✓
-   · Dial canvas dentro del overlay (pointer-events:auto explícito en su
-     cssText): los hijos con auto SUPERAN al padre con none → recibe clicks ✓
-   · Drag handles (dentro de paneles): paneles tienen auto → funcionan ✓
+   2) DRAG HANDLES no se creaban
+      Diagnóstico via consola: window._hudPanels[0].el.querySelector
+      ('.hud-dnd-handle') retornaba null. makeDraggable solo se llamaba
+      en init() una vez. Fix: en el hook abrirDial, re-aplicar
+      makeDraggable a todos los paneles cada vez que se abre el dial.
+      makeDraggable es idempotente (chequea si el handle ya existe).
 
-   Lo que se PIERDE:
-   · "Click en zona vacía del overlay para cerrar el dial"
-   Alternativas para cerrar: ESC, botón close, click en centro del dial.
+   3) NECESIDADES expandida con scroll innecesario
+      CSS de .hud-expanded-content tenía overflow:auto que mostraba
+      scrollbar siempre, aunque el contenido cabiera. Cambio a
+      overflow-y:auto + flex:1 1 auto + overflow-x:hidden para que
+      el scrollbar solo aparezca cuando el contenido excede.
 
-   ── Heredado v5.134 ──
-   insertBefore del overlay en orden DOM.
+   ── Heredado v5.136 ──
+   _dialOverlay con pointer-events:none para que paneles reciban clicks.
 
    ── Heredado v5.132 ──
-   togEnteEdit/guardarEnte usan event.target en lugar de getElementById
-   para evitar IDs duplicados en el DOM (renderEntes y renderPatrimonio
-   ambos generan ee-FILA).
-
-   ── Heredado v5.127 ──
-   Limpieza quirúrgica en toggleEntradaDropdown.
+   togEnteEdit/guardarEnte usan event.target en lugar de getElementById.
    "resetear" los paneles antes de abrirDial. Pero eso eliminaba TODO el
    styling visual original (background, border, box-shadow, animation,
    font-family, CSS variables --pc-dim/--pc-mid/--pc-glow). Yo
@@ -855,7 +849,11 @@ function _crearDialOverlay(){
       '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)!important;z-index:9050!important;display:flex;flex-direction:column}',
       '.hud-pnl.hud-expanded > [id$="-inner"]{display:flex;flex-direction:column;flex:1;min-height:0}',
       // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
-      '.hud-expanded-content{display:none;flex:1;min-height:0;overflow:auto;padding:14px 18px}',
+      // v5.137: cambio overflow:auto a overflow-y:auto + min-height:0
+      // para que el scrollbar solo aparezca si el contenido realmente
+      // excede la altura disponible. Antes aparecía siempre incluso
+      // cuando el contenido cabía.
+      '.hud-expanded-content{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 18px}',
       '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px;justify-content:center}',
       '.hud-expanded .hud-collapsed-content{display:none}',
       // Tablas dentro del panel expandido: scroll horizontal mantenido
@@ -1077,6 +1075,7 @@ function _crearDialOverlay(){
         '<circle cx="'+lastPt[0]+'" cy="'+lastPt[1]+'" r="1.6" fill="'+color+'" style="filter:drop-shadow(0 0 3px '+color+')"/>'+
       '</svg>'+
       '<button class="hud-h-expand" data-color="'+color+'" title="Expandir" '+
+        'onclick="event.stopPropagation();var p=this.closest(\'.hud-pnl\');if(p&&typeof window._hudExpand===\'function\')window._hudExpand(p);return false;" '+
         'style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+
         '<i class="fas fa-up-right-and-down-left-from-center"></i>'+
       '</button>'+
@@ -1089,7 +1088,9 @@ function _crearDialOverlay(){
   // El parámetro `fn` se ignora ahora — antes navegaba a un panel externo
   // (irAPatrimonio, etc). Mantenemos el parámetro por compat con llamadas existentes.
   function _pCTA(label, color, fn){
-    return '<div class="hud-cta hud-cta-expand" style="'+
+    return '<div class="hud-cta hud-cta-expand" '+
+      'onclick="event.stopPropagation();var p=this.closest(\'.hud-pnl\');if(p&&typeof window._hudExpand===\'function\')window._hudExpand(p);return false;" '+
+      'style="'+
       '--ac-15:'+_rgba(color,0.12)+';'+
       '--ac-08:'+_rgba(color,0.08)+';'+
       'cursor:pointer">'+

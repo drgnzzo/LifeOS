@@ -339,13 +339,19 @@
 
   // ═══ Hacer un panel arrastrable ═══
   function makeDraggable(panelEl){
-    if(panelEl._dndDraggable) return;
     var side = panelEl._side;
     if(!isAllowedSide(side)) return;
 
     var header = panelEl.querySelector('.hud-h') || panelEl.querySelector('.hud-card');
     if(!header) return;
-    if(header.querySelector('.hud-dnd-handle')) return;
+
+    // v5.137: si ya tiene el handle, no hacer nada. Pero si _dndDraggable
+    // está marcado y el handle NO existe (HTML re-renderizado), permitir
+    // recrear el handle.
+    if(header.querySelector('.hud-dnd-handle')){
+      panelEl._dndDraggable = true; // garantizar el flag
+      return;
+    }
 
     var handle = document.createElement('div');
     handle.className = 'hud-dnd-handle';
@@ -554,8 +560,20 @@
     window.abrirDial = function(){
       var r = origAbrir.apply(this, arguments);
       setTimeout(function(){
-        if(_state.initialized) buildGhostSlots();
-        else init();
+        if(_state.initialized){
+          // v5.137: en CADA apertura, re-aplicar makeDraggable a TODOS los
+          // paneles. La primera vez init() lo hace pero si los paneles
+          // tienen su HTML re-creado en algún momento (raro pero posible),
+          // los handles se pierden. makeDraggable es idempotente
+          // (chequea _dndDraggable y la existencia del handle), así que
+          // llamarlo siempre es seguro.
+          if(window._hudPanels){
+            window._hudPanels.forEach(function(hp){ makeDraggable(hp.el); });
+          }
+          buildGhostSlots();
+        } else {
+          init();
+        }
       }, 600);
       return r;
     };
