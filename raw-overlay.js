@@ -1,24 +1,36 @@
-/* RAW Entry — Overlay v.5.135
-   FIX clicks en +Nueva — solución simple y robusta.
+/* RAW Entry — Overlay v.5.136
+   FIX clicks en +Nueva — versión definitiva.
 
-   ── Bug ──
-   El _dialOverlay con backdrop-filter creaba un stacking context que
-   capturaba todos los clicks aunque los paneles tuvieran z-index mayor.
-   v5.134 intentó arreglar reordenando el DOM (insertBefore), pero no fue
-   suficiente.
+   ── Diagnóstico final ──
+   El _dialOverlay tiene backdrop-filter:blur(28px) que crea un stacking
+   context independiente. Aunque z-index de paneles (9001) > overlay
+   (9000), document.elementFromPoint() retorna el overlay sobre los
+   paneles. Eso hacía que TODOS los clicks dentro del área del overlay
+   se los comiera él (su listener "click fuera = cerrar" no detenía
+   propagación, pero capturaba el target antes que los paneles).
 
-   ── Fix v5.135 ──
-   Cambiar _dialOverlay.style.pointerEvents = 'auto' a 'none' al abrir.
-   Los paneles flotantes (con pointer-events:auto explícito) reciben los
-   clicks ya que el overlay deja de capturarlos.
-   El dial canvas DENTRO del overlay tiene pointer-events:auto explícito
-   en su cssText, por lo que sigue capturando clicks (los hijos con auto
-   superan al padre con none en CSS pointer-events).
-   Se PIERDE: "click en zona vacía del overlay para cerrar". Quedan
-   alternativas: ESC, botón close, click en centro del dial.
+   Solo Sim banda (megatabs) funcionaba porque por alguna razón su
+   stacking se resuelve diferente — quizás por estar en el top sin
+   solaparse con el dial central.
+
+   ── Fix ──
+   _dialOverlay.style.pointerEvents = 'none' al abrir el dial.
+   · Paneles flotantes (pointer-events:auto default): reciben clicks ✓
+   · Dial canvas dentro del overlay (pointer-events:auto explícito en su
+     cssText): los hijos con auto SUPERAN al padre con none → recibe clicks ✓
+   · Drag handles (dentro de paneles): paneles tienen auto → funcionan ✓
+
+   Lo que se PIERDE:
+   · "Click en zona vacía del overlay para cerrar el dial"
+   Alternativas para cerrar: ESC, botón close, click en centro del dial.
 
    ── Heredado v5.134 ──
-   insertBefore del overlay (aún útil para orden DOM correcto).
+   insertBefore del overlay en orden DOM.
+
+   ── Heredado v5.132 ──
+   togEnteEdit/guardarEnte usan event.target en lugar de getElementById
+   para evitar IDs duplicados en el DOM (renderEntes y renderPatrimonio
+   ambos generan ee-FILA).
 
    ── Heredado v5.127 ──
    Limpieza quirúrgica en toggleEntradaDropdown.
@@ -4524,16 +4536,18 @@ function abrirDial(){
 
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
-  // v5.135: pointer-events:none en el overlay para que los clicks pasen a
-  // los paneles flotantes que están a sus lados. El backdrop-filter del
-  // overlay crea un stacking context que capturaba clicks aunque z-index
-  // de paneles fuera mayor. Con pointer-events:none, los clicks atraviesan
-  // y los paneles los reciben.
-  // El dial canvas dentro del overlay TIENE pointer-events:auto explícito,
-  // así que sigue capturando clicks normalmente (los hijos con auto superan
-  // al padre con none).
-  // Se pierde la capacidad de "click fuera del dial = cerrar". Para cerrar
-  // queda: ESC, botón close, click en centro del dial.
+  // v5.136: _dialOverlay con pointer-events:none. El backdrop-filter del
+  // overlay crea un stacking context que capturaba TODOS los clicks sobre
+  // el área del overlay aunque los paneles tuvieran z-index mayor. Eso
+  // hacía que clicks en cards laterales, drag-handles, expand buttons, y
+  // dial-canvas mismo (cuando coincidía con zona del overlay) no llegaran
+  // a sus listeners.
+  // Con pointer-events:none:
+  //   · overlay deja de capturar clicks → paneles flotantes los reciben (auto)
+  //   · canvas del dial tiene pointer-events:auto explícito → sigue clickeable
+  //   · drag handles (dentro de paneles con auto) siguen funcionando
+  // Lo que se PIERDE: "click en zona vacía del overlay = cerrar el dial".
+  // Quedan alternativas: ESC, botón close del dial.
   _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = true;
 
