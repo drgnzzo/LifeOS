@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.140
+/* RAW Entry — Overlay v.5.142
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -853,7 +853,9 @@ function _crearDialOverlay(){
       '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)!important;z-index:9050!important;display:flex;flex-direction:column}',
       '.hud-pnl.hud-expanded > [id$="-inner"]{display:flex;flex-direction:column;flex:1;min-height:0}',
       // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
-      '.hud-expanded-content{display:none;flex:1;min-height:0;overflow:auto;padding:14px 18px}',
+      // v5.142 (heredado v5.137): overflow-y:auto + min-height:0 + overflow-x:hidden
+      // para que el scrollbar solo aparezca si el contenido excede.
+      '.hud-expanded-content{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 18px}',
       '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px;justify-content:center}',
       '.hud-expanded .hud-collapsed-content{display:none}',
       // Tablas dentro del panel expandido: scroll horizontal mantenido
@@ -1075,6 +1077,7 @@ function _crearDialOverlay(){
         '<circle cx="'+lastPt[0]+'" cy="'+lastPt[1]+'" r="1.6" fill="'+color+'" style="filter:drop-shadow(0 0 3px '+color+')"/>'+
       '</svg>'+
       '<button class="hud-h-expand" data-color="'+color+'" title="Expandir" '+
+        'onclick="event.stopPropagation();var p=this.closest(\'.hud-pnl\');if(p&&typeof window._hudExpand===\'function\')window._hudExpand(p);return false;" '+
         'style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+
         '<i class="fas fa-up-right-and-down-left-from-center"></i>'+
       '</button>'+
@@ -1087,7 +1090,9 @@ function _crearDialOverlay(){
   // El parámetro `fn` se ignora ahora — antes navegaba a un panel externo
   // (irAPatrimonio, etc). Mantenemos el parámetro por compat con llamadas existentes.
   function _pCTA(label, color, fn){
-    return '<div class="hud-cta hud-cta-expand" style="'+
+    return '<div class="hud-cta hud-cta-expand" '+
+      'onclick="event.stopPropagation();var p=this.closest(\'.hud-pnl\');if(p&&typeof window._hudExpand===\'function\')window._hudExpand(p);return false;" '+
+      'style="'+
       '--ac-15:'+_rgba(color,0.12)+';'+
       '--ac-08:'+_rgba(color,0.08)+';'+
       'cursor:pointer">'+
@@ -2369,13 +2374,14 @@ function _crearDialOverlay(){
 
     // ── DISTRIBUCIÓN: barras horizontales proporcionales al % real ──
     if(listaEl){
-      // v5.140: reemplazo la pirámide SVG por barras horizontales donde
-      // el ANCHO de cada barra refleja el porcentaje real sobre 100%.
-      // Orden original de NIVELES_CFG (Fisiológicas → Autorrealización).
+      // v5.141: orden INVERTIDO (Autorrealización arriba, Fisiológicas abajo).
+      // Barras centradas crecen del centro hacia ambos lados — cada barra ocupa
+      // pct% del track total, dividido en pct/2 a cada lado del centro.
+      var ordenInvertido = NIVELES_CFG.slice().reverse();
       var pyrHTML =
         '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px;text-align:center">DISTRIBUCIÓN</div>'+
         '<div style="display:flex;flex-direction:column;gap:6px;width:100%">';
-      NIVELES_CFG.forEach(function(c){
+      ordenInvertido.forEach(function(c){
         var d = _dataDe(c.key);
         var abs = Math.abs(d.total || 0);
         var pct = totalAll > 0 ? (abs/totalAll)*100 : 0;
@@ -2384,10 +2390,14 @@ function _crearDialOverlay(){
         pyrHTML +=
           '<div style="display:flex;align-items:center;gap:8px;opacity:'+op+'">'+
             '<div style="flex:0 0 105px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.label+'</div>'+
+            // Track con barra centrada: el fill ocupa pct% del track, centrado horizontalmente
             '<div style="flex:1;position:relative;height:20px;background:rgba(255,255,255,0.04);border:1px solid '+c.color+'30;border-radius:4px;overflow:hidden;min-width:0">'+
-              '<div style="position:absolute;left:0;top:0;bottom:0;width:'+pct.toFixed(2)+'%;'+
-                'background:linear-gradient(90deg,'+c.color+'dd,'+c.color+');'+
-                'box-shadow:0 0 6px '+c.color+'66"></div>'+
+              // Fill centrado: left = (100-pct)/2, width = pct
+              '<div style="position:absolute;left:'+((100-pct)/2).toFixed(2)+'%;top:0;bottom:0;width:'+pct.toFixed(2)+'%;'+
+                'background:linear-gradient(90deg,'+c.color+'dd,'+c.color+','+c.color+'dd);'+
+                'box-shadow:0 0 6px '+c.color+'66;border-radius:3px"></div>'+
+              // Línea de referencia central tenue
+              '<div style="position:absolute;left:50%;top:2px;bottom:2px;width:1px;background:rgba(255,255,255,0.10);pointer-events:none"></div>'+
             '</div>'+
             '<div style="flex:0 0 38px;font-size:10px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;text-align:right">'+pctRound+'%</div>'+
           '</div>';
@@ -4526,7 +4536,11 @@ function abrirDial(){
 
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
-  _dialOverlay.style.pointerEvents = 'auto';
+  // v5.142 (heredado v5.136): pointer-events:none para que paneles
+  // flotantes y dial canvas (con pointer-events:auto explícitos)
+  // reciban clicks correctamente. backdrop-filter del overlay creaba
+  // un stacking context que atrapaba clicks.
+  _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = true;
 
   // ═══ FASE 0 — Estado inicial: TODO oculto ═══

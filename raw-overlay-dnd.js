@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay Drag & Drop v.5.107
+/* RAW Entry — Overlay Drag & Drop v.5.142
 
    Cambios desde v5.087:
    - FIX BUG "layout se rompe al soltar una card". Causa raíz: 3 bugs
@@ -345,11 +345,9 @@
     var header = panelEl.querySelector('.hud-h') || panelEl.querySelector('.hud-card');
     if(!header) return;
 
-    // v5.137: si ya tiene el handle, no hacer nada. Pero si _dndDraggable
-    // está marcado y el handle NO existe (HTML re-renderizado), permitir
-    // recrear el handle.
+    // v5.142: idempotente. Si ya existe el handle, garantizar el flag y salir.
     if(header.querySelector('.hud-dnd-handle')){
-      panelEl._dndDraggable = true; // garantizar el flag
+      panelEl._dndDraggable = true;
       return;
     }
 
@@ -551,7 +549,7 @@
     }
   }, 200);
 
-  // Hook abrirDial: rebuild slots cuando se abre
+  // Hook abrirDial: rebuild slots cuando se abre + reaplica makeDraggable
   var origAbrir = null;
   var hookT = setInterval(function(){
     if(typeof window.abrirDial !== 'function') return;
@@ -561,12 +559,12 @@
       var r = origAbrir.apply(this, arguments);
       setTimeout(function(){
         if(_state.initialized){
-          // v5.137: en CADA apertura, re-aplicar makeDraggable a TODOS los
-          // paneles. La primera vez init() lo hace pero si los paneles
-          // tienen su HTML re-creado en algún momento (raro pero posible),
-          // los handles se pierden. makeDraggable es idempotente
-          // (chequea _dndDraggable y la existencia del handle), así que
-          // llamarlo siempre es seguro.
+          // v5.142: re-aplicar makeDraggable a TODOS los paneles en CADA
+          // apertura del dial. Idempotente: si el handle ya existe no se
+          // recrea. Garantiza que si por algún motivo se perdieron los
+          // handles (recreo de paneles, HTML re-rendered, etc.) vuelvan
+          // a estar. Esto resuelve el bug "drag-drop no funciona después
+          // de abrir +Nueva".
           if(window._hudPanels){
             window._hudPanels.forEach(function(hp){ makeDraggable(hp.el); });
           }
