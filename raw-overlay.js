@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.152
+/* RAW Entry — Overlay v.5.153
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -770,7 +770,7 @@ function _crearDialOverlay(){
         var r = minR + (maxR - minR) * t;
         // Cada anillo tiene más nodos cuanto más grande
         var circumference = 2 * Math.PI * r;
-        var nNodes = Math.max(8, Math.floor(circumference / 90));
+        var nNodes = Math.max(6, Math.floor(circumference / 140));
         // Color base por anillo (gradiente violeta→cyan→verde→cyan claro)
         var baseColor = PALETTE[ri % PALETTE.length];
         ringDefs.push({ r: r, n: nNodes, color: baseColor, ringIdx: ri });
@@ -815,9 +815,11 @@ function _crearDialOverlay(){
       });
 
       // ── CONEXIONES TANGENCIALES (entre nodos vecinos del mismo anillo) ──
-      // Forman arcos de circunferencia (orbitales) en torno al dial
+      // v5.153: solo dibujar segmentos alternos para no saturar (arcos discontinuos)
       ringDefs.forEach(function(rd){
         for(var i = 0; i < rd.nodes.length; i++){
+          // Saltar nodos alternos: solo dibujar conexión en índices pares
+          if(i % 2 !== 0) continue;
           var a = rd.nodes[i];
           var b = rd.nodes[(i + 1) % rd.nodes.length];
           // Punto de control: en el punto medio angular pero al radio del anillo
@@ -871,7 +873,7 @@ function _crearDialOverlay(){
         var outer = ringDefs[rIdx + 1];
         // Solo conectar algunos (no todos) para no saturar
         inner.nodes.forEach(function(n1){
-          if(Math.random() > 0.55) return; // ~55% de los nodos del anillo interno conectan al externo
+          if(Math.random() > 0.25) return; // v5.153: ~25% (antes 55%) — menos saturación
           // Nodo más cercano por ángulo en el anillo externo
           var nearest = null, minDA = Infinity;
           outer.nodes.forEach(function(n2){
@@ -1025,8 +1027,8 @@ function _crearDialOverlay(){
         drawPulse(p);
       }
 
-      // 4) Spawn (alta densidad para que se vea siempre lleno)
-      if(pulses.length < 20 && Math.random() < 0.12){
+      // 4) Spawn — v5.153: densidad reducida para no saturar
+      if(pulses.length < 10 && Math.random() < 0.06){
         spawnPulse();
       }
 
@@ -1037,7 +1039,7 @@ function _crearDialOverlay(){
       resize();
       buildNetwork();
       // Pre-spawn: poblar el campo desde el principio
-      for(var i = 0; i < 8; i++){
+      for(var i = 0; i < 4; i++){
         var e = edges[Math.floor(Math.random() * edges.length)];
         if(!e) continue;
         pulses.push({
