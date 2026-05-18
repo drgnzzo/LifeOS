@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.151
+/* RAW Entry — Overlay v.5.152
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -713,14 +713,14 @@ function _crearDialOverlay(){
   _dialOverlay.appendChild(_glowEl);
 
   // ══════════════════════════════════════════════════════════════════
-  //  v5.150: ANIMACIÓN DE RED NEURONAL ORGÁNICA
-  //  Reemplaza el circuit-board angular por una red orgánica con:
-  //  • Clusters de nodos (no grid uniforme) — distribución orgánica
-  //  • Hubs centrales en cada cluster con conexiones cercanas
-  //  • Curvas Bézier (no líneas rectas Manhattan) entre nodos
-  //  • Pulsos sinápticos que viajan por las curvas
-  //  • "Raíces" desde el dial central hacia nodos cercanos —
-  //    el dial es el cerebro del que emanan las señales
+  //  v5.152: ESTRUCTURA TIPO ANILLOS DE DYSON / GALAXIA CIBERNÉTICA
+  //  Reemplaza los clusters dispersos que dejaban zonas vacías.
+  //  Ahora 4 anillos concéntricos alrededor del dial que cubren todo
+  //  el viewport. Nodos distribuidos angularmente con jitter mínimo.
+  //  Conexiones tangenciales (arcos orbitales) + radiales (entre
+  //  anillos) + raíces del dial. Rotación orbital lenta (anillos
+  //  pares e impares en sentido opuesto). Biomimético: orgánico en
+  //  forma pero geométrico en estructura como anillos planetarios.
   // ══════════════════════════════════════════════════════════════════
   var _particlesCanvas = document.createElement('canvas');
   _particlesCanvas.id = 'dial-particles';
@@ -728,7 +728,7 @@ function _crearDialOverlay(){
   _dialOverlay.appendChild(_particlesCanvas);
 
   (function initNeural(){
-    var pctx, nodes, hubs, edges, pulses, dialRoots, lastT = 0, animId = null;
+    var pctx, nodes, edges, pulses, lastT = 0, animId = null;
     var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0;
     var PALETTE = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9', '#86EFAC'];
 
@@ -737,7 +737,6 @@ function _crearDialOverlay(){
       W = window.innerWidth;
       H = window.innerHeight;
       CX = W / 2; CY = H / 2;
-      // Radio aproximado de exclusión alrededor del dial
       DIAL_R = Math.min(W, H) * 0.22;
       _particlesCanvas.width = W * dpr;
       _particlesCanvas.height = H * dpr;
@@ -747,131 +746,156 @@ function _crearDialOverlay(){
       pctx.scale(dpr, dpr);
     }
 
-    // Distribuir nodos en CLUSTERS orgánicos en lugar de grid uniforme.
-    // Cada cluster: un hub central + 3-7 nodos satélite alrededor.
+    // ══════════════════════════════════════════════════════════════════
+    //  ESTRUCTURA TIPO ANILLO DE DYSON / GALAXIA CIBERNÉTICA
+    //  4 anillos concéntricos alrededor del dial. Cada anillo tiene nodos
+    //  distribuidos angularmente con jitter mínimo (cubre TODA el área).
+    //  Conexiones radiales (dial → afuera) + tangenciales (entre nodos
+    //  vecinos del mismo anillo, en arco curvo).
+    // ══════════════════════════════════════════════════════════════════
     function buildNetwork(){
       nodes = [];
-      hubs = [];
       edges = [];
       pulses = [];
-      dialRoots = [];
 
-      // Número de clusters según tamaño de viewport
-      var area = W * H;
-      var nClusters = Math.max(6, Math.min(14, Math.round(area / 180000)));
+      // Radio máximo: la diagonal del viewport menos un margen
+      var maxR = Math.hypot(W/2, H/2) - 30;
+      var minR = DIAL_R + 50;
 
-      // Sembrar clusters fuera de la zona del dial, distribuidos por las 4 esquinas/lados
-      for(var cl = 0; cl < nClusters; cl++){
-        var hx, hy, tries = 0, ok = false;
-        // Buscar posición válida (lejos del centro, lejos de otros hubs)
-        while(!ok && tries < 30){
-          hx = 80 + Math.random() * (W - 160);
-          hy = 80 + Math.random() * (H - 160);
-          if(Math.hypot(hx - CX, hy - CY) < DIAL_R + 40){ tries++; continue; }
-          var tooClose = hubs.some(function(h){ return Math.hypot(h.x - hx, h.y - hy) < 180; });
-          if(!tooClose) ok = true;
-          tries++;
-        }
-        if(!ok) continue;
-        var hubColor = PALETTE[Math.floor(Math.random() * PALETTE.length)];
-        var hub = {
-          x: hx, y: hy,
-          color: hubColor,
-          phase: Math.random() * Math.PI * 2,
-          speed: 0.5 + Math.random() * 0.6,
-          baseR: 1.8 + Math.random() * 1.2,
-          isHub: true,
-          satellites: [],
-        };
-        hubs.push(hub);
-        nodes.push(hub);
+      // 4 anillos a distancias graduadas
+      var nRings = 4;
+      var ringDefs = [];
+      for(var ri = 0; ri < nRings; ri++){
+        var t = (ri + 1) / nRings;
+        var r = minR + (maxR - minR) * t;
+        // Cada anillo tiene más nodos cuanto más grande
+        var circumference = 2 * Math.PI * r;
+        var nNodes = Math.max(8, Math.floor(circumference / 90));
+        // Color base por anillo (gradiente violeta→cyan→verde→cyan claro)
+        var baseColor = PALETTE[ri % PALETTE.length];
+        ringDefs.push({ r: r, n: nNodes, color: baseColor, ringIdx: ri });
+      }
 
-        // Satélites alrededor del hub (en arco con jitter, distancia variable)
-        var nSats = 3 + Math.floor(Math.random() * 5);
-        for(var s = 0; s < nSats; s++){
-          var angle = (s / nSats) * Math.PI * 2 + Math.random() * 0.6;
-          var dist  = 55 + Math.random() * 75;
-          var sx = hx + Math.cos(angle) * dist;
-          var sy = hy + Math.sin(angle) * dist;
-          // Excluir si cae dentro del dial
-          if(Math.hypot(sx - CX, sy - CY) < DIAL_R + 20) continue;
-          // Mantener dentro del viewport
-          sx = Math.max(20, Math.min(W - 20, sx));
-          sy = Math.max(20, Math.min(H - 20, sy));
-          var sat = {
-            x: sx, y: sy,
-            color: hubColor, // mismo color del cluster
+      // Crear nodos de cada anillo, distribuidos angularmente con jitter pequeño
+      ringDefs.forEach(function(rd){
+        // Offset angular aleatorio para que los anillos no estén alineados
+        var angleOffset = Math.random() * Math.PI * 2;
+        // Inverso: anillos pares giran en sentido opuesto
+        var direction = rd.ringIdx % 2 === 0 ? 1 : -1;
+        rd.nodes = [];
+        for(var k = 0; k < rd.n; k++){
+          var baseAngle = angleOffset + direction * (k / rd.n) * Math.PI * 2;
+          // Jitter angular y radial muy pequeño (mantener forma del anillo)
+          var jitterAngle = (Math.random() - 0.5) * (Math.PI * 2 / rd.n) * 0.3;
+          var jitterR = (Math.random() - 0.5) * 25;
+          var angle = baseAngle + jitterAngle;
+          var r = rd.r + jitterR;
+          var x = CX + Math.cos(angle) * r;
+          var y = CY + Math.sin(angle) * r;
+          // Si el nodo cae fuera del viewport con margen, descartar
+          if(x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+          var node = {
+            x: x, y: y,
+            angle: angle,
+            ringR: rd.r,
+            ringIdx: rd.ringIdx,
+            color: rd.color,
             phase: Math.random() * Math.PI * 2,
-            speed: 0.7 + Math.random() * 0.8,
-            baseR: 0.7 + Math.random() * 0.9,
-            isHub: false,
+            speed: 0.5 + Math.random() * 0.7,
+            baseR: 0.9 + Math.random() * 1.0,
+            // Algunos nodos son "hubs": más grandes y brillantes
+            isHub: Math.random() < 0.18,
           };
-          hub.satellites.push(sat);
-          nodes.push(sat);
-          // Edge curvo del hub al satélite
-          edges.push(makeCurvedEdge(hub, sat));
-        }
-      }
-
-      // Conexiones entre hubs cercanos (estructura de red entre clusters)
-      for(var i = 0; i < hubs.length; i++){
-        for(var j = i + 1; j < hubs.length; j++){
-          var d = Math.hypot(hubs[i].x - hubs[j].x, hubs[i].y - hubs[j].y);
-          if(d < 320 && Math.random() < 0.6){
-            edges.push(makeCurvedEdge(hubs[i], hubs[j], 0.4));
+          if(node.isHub){
+            node.baseR = 1.7 + Math.random() * 1.0;
           }
+          rd.nodes.push(node);
+          nodes.push(node);
         }
-      }
+      });
 
-      // "Raíces" del DIAL hacia los hubs más cercanos.
-      // Emanan del borde del dial central, no del centro exacto.
-      hubs.forEach(function(h){
-        var dx = h.x - CX, dy = h.y - CY;
-        var dist = Math.hypot(dx, dy);
-        if(dist <= 0) return;
-        // Punto de origen en el borde del dial
+      // ── CONEXIONES TANGENCIALES (entre nodos vecinos del mismo anillo) ──
+      // Forman arcos de circunferencia (orbitales) en torno al dial
+      ringDefs.forEach(function(rd){
+        for(var i = 0; i < rd.nodes.length; i++){
+          var a = rd.nodes[i];
+          var b = rd.nodes[(i + 1) % rd.nodes.length];
+          // Punto de control: en el punto medio angular pero al radio del anillo
+          // (esto curva la línea siguiendo la circunferencia)
+          var midAngle = (a.angle + b.angle) / 2;
+          // Si los ángulos se cruzan, ajustar
+          var diff = b.angle - a.angle;
+          if(Math.abs(diff) > Math.PI){
+            midAngle = midAngle + Math.PI;
+          }
+          // El control point queda un poco más afuera del radio (curva orgánica hacia afuera)
+          var cpR = rd.r + 8;
+          var cpx = CX + Math.cos(midAngle) * cpR;
+          var cpy = CY + Math.sin(midAngle) * cpR;
+          edges.push({
+            a: a, b: b,
+            cp: { x: cpx, y: cpy },
+            color: rd.color,
+            type: 'tangential',
+            ringIdx: rd.ringIdx,
+          });
+        }
+      });
+
+      // ── CONEXIONES RADIALES (del dial hacia cada nodo del primer anillo,
+      //    y entre anillos adyacentes) ──
+      // Del dial a cada nodo del anillo 0
+      ringDefs[0].nodes.forEach(function(n){
+        // Origen en el borde del dial (en la dirección del nodo)
+        var dx = n.x - CX, dy = n.y - CY;
+        var dist = Math.hypot(dx, dy) || 1;
         var ox = CX + (dx / dist) * DIAL_R;
         var oy = CY + (dy / dist) * DIAL_R;
-        var virtualOrigin = { x: ox, y: oy, color: h.color, isVirtual: true };
-        var rootEdge = makeCurvedEdge(virtualOrigin, h, 0.7);
-        rootEdge.isRoot = true;
-        dialRoots.push(rootEdge);
+        var virtualOrigin = { x: ox, y: oy, color: n.color, isVirtual: true };
+        // Control point: ligeramente desviado perpendicularmente para curva orgánica
+        var mx = (ox + n.x) / 2, my = (oy + n.y) / 2;
+        var perpX = -dy / dist, perpY = dx / dist;
+        var off = (Math.random() - 0.5) * 25;
+        edges.push({
+          a: virtualOrigin, b: n,
+          cp: { x: mx + perpX * off, y: my + perpY * off },
+          color: n.color,
+          type: 'root',
+          ringIdx: 0,
+        });
       });
-    }
 
-    // Crear edge con curva Bézier cuadrática y un control point desplazado
-    // perpendicular a la línea recta entre los dos nodos.
-    function makeCurvedEdge(a, b, curvature){
-      var curv = curvature !== undefined ? curvature : 0.5;
-      var mx = (a.x + b.x) / 2;
-      var my = (a.y + b.y) / 2;
-      var dx = b.x - a.x, dy = b.y - a.y;
-      var len = Math.hypot(dx, dy) || 1;
-      // Perpendicular normalizado
-      var nx = -dy / len, ny = dx / len;
-      // Offset aleatorio +/- para que la curva sea orgánica
-      var sign = Math.random() < 0.5 ? -1 : 1;
-      var off = len * curv * 0.4 * sign;
-      var cpx = mx + nx * off;
-      var cpy = my + ny * off;
-      return {
-        a: a, b: b,
-        cp: { x: cpx, y: cpy },
-        len: approxBezierLen(a, {x:cpx,y:cpy}, b),
-        color: a.color || b.color,
-        baseAlpha: 0.10 + Math.random() * 0.10,
-      };
-    }
-
-    // Longitud aprox. de una bezier cuadrática (sampling)
-    function approxBezierLen(a, cp, b){
-      var prev = a, total = 0;
-      for(var t = 0.1; t <= 1.001; t += 0.1){
-        var p = bezierPoint(a, cp, b, t);
-        total += Math.hypot(p.x - prev.x, p.y - prev.y);
-        prev = p;
+      // Entre anillos adyacentes: cada nodo de anillo i conecta con el más cercano del anillo i+1
+      for(var rIdx = 0; rIdx < ringDefs.length - 1; rIdx++){
+        var inner = ringDefs[rIdx];
+        var outer = ringDefs[rIdx + 1];
+        // Solo conectar algunos (no todos) para no saturar
+        inner.nodes.forEach(function(n1){
+          if(Math.random() > 0.55) return; // ~55% de los nodos del anillo interno conectan al externo
+          // Nodo más cercano por ángulo en el anillo externo
+          var nearest = null, minDA = Infinity;
+          outer.nodes.forEach(function(n2){
+            var dA = Math.abs(n2.angle - n1.angle);
+            if(dA > Math.PI) dA = Math.PI * 2 - dA;
+            if(dA < minDA){ minDA = dA; nearest = n2; }
+          });
+          if(!nearest) return;
+          // Curva radial entre los dos
+          var mx = (n1.x + nearest.x) / 2;
+          var my = (n1.y + nearest.y) / 2;
+          var dx = nearest.x - n1.x, dy = nearest.y - n1.y;
+          var len = Math.hypot(dx, dy) || 1;
+          var perpX = -dy / len, perpY = dx / len;
+          var off = (Math.random() - 0.5) * 30;
+          edges.push({
+            a: n1, b: nearest,
+            cp: { x: mx + perpX * off, y: my + perpY * off },
+            color: n1.color,
+            type: 'radial',
+            ringIdx: rIdx,
+          });
+        });
       }
-      return total;
     }
 
     function bezierPoint(a, cp, b, t){
@@ -882,29 +906,38 @@ function _crearDialOverlay(){
       };
     }
 
-    // Spawn de pulso sináptico — viaja por una edge desde a hacia b
+    // Spawn pulso por una edge (preferencia: roots y tangenciales)
     function spawnPulse(){
-      var pool = edges.concat(dialRoots);
-      if(!pool.length) return;
+      if(!edges.length) return;
+      // Sesgo: 40% roots, 35% tangenciales, 25% radiales
+      var pool = [];
+      var r = Math.random();
+      if(r < 0.40) pool = edges.filter(function(e){ return e.type === 'root'; });
+      else if(r < 0.75) pool = edges.filter(function(e){ return e.type === 'tangential'; });
+      else pool = edges.filter(function(e){ return e.type === 'radial'; });
+      if(!pool.length) pool = edges;
       var edge = pool[Math.floor(Math.random() * pool.length)];
-      // Si es root, mayor probabilidad de dirección saliente (del dial hacia hub)
-      var forward = edge.isRoot ? (Math.random() < 0.75) : (Math.random() < 0.5);
+      // Dirección: roots siempre forward (del dial hacia afuera)
+      var forward = edge.type === 'root' ? (Math.random() < 0.85) : (Math.random() < 0.5);
       pulses.push({
         edge: edge,
         t: 0,
-        speed: 0.35 + Math.random() * 0.45, // unidad/seg
+        speed: 0.35 + Math.random() * 0.40,
         forward: forward,
         life: 1,
         color: edge.color,
         tailT: 0.18 + Math.random() * 0.12,
-        isRoot: !!edge.isRoot,
+        isRoot: edge.type === 'root',
       });
     }
 
-    function drawEdge(e, isRoot){
-      // Línea base (muy tenue) — más visible para roots
-      pctx.strokeStyle = e.color + (isRoot ? '55' : '22');
-      pctx.lineWidth = isRoot ? 1.2 : 0.8;
+    function drawEdge(e){
+      var alphaHex = '22';
+      var lw = 0.7;
+      if(e.type === 'root'){ alphaHex = '45'; lw = 1.1; }
+      else if(e.type === 'tangential'){ alphaHex = '2a'; lw = 0.9; }
+      pctx.strokeStyle = e.color + alphaHex;
+      pctx.lineWidth = lw;
       pctx.beginPath();
       pctx.moveTo(e.a.x, e.a.y);
       pctx.quadraticCurveTo(e.cp.x, e.cp.y, e.b.x, e.b.y);
@@ -914,7 +947,6 @@ function _crearDialOverlay(){
     function drawPulse(p){
       var e = p.edge;
       var t = p.forward ? p.t : (1 - p.t);
-      // Cola: serie de samples del tail al head
       var samples = [];
       var steps = 12;
       for(var i = 0; i <= steps; i++){
@@ -929,19 +961,18 @@ function _crearDialOverlay(){
       for(var s = 1; s < samples.length; s++){
         var a = samples[s].alpha * p.life * 0.95;
         pctx.strokeStyle = p.color + Math.floor(a * 220).toString(16).padStart(2, '0');
-        pctx.lineWidth = p.isRoot ? 2.2 * samples[s].alpha : 1.8 * samples[s].alpha;
+        pctx.lineWidth = (p.isRoot ? 2.2 : 1.7) * samples[s].alpha;
         pctx.beginPath();
         pctx.moveTo(samples[s-1].pt.x, samples[s-1].pt.y);
         pctx.lineTo(samples[s].pt.x, samples[s].pt.y);
         pctx.stroke();
       }
-      // Cabeza brillante
       var head = bezierPoint(e.a, e.cp, e.b, t);
       pctx.fillStyle = p.color;
       pctx.shadowColor = p.color;
-      pctx.shadowBlur = p.isRoot ? 16 : 11;
+      pctx.shadowBlur = p.isRoot ? 16 : 10;
       pctx.beginPath();
-      pctx.arc(head.x, head.y, p.isRoot ? 2.6 : 2.2, 0, Math.PI * 2);
+      pctx.arc(head.x, head.y, p.isRoot ? 2.6 : 2.1, 0, Math.PI * 2);
       pctx.fill();
       pctx.shadowBlur = 0;
     }
@@ -952,18 +983,26 @@ function _crearDialOverlay(){
       if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
 
-      // 1) Dibujar edges base (curvas tenues)
-      for(var ei = 0; ei < edges.length; ei++) drawEdge(edges[ei], false);
-      // Roots del dial: más visibles
-      for(var ri = 0; ri < dialRoots.length; ri++) drawEdge(dialRoots[ri], true);
+      // 1) Dibujar edges (curvas tenues — el tejido de fondo)
+      for(var ei = 0; ei < edges.length; ei++) drawEdge(edges[ei]);
 
-      // 2) Nodos pulsantes
+      // 2) Lentísima rotación orbital de los nodos sobre su anillo
+      //    (galaxia que rota muy despacio)
       for(var ni = 0; ni < nodes.length; ni++){
         var n = nodes[ni];
+        // Dirección: anillos pares en sentido horario, impares antihorario
+        var dir = n.ringIdx % 2 === 0 ? 1 : -1;
+        // Velocidad angular MUY lenta (anillos interiores más rápidos)
+        var angVel = dir * 0.02 / (1 + n.ringIdx * 0.4);
+        n.angle += angVel * dt;
+        n.x = CX + Math.cos(n.angle) * n.ringR;
+        n.y = CY + Math.sin(n.angle) * n.ringR;
+
+        // Pulso visual del nodo
         n.phase += n.speed * dt;
         var pulse = (Math.sin(n.phase) + 1) / 2;
         var r = n.baseR + pulse * (n.isHub ? 1.8 : 1.2);
-        var alpha = 0.35 + pulse * 0.55;
+        var alpha = 0.4 + pulse * 0.5;
         pctx.fillStyle = n.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = n.color;
         pctx.shadowBlur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
@@ -973,22 +1012,21 @@ function _crearDialOverlay(){
       }
       pctx.shadowBlur = 0;
 
-      // 3) Avanzar pulsos sinápticos
+      // Recalcular las curvas de edges porque los nodos se movieron
+      // (solo recalcular control points de tangenciales y radiales si los nodos rotan)
+      // Para eficiencia: aceptamos un pequeño desfase. Las curvas siguen viéndose bien.
+
+      // 3) Avanzar pulsos
       for(var pi = pulses.length - 1; pi >= 0; pi--){
         var p = pulses[pi];
         p.t += p.speed * dt;
-        if(p.t > 1 + p.tailT){
-          pulses.splice(pi, 1);
-          continue;
-        }
-        if(p.t > 1){
-          p.life = Math.max(0, 1 - (p.t - 1) / p.tailT);
-        }
+        if(p.t > 1 + p.tailT){ pulses.splice(pi, 1); continue; }
+        if(p.t > 1){ p.life = Math.max(0, 1 - (p.t - 1) / p.tailT); }
         drawPulse(p);
       }
 
-      // 4) Spawn ocasional — más frecuente en roots
-      if(pulses.length < 14 && Math.random() < 0.08){
+      // 4) Spawn (alta densidad para que se vea siempre lleno)
+      if(pulses.length < 20 && Math.random() < 0.12){
         spawnPulse();
       }
 
@@ -998,18 +1036,20 @@ function _crearDialOverlay(){
     function start(){
       resize();
       buildNetwork();
-      // Spawn inicial: priorizar roots para que se vea la emanación del dial
-      for(var i = 0; i < 4; i++){
-        if(dialRoots.length && Math.random() < 0.7){
-          pulses.push({
-            edge: dialRoots[Math.floor(Math.random() * dialRoots.length)],
-            t: Math.random() * 0.6, speed: 0.4, forward: true, life: 1,
-            color: PALETTE[Math.floor(Math.random()*PALETTE.length)],
-            tailT: 0.22, isRoot: true,
-          });
-        } else {
-          spawnPulse();
-        }
+      // Pre-spawn: poblar el campo desde el principio
+      for(var i = 0; i < 8; i++){
+        var e = edges[Math.floor(Math.random() * edges.length)];
+        if(!e) continue;
+        pulses.push({
+          edge: e,
+          t: Math.random(),
+          speed: 0.35 + Math.random() * 0.4,
+          forward: e.type === 'root' ? true : (Math.random() < 0.5),
+          life: 1,
+          color: e.color,
+          tailT: 0.20,
+          isRoot: e.type === 'root',
+        });
       }
       lastT = 0;
       if(animId) cancelAnimationFrame(animId);
