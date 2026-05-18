@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.146
+/* RAW Entry — Overlay v.5.147
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -856,7 +856,7 @@ function _crearDialOverlay(){
       // v5.142 (heredado v5.137): overflow-y:auto + min-height:0 + overflow-x:hidden
       // para que el scrollbar solo aparezca si el contenido excede.
       '.hud-expanded-content{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 18px}',
-      '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px;justify-content:center}',
+      '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px;justify-content:flex-start}',
       '.hud-expanded .hud-collapsed-content{display:none}',
       // Tablas dentro del panel expandido: scroll horizontal mantenido
       '.hud-expanded-content .tbl-wrap{overflow-x:auto;overflow-y:auto;border-radius:8px;border:1px solid rgba(255,255,255,0.06);max-height:100%}',
@@ -1836,11 +1836,75 @@ function _crearDialOverlay(){
       }
 
       // Top row: USER y Stats igual; Sim achicado pero presente
-      // (lo mantenemos en su misma posición del modo normal — solo la zona
-      // central debajo de la fila top cambia)
-      // Posicionamiento del top SIGUE el flujo normal de abajo, así que dejamos
-      // que continúe el código siguiente. Pero los paneles laterales y bottom
-      // ya están posicionados; debemos retornar.
+      // v5.147: ANTES retornaba aquí sin tocar paneles top → si algo
+      // disparaba _reposicionarHUD durante modo expandido, los paneles top
+      // quedaban en posiciones viejas y "se desplazaban a la izquierda".
+      // Ahora reposicionamos los paneles top también (USER, Sim, Stats)
+      // con el mismo cálculo del modo normal, para que se mantengan en
+      // su lugar correcto durante todo el modo expandido.
+      (function _reposicionarTopEnExpandido(){
+        // Calcular leftX/rightW exactamente como el flujo normal de abajo.
+        var _leftSpaceN  = r.left;
+        var _rightSpaceN = vW - r.right;
+        var _candidatesN = [340, 300, 270, 240, 210];
+        var COL_W_N = 210;
+        for(var _ciN=0; _ciN<_candidatesN.length; _ciN++){
+          var _wN = _candidatesN[_ciN];
+          if((_leftSpaceN  >= (_wN * 2 + GAP * 3)) &&
+             (_rightSpaceN >= (_wN * 2 + GAP * 3))){
+            COL_W_N = _wN; break;
+          }
+        }
+        var fourColsN = (_leftSpaceN  >= (COL_W_N * 2 + GAP * 3)) &&
+                        (_rightSpaceN >= (COL_W_N * 2 + GAP * 3));
+        var leftXN  = fourColsN ? GAP : GAP;
+        var leftWN  = fourColsN ? (COL_W_N * 2 + GAP) : COL_W_N;
+        var rightWN = fourColsN ? (COL_W_N * 2 + GAP) : COL_W_N;
+        var rightXN = vW - rightWN - GAP;
+
+        var topPad_e = GAP;
+        var pUser_e  = window._hudPanels.filter(function(hp){ return hp.el._side==='top-left'; })[0];
+        var pSim_e   = window._hudPanels.filter(function(hp){ return hp.el._side==='top-center'; })[0];
+        var pStats_e = window._hudPanels.filter(function(hp){ return hp.el._side==='top-right'; })[0];
+
+        var topBarStartX_e = leftXN;
+        var topBarEndX_e   = rightXN + rightWN;
+        var topBarTotalW_e = topBarEndX_e - topBarStartX_e;
+
+        var wUser_e, wStats_e;
+        if(fourColsN){
+          wUser_e = COL_W_N;
+          wStats_e = 0;
+        } else {
+          wUser_e = leftWN;
+          wStats_e = 0;
+        }
+        var wSim_e = topBarTotalW_e - wUser_e;
+        if(wSim_e < 400){
+          wUser_e = Math.min(180, wUser_e);
+          wSim_e = topBarTotalW_e - wUser_e;
+        }
+
+        if(pUser_e && wUser_e>0){
+          pUser_e.el.style.width = wUser_e+'px';
+          pUser_e.el.style.left = topBarStartX_e + 'px';
+          pUser_e.el.style.top = topPad_e + 'px';
+          pUser_e.el.style.clipPath = chamferRect;
+          pUser_e.el.style.visibility = 'visible';
+          pUser_e.el.style.opacity = '';
+        }
+        if(pSim_e){
+          pSim_e.el.style.width = wSim_e + 'px';
+          pSim_e.el.style.left = (topBarStartX_e + wUser_e) + 'px';
+          pSim_e.el.style.top = topPad_e + 'px';
+          pSim_e.el.style.clipPath = chamferRect;
+        }
+        if(pStats_e){
+          pStats_e.el.style.width = '0px';
+          pStats_e.el.style.opacity = '0';
+          pStats_e.el.style.visibility = 'hidden';
+        }
+      })();
       return;
     }
 
@@ -2659,9 +2723,9 @@ function _crearDialOverlay(){
             '<div style="margin-top:8px;font-size:10px;color:#22C55E;cursor:pointer;text-align:right">Ver análisis completo ›</div>';
         })();
 
-        // Apartados y Objetivos: cards
+        // Apartados y Objetivos: TODOS los apartados activos (v5.147)
         (function(){
-          var activos = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); }).slice(0,2);
+          var activos = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); });
           var hoy = new Date(); hoy.setHours(0,0,0,0);
           var cards = activos.map(function(ap){
             var pct = ap.meta && ap.monto ? Math.min(100, Math.round((ap.monto/(ap.metaMonto||ap.monto))*100)) : 66;
@@ -2673,10 +2737,10 @@ function _crearDialOverlay(){
             var vencidoBadge = (ap.meta && new Date(ap.meta) < hoy) ? '<span style="font-size:8px;font-weight:800;padding:1px 6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.40);border-radius:4px;color:#EF4444;letter-spacing:.06em;text-transform:uppercase">Vencido</span>' : '';
             return '<div style="padding:11px;border:1px solid rgba(34,197,94,0.30);border-radius:9px;background:rgba(34,197,94,0.04)">'+
               '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
-                '<div style="width:26px;height:26px;border-radius:6px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-coins" style="color:#F59E0B;font-size:11px"></i></div>'+
+                '<div style="width:26px;height:26px;border-radius:6px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.40);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-coins" style="color:#F59E0B;font-size:11px"></i></div>'+
                 '<div style="flex:1;min-width:0">'+
                   '<div style="font-size:11px;font-weight:800;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ap.nombre||'')+'</div>'+
-                  '<div style="font-size:9px;color:rgba(220,224,235,0.45)">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+' · '+metaStr+'</div>'+
+                  '<div style="font-size:9px;color:rgba(220,224,235,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+' · '+metaStr+'</div>'+
                 '</div>'+
               '</div>'+
               '<div style="font-size:16px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;white-space:nowrap;margin-bottom:6px">'+fmt2(ap.monto)+'</div>'+
@@ -2686,10 +2750,10 @@ function _crearDialOverlay(){
             '</div>';
           }).join('');
           var nuevo = '<div style="display:flex;align-items:center;justify-content:center;border:1px dashed rgba(34,197,94,0.40);border-radius:9px;background:rgba(34,197,94,0.02);cursor:pointer;min-height:120px"><div style="text-align:center"><div style="width:32px;height:32px;border-radius:8px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);display:flex;align-items:center;justify-content:center;margin:0 auto 6px"><i class="fas fa-plus" style="color:#4ADE80;font-size:13px"></i></div><div style="font-size:10px;font-weight:800;color:#4ADE80;letter-spacing:.06em">Nuevo<br>apartado</div></div></div>';
+          // v5.147: grid auto-fill — cantas tarjetas quepan por fila según ancho
           document.getElementById('pat-apartados').innerHTML =
-            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Apartados y Objetivos</div>'+
-            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+(cards || '')+nuevo+'</div>'+
-            '<div style="margin-top:8px;font-size:10px;color:#22C55E;cursor:pointer">Ver todos los apartados ('+apartados.length+') ›</div>';
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Apartados y Objetivos <span style="color:rgba(220,224,235,0.40);font-weight:700">('+activos.length+')</span></div>'+
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">'+(cards || '')+nuevo+'</div>';
         })();
 
         // Flujo y Liquidez
@@ -3180,16 +3244,13 @@ function _crearDialOverlay(){
     var expContent = inner.querySelector(':scope > .hud-expanded-content');
     if(!expContent) return;
 
-    // Sumar altura del header (children collapsed visibles tras display:none) +
-    // altura natural del wrapper expandido.
-    // Estrategia: temporalmente quitar height fijo del panel y dejar que mida
-    // su altura natural, luego restaurar.
+    // v5.147: medir altura natural del contenido sin restricciones
     panel.style.height = 'auto';
     panel.style.minHeight = '0';
     expContent.style.overflow = 'visible';
     expContent.style.justifyContent = 'flex-start';
     expContent.style.height = 'auto';
-    expContent.style.flex = 'none'; // sacar de flex:1 para que mida natural
+    expContent.style.flex = 'none';
 
     // Forzar reflow
     var contentNaturalH = panel.scrollHeight;
@@ -3206,22 +3267,37 @@ function _crearDialOverlay(){
       return;
     }
 
-    // Buffer de seguridad por sombras y bordes
+    // v5.147: el panel CRECE para mostrar todo su contenido sin scroll interno.
+    // Limitamos solo al viewport (vh - margen) para no salirse de pantalla.
+    var maxH = window.innerHeight - 80; // margen para barra superior + bottom
     contentNaturalH = Math.max(280, contentNaturalH);
+    var finalH = Math.min(contentNaturalH, maxH);
 
-    var finalH = Math.min(contentNaturalH, zonaH);
-    var finalY = zonaY + Math.max(0, Math.round((zonaH - finalH)/2));
+    // Centrar el panel verticalmente respecto a la zona disponible si cabe ahí,
+    // o subirlo hasta ~40px del top si necesita más espacio que zonaH.
+    var finalY;
+    if(contentNaturalH <= zonaH){
+      // Cabe en la zona normal: centrar dentro
+      finalY = zonaY + Math.max(0, Math.round((zonaH - finalH)/2));
+    } else {
+      // Necesita más alto: subir y dejar margen mínimo del top
+      finalY = Math.max(80, zonaY - Math.round((finalH - zonaH)/2));
+      // Si aún se sale por abajo, ajustar
+      if(finalY + finalH > window.innerHeight - 20){
+        finalY = Math.max(80, window.innerHeight - 20 - finalH);
+      }
+    }
 
     panel.style.height = finalH + 'px';
     panel.style.minHeight = finalH + 'px';
     panel.style.top = finalY + 'px';
 
-    if(contentNaturalH <= zonaH){
-      // Cabe entero: sin scroll
+    // v5.147: solo poner scroll si el contenido NATURAL es mayor que el viewport
+    // (no que zonaH). Lo normal es que contenido<=maxH y NO haya scroll.
+    if(contentNaturalH <= maxH){
       expContent.style.overflow = 'visible';
-      expContent.style.justifyContent = 'center';
+      expContent.style.justifyContent = 'flex-start';
     } else {
-      // No cabe: scroll vertical
       expContent.style.overflow = 'auto';
       expContent.style.justifyContent = 'flex-start';
     }
@@ -3577,26 +3653,17 @@ function _crearDialOverlay(){
       });
     }
 
-    // ── Apartados (todos) ──
+    // ── Apartados (solo conteo + total, no desglose — v5.147) ──
     var apActivos = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); });
     if(apActivos.length){
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 2px 2px;margin-top:4px;border-top:1px solid rgba(255,255,255,0.06)"><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(220,224,235,0.55)">Apartados <span style="color:rgba(220,224,235,0.40)">('+apActivos.length+')</span></span><span style="font-size:12px;font-weight:800;color:#F59E0B;font-family:JetBrains Mono,monospace">'+fmt(totalAp)+'</span></div>';
-
-      var hoy = new Date(); hoy.setHours(0,0,0,0);
-      apActivos.forEach(function(ap){
-        var metaStr = '';
-        if(ap.meta){
-          var diff = Math.floor((new Date(ap.meta) - hoy)/86400000);
-          metaStr = diff<0?'Vencido':diff===0?'Hoy':'en '+diff+'d';
-        }
-        html += '<div style="padding:5px 8px;border:1px solid rgba(245,158,11,0.15);border-radius:6px;background:rgba(245,158,11,0.04);display:flex;align-items:center;justify-content:space-between;gap:6px">'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">💰 '+ap.nombre+'</div>'+
-            '<div style="font-size:8px;color:rgba(220,224,235,0.45);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+(metaStr?' · '+metaStr:'')+'</div>'+
-          '</div>'+
-          '<div style="font-size:10px;font-weight:800;color:#F59E0B;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt(ap.monto)+'</div>'+
-        '</div>';
-      });
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-top:4px;border:1px solid rgba(245,158,11,0.18);border-radius:6px;background:rgba(245,158,11,0.04)">'+
+        '<div style="display:flex;align-items:center;gap:6px">'+
+          '<i class="fas fa-lock" style="color:#F59E0B;font-size:10px"></i>'+
+          '<span style="font-size:10px;font-weight:700;color:rgba(220,224,235,0.65)">Apartados</span>'+
+          '<span style="font-size:9px;font-weight:700;color:rgba(220,224,235,0.40);padding:2px 6px;border-radius:999px;background:rgba(255,255,255,0.04)">'+apActivos.length+'</span>'+
+        '</div>'+
+        '<span style="font-size:12px;font-weight:800;color:#F59E0B;font-family:JetBrains Mono,monospace">'+fmt(totalAp)+'</span>'+
+      '</div>';
     }
 
     content.innerHTML = html;
