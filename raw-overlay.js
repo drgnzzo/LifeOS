@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.144
+/* RAW Entry — Overlay v.5.146
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -1366,12 +1366,9 @@ function _crearDialOverlay(){
   _p1.style.animationDelay = '0s';
   document.getElementById('hud-patrimonio-inner').innerHTML =
     _pH('Patrimonio','#22C55E','fa-landmark') +
-    _hero('_hud-saldo','#22C55E','Disponible hoy','_hud-saldo-chip') +
-    _miniBar('Fondo emergencia','_hud-fondo-pct','_hud-fondo-bar','#22C55E') +
-    _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','fa-building-columns') +
-    _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','fa-credit-card') +
-    _row('Efectivo', '_hud-efec',  '#FCD34D',null,'fa-money-bill-wave') +
-    _row('Apartados','_hud-apart', '#F59E0B',null,'fa-lock') +
+    // v5.145: contenedor dinámico — se llena en _renderPatrimonioOverlayCard()
+    // con TODOS los bancos y apartados reales, no solo BBVA/BEATS hardcoded.
+    '<div id="_hud-pat-content" style="display:flex;flex-direction:column;gap:8px;padding:0 2px"></div>' +
     _pCTA('Ver detalle completo','#22C55E','irAPatrimonio');
 
   // ── Panel 2: Necesidades ──
@@ -3497,6 +3494,115 @@ function _crearDialOverlay(){
   window._hudCollapse = _hudCollapse;
 
   // ══════════════════════════════════════
+  //  PATRIMONIO OVERLAY CARD — dinámico (v5.145)
+  //  Construye el contenido del panel Patrimonio del overlay leyendo
+  //  TODOS los bancos (_fijosData) y apartados (_apartadosData) reales,
+  //  no solo BBVA/BEATS hardcoded. Misma lógica que renderPatrimonio
+  //  de HOME pero adaptada al ancho compacto del panel flotante.
+  // ══════════════════════════════════════
+  window._renderPatrimonioOverlayCard = function(){
+    var content = document.getElementById('_hud-pat-content');
+    if(!content) return;
+    var fijos = window._fijosData || [];
+    var apartados = window._apartadosData || [];
+    var patD = window._patrimonioData || {};
+    var fondo = patD.fondo || {};
+    if(!fijos.length){
+      content.innerHTML = '<div style="padding:14px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Cargando saldos…</div>';
+      return;
+    }
+    function fmt(v){ return '$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:0}); }
+    function fmt2(v){ return '$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+    // Apartados activos agrupados por banco (key uppercase)
+    var apPorBanco = {}, totalAp = 0;
+    apartados.forEach(function(ap){
+      if(ap.estado && ap.estado.toLowerCase()==='usado') return;
+      var b = (ap.banco||'').trim().toUpperCase();
+      apPorBanco[b] = (apPorBanco[b]||0) + (ap.monto||0);
+      totalAp += (ap.monto||0);
+    });
+
+    // Total bruto (excluyendo "P" si lo hay)
+    var totalBruto = fijos.reduce(function(s,fi){ return fi.nombre==='P'?s:s+(fi.monto||0); },0);
+    var totalDisp = totalBruto - totalAp;
+
+    var html = '';
+
+    // ── Hero: Disponible hoy ──
+    html += '<div style="padding:8px 10px;border:1px solid rgba(34,197,94,0.25);border-radius:8px;background:rgba(34,197,94,0.05);margin-bottom:4px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">'+
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(220,224,235,0.55)">Disponible hoy</div>'+
+        (totalAp>0 ? '<div style="font-size:9px;color:rgba(220,224,235,0.40)">bruto <span style="color:rgba(220,224,235,0.65);font-weight:700">'+fmt(totalBruto)+'</span> − apartados <span style="color:#F59E0B;font-weight:700">'+fmt(totalAp)+'</span></div>' : '')+
+      '</div>'+
+      '<div style="font-size:22px;font-weight:800;color:#4ADE80;letter-spacing:-.03em;line-height:1.1;margin-top:2px;font-family:JetBrains Mono,monospace">'+fmt2(totalDisp)+'</div>'+
+    '</div>';
+
+    // ── Fondo de emergencia ──
+    if(fondo.meta && fondo.meta>0){
+      var saludColor = fondo.salud==='ok'?'#4ADE80':fondo.salud==='warn'?'#F59E0B':'#EF4444';
+      html += '<div style="padding:6px 10px;border:1px solid rgba(255,255,255,0.06);border-radius:6px;background:rgba(255,255,255,0.02);margin-bottom:4px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+          '<span style="font-size:9px;color:rgba(220,224,235,0.55);font-weight:600">🎯 Fondo emergencia</span>'+
+          '<span style="font-size:10px;font-weight:800;color:'+saludColor+'">'+(fondo.avance||0)+'%</span>'+
+        '</div>'+
+        '<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">'+
+          '<div style="height:100%;width:'+Math.min(100,fondo.avance||0)+'%;background:'+saludColor+';border-radius:2px"></div>'+
+        '</div>'+
+      '</div>';
+    }
+
+    // ── Saldos por banco (todos, no solo BBVA/BEATS) ──
+    // Mostrar cada fijo con: nombre, saldo bruto, apartados de ese banco, disponible neto
+    var fijosVisibles = fijos.filter(function(fi){ return fi.nombre!=='P'; });
+    if(fijosVisibles.length){
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px"><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(220,224,235,0.55)">Saldos</span><span style="font-size:13px;font-weight:800;color:#4ADE80;font-family:JetBrains Mono,monospace">'+fmt2(totalDisp)+'</span></div>';
+
+      fijosVisibles.forEach(function(fi){
+        var bancKey = (fi.nombre||'').trim().toUpperCase();
+        var apBanco = apPorBanco[bancKey] || 0;
+        var dispBanco = (fi.monto||0) - apBanco;
+        // Color: verde si positivo, rojo si negativo
+        var col = (fi.monto||0) >= 0 ? '#4ADE80' : '#EF4444';
+        html += '<div style="padding:6px 8px;border:1px solid rgba(255,255,255,0.05);border-radius:6px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+          '<div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px">'+
+            '<i class="fas fa-building-columns" style="color:'+col+';font-size:10px;opacity:.75"></i>'+
+            '<span style="font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fi.nombre+'</span>'+
+          '</div>'+
+          '<div style="text-align:right;font-family:JetBrains Mono,monospace">'+
+            '<div style="font-size:11px;font-weight:800;color:'+col+'">'+fmt2(fi.monto)+'</div>'+
+            (apBanco>0 ? '<div style="font-size:9px;color:rgba(220,224,235,0.45);margin-top:1px">disp <span style="color:#4ADE80;font-weight:700">'+fmt(dispBanco)+'</span></div>' : '')+
+          '</div>'+
+        '</div>';
+      });
+    }
+
+    // ── Apartados (todos) ──
+    var apActivos = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); });
+    if(apActivos.length){
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 2px 2px;margin-top:4px;border-top:1px solid rgba(255,255,255,0.06)"><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(220,224,235,0.55)">Apartados <span style="color:rgba(220,224,235,0.40)">('+apActivos.length+')</span></span><span style="font-size:12px;font-weight:800;color:#F59E0B;font-family:JetBrains Mono,monospace">'+fmt(totalAp)+'</span></div>';
+
+      var hoy = new Date(); hoy.setHours(0,0,0,0);
+      apActivos.forEach(function(ap){
+        var metaStr = '';
+        if(ap.meta){
+          var diff = Math.floor((new Date(ap.meta) - hoy)/86400000);
+          metaStr = diff<0?'Vencido':diff===0?'Hoy':'en '+diff+'d';
+        }
+        html += '<div style="padding:5px 8px;border:1px solid rgba(245,158,11,0.15);border-radius:6px;background:rgba(245,158,11,0.04);display:flex;align-items:center;justify-content:space-between;gap:6px">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">💰 '+ap.nombre+'</div>'+
+            '<div style="font-size:8px;color:rgba(220,224,235,0.45);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+(metaStr?' · '+metaStr:'')+'</div>'+
+          '</div>'+
+          '<div style="font-size:10px;font-weight:800;color:#F59E0B;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt(ap.monto)+'</div>'+
+        '</div>';
+      });
+    }
+
+    content.innerHTML = html;
+  };
+
+  // ══════════════════════════════════════
   //  REFRESCAR ESPEJOS — incluye Nutrición y banda Sim
   // ══════════════════════════════════════
   window._refrescarEspejos = function(datos){
@@ -3610,20 +3716,15 @@ function _crearDialOverlay(){
       }
     }
 
-    // ── Patrimonio ──
+    // ── Patrimonio (v5.145: dinámico, todos los bancos + apartados) ──
+    if(typeof window._renderPatrimonioOverlayCard === 'function'){
+      window._renderPatrimonioOverlayCard();
+    }
     var fijosAll = window._fijosData || [];
     var totalDisp = fijosAll.reduce(function(s,f){ return f.nombre==='P'?s:s+(f.monto||0); },0);
     var totalApD  = (window._apartadosData||[]).reduce(function(s,a){
       return a.estado&&a.estado.toLowerCase()==='usado'?s:s+(a.monto||0);
     },0);
-    if(totalDisp !== 0) setMoney('_hud-saldo', totalDisp - totalApD);
-    var sv = document.getElementById('saldo-val');
-    if(sv && sv.textContent && sv.textContent.trim().length>2 && sv.textContent.trim()!=='—'){
-      // Si saldo-val ya tiene un valor formateado, parsearlo y aplicar setMoney
-      var raw = sv.textContent.trim().replace(/[^\d.\-]/g,'');
-      var num = parseFloat(raw);
-      if(!isNaN(num)) setMoney('_hud-saldo', num);
-    }
 
     // Chip "+/- X% vs ayer" — compara contra saldo guardado en localStorage
     (function(){
@@ -3633,10 +3734,8 @@ function _crearDialOverlay(){
       try{
         var hoy = new Date().toISOString().slice(0,10);
         var prev = JSON.parse(localStorage.getItem('hud:saldoSnap')||'null');
-        // Guardar snapshot de hoy si no existe (para comparar mañana)
         if(!prev || prev.fecha !== hoy){
           if(prev && prev.fecha !== hoy){
-            // Tenemos snapshot de un día anterior → calcular delta
             var delta = saldoActual - prev.saldo;
             var pct = prev.saldo!==0 ? Math.round((delta/Math.abs(prev.saldo))*100) : 0;
             var pos = delta >= 0;
@@ -3651,45 +3750,12 @@ function _crearDialOverlay(){
           } else {
             chip.style.display = 'none';
           }
-          // Actualizar snapshot
           localStorage.setItem('hud:saldoSnap', JSON.stringify({fecha:hoy, saldo:saldoActual}));
         } else {
           chip.style.display = 'none';
         }
       } catch(e){ chip.style.display = 'none'; }
     })();
-
-    var fijos = window._fijosData || [];
-    var maxMonto = fijos.reduce(function(m,f){ return f.nombre!=='P'?Math.max(m,Math.abs(f.monto||0)):m; },1);
-    var bbvaSet=false, beatsSet=false;
-    fijos.forEach(function(fi){
-      if(fi.nombre==='P') return;
-      var nl = (fi.nombre||'').toLowerCase();
-      if(!bbvaSet && (nl.indexOf('bbva')>=0||nl.indexOf('banco')>=0||nl.indexOf('santan')>=0)){
-        set('_hud-bbva', fmt2(fi.monto));
-        setW('_hud-bbva-bar', Math.abs(fi.monto||0)/maxMonto*100);
-        bbvaSet=true;
-      } else if(!beatsSet && (nl.indexOf('beats')>=0||nl.indexOf('nu')>=0||nl.indexOf('hey')>=0||nl.indexOf('spin')>=0)){
-        set('_hud-beats', fmt2(fi.monto));
-        setW('_hud-beats-bar', Math.abs(fi.monto||0)/maxMonto*100);
-        beatsSet=true;
-      } else if(nl.indexOf('efectivo')>=0||nl.indexOf('cash')>=0){
-        set('_hud-efec', fmt2(fi.monto));
-      }
-    });
-    var bancos = fijos.filter(function(f){ return f.nombre!=='P'; });
-    if(!bbvaSet && bancos[0]){ set('_hud-bbva', fmt2(bancos[0].monto)); setW('_hud-bbva-bar', Math.abs(bancos[0].monto||0)/maxMonto*100); }
-    if(!beatsSet && bancos[1]){ set('_hud-beats', fmt2(bancos[1].monto)); setW('_hud-beats-bar', Math.abs(bancos[1].monto||0)/maxMonto*100); }
-
-    var totalAp = (window._apartadosData||[]).reduce(function(s,a){
-      return a.estado&&a.estado.toLowerCase()==='usado'?s:s+(a.monto||0);
-    },0);
-    set('_hud-apart', fmt(d.totalApartado || totalAp));
-
-    if(window._patrimonioData && window._patrimonioData.fondo){
-      set('_hud-fondo-pct', (window._patrimonioData.fondo.avance||0)+'%');
-      setW('_hud-fondo-bar', window._patrimonioData.fondo.avance||0);
-    }
 
     // ── Financiero ──
     var finD = window._finData;
@@ -3707,11 +3773,14 @@ function _crearDialOverlay(){
     }
 
     // ── Necesidades ──
-    var nec = d.necesidades || window._necData || {};
+    // v5.146: preferir _necInlineData (filtrado por mes actual) sobre
+    // d.necesidades (que getAll devuelve sin filtrar = todo el año).
+    var nec = window._necInlineData || d.necesidades || window._necData || {};
     var niveles = nec.niveles || [];
     var totalNec = niveles.reduce(function(s,n){ return s+Math.abs(n.total||0); },0);
     [1,2,3,4,5].forEach(function(n){
-      var nv = niveles[n-1] || {total:0};
+      // Buscar por KEY, no por posición — el array puede no estar en orden
+      var nv = niveles.find(function(x){ return String(x.key) === String(n); }) || {total:0};
       var abs = Math.abs(nv.total||0);
       set('_hud-nec-'+n, abs>0 ? fmt(abs) : '—');
       setW('_hud-nec-'+n+'-bar', totalNec>0 ? abs/totalNec*100 : 0);
@@ -5145,6 +5214,23 @@ window.addEventListener('DOMContentLoaded',()=>{
         datosMes: d.datosMes || {},
         financiero: d.financieroAvanzado || {},
       };
+      // v5.146: getAll() llama a getNecesidades() sin parámetros, lo que
+      // devuelve TODO el AÑO. Para que el panel colapsado de Necesidades
+      // muestre solo los datos del mes actual (igual que la card expandida
+      // y la card de HOME al filtrar), pedir explícitamente las necesidades
+      // del mes en curso y reemplazar los datos del año.
+      if(typeof api !== 'undefined' && api.getNecesidades){
+        var _hoy = new Date();
+        api.getNecesidades(_hoy.getFullYear(), String(_hoy.getMonth()+1), null).then(function(necMes){
+          if(necMes && necMes.niveles){
+            window._hudDatos.necesidades = necMes;
+            window._necInlineData = necMes;
+            if(typeof window._refrescarEspejos === 'function'){
+              window._refrescarEspejos(window._hudDatos);
+            }
+          }
+        }).catch(function(){});
+      }
       setTimeout(function(){
         if(typeof window._refrescarEspejos==='function') window._refrescarEspejos(window._hudDatos);
       }, 600);
