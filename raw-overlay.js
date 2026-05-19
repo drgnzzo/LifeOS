@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.171
+/* RAW Entry — Overlay v.5.172
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -1786,8 +1786,8 @@ function _crearDialOverlay(){
       // 8b) v5.171: Red interestelar (cadenas que no pasan por el centro)
       drawInterMesh(dt);
 
-      // 8c) v5.171: Mandalas / crop circles geométricos
-      drawMandalas(dt);
+      // 8c) v5.171: Mandalas eliminados en v5.172 (distraían)
+      // drawMandalas(dt);
 
       // 9) Constelaciones
       drawConstellations(dt);
@@ -1884,7 +1884,8 @@ function _crearDialOverlay(){
       if(meteors.length < 3 && Math.random() < 0.015) spawnMeteor();
       // v5.171: Red interestelar y mandalas
       if(interMesh.length < 4 && Math.random() < 0.025) spawnInterMesh();
-      if(mandalas.length < 3 && Math.random() < 0.008) spawnMandala();
+      // v5.172: mandalas desactivados (aparecían/desaparecían y distraían)
+      // if(mandalas.length < 3 && Math.random() < 0.008) spawnMandala();
 
       animId = requestAnimationFrame(frame);
     }
