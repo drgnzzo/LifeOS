@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.160
+/* RAW Entry — Overlay v.5.161
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -854,7 +854,7 @@ function _crearDialOverlay(){
           var b = rd.nodes[(i + 1) % nRadii];
           if(!a || !b) continue;
           var midStrength = (radialStrength[i] + radialStrength[(i+1) % nRadii]) / 2;
-          if(midStrength < 0.45) continue;
+          if(midStrength < 0.20) continue;
           var midAngle = a.angle + (Math.PI * 2 / nRadii) / 2;
           var cpx = CX + Math.cos(midAngle) * rd.r;
           var cpy = CY + Math.sin(midAngle) * rd.r;
@@ -871,7 +871,7 @@ function _crearDialOverlay(){
 
       // Radiales: solo en radios con fuerza media o alta
       for(var ai3 = 0; ai3 < nRadii; ai3++){
-        if(radialStrength[ai3] < 0.40) continue;
+        if(radialStrength[ai3] < 0.20) continue;
         for(var ri3 = 0; ri3 < nRings - 1; ri3++){
           var n1 = ringDefs[ri3].nodes[ai3];
           var n2 = ringDefs[ri3 + 1].nodes[ai3];
@@ -1012,7 +1012,9 @@ function _crearDialOverlay(){
       }
       // Mapear total a [0.4, 1.0]: hay siempre algo de visibilidad mínima
       total = Math.min(1, total);
-      return 0.4 + 0.6 * total;
+      // v5.161: piso 0.7 (antes 0.4) → zonas "tenues" siguen siendo visibles,
+      // las brillantes solo destacan un poco más. Menos contraste, menos vacío.
+      return 0.7 + 0.3 * total;
     }
 
     function initEquations(){
@@ -1293,26 +1295,31 @@ function _crearDialOverlay(){
     }
 
     function drawEdge(e){
-      var alphaHex = '22';
-      var lw = 0.7;
-      var immune = false; // raíces siempre 100% visibles
+      // v5.161: alphas base subidos para que la malla sea visible
+      //   antes de la modulación. Raíces (tipo root) MÁS DISCRETAS:
+      //   ya no son los "rayos" largos que dominaban la escena.
+      var alphaHex = '50';   // base radial/otros más visible (era '22')
+      var lw = 0.8;
+      var immune = false;
       if(e.type === 'root'){
-        alphaHex = '88';
-        lw = 1.4;
-        immune = true;
+        // v5.161: raíces ya NO son inmunes ni gruesas — son una línea más del mallado
+        alphaHex = '55';
+        lw = 0.8;
+        immune = false;
       }
-      else if(e.type === 'tangential'){ alphaHex = '2a'; lw = 0.9; }
+      else if(e.type === 'tangential'){ alphaHex = '55'; lw = 1.0; }   // antes '2a'
+      else if(e.type === 'radial'){ alphaHex = '50'; lw = 0.9; }
       else if(e.type === 'constellation'){
         alphaHex = '38';
         lw = 0.6;
       }
-      // v5.160: aplicar modulación de nebulosa + respiración global
+      // Aplicar modulación de nebulosa + respiración global
       var alpha = parseInt(alphaHex, 16) / 255;
       if(!immune){
         var midX = (e.a.x + e.b.x) / 2;
         var midY = (e.a.y + e.b.y) / 2;
         var neb = nebulaDensityAt(midX, midY);
-        var breath = 0.65 + 0.35 * (Math.sin(globalBreathPhase) + 1) / 2;
+        var breath = 0.82 + 0.18 * (Math.sin(globalBreathPhase) + 1) / 2;
         alpha = alpha * neb * breath;
       }
       var finalHex = Math.max(0, Math.min(255, Math.floor(alpha * 255))).toString(16).padStart(2, '0');
@@ -1421,7 +1428,7 @@ function _crearDialOverlay(){
         var coreImmune = (!n.isBgStar && !n.isConstellation && n.ringIdx === 0);
         if(!coreImmune){
           var neb = nebulaDensityAt(n.x, n.y);
-          var breath = 0.65 + 0.35 * (Math.sin(globalBreathPhase) + 1) / 2;
+          var breath = 0.82 + 0.18 * (Math.sin(globalBreathPhase) + 1) / 2;
           alpha = alpha * neb * breath;
         }
         pctx.fillStyle = n.color + Math.max(0, Math.min(255, Math.floor(alpha * 220))).toString(16).padStart(2, '0');
