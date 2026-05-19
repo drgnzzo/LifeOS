@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.156
+/* RAW Entry — Overlay v.5.157
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -764,89 +764,89 @@ function _crearDialOverlay(){
     //  Conexiones radiales (dial → afuera) + tangenciales (entre nodos
     //  vecinos del mismo anillo, en arco curvo).
     // ══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.157: ESTRUCTURA SIMÉTRICA E INTEGRADA
+    //  Anillos concéntricos con MISMA cantidad de nodos cada uno,
+    //  alineados radialmente (mismo ángulo base por radio). Esto crea
+    //  una malla simétrica donde cada nodo tiene exactamente un
+    //  correspondiente en cada anillo. Conexiones radiales sistemáticas
+    //  + tangenciales completas. Sin nodos sueltos.
+    // ══════════════════════════════════════════════════════════════════
     function buildNetwork(){
       nodes = [];
       edges = [];
       pulses = [];
 
-      // Radio máximo: la diagonal del viewport (los anillos exteriores
-      // pueden quedar parcialmente fuera, los nodos fuera se descartan)
-      // v5.156: estirar más hacia bordes — minR más lejos del dial,
-      // maxR ya casi tocando esquinas
-      var maxR = Math.hypot(W/2, H/2) + 60;
-      var minR = DIAL_R + 110;
+      // Número de "radios" — define la simetría angular global.
+      // Adaptativo al tamaño del viewport pero limitado para no saturar.
+      var nRadii = Math.max(12, Math.min(18, Math.floor(Math.min(W, H) / 80)));
 
-      // 4 anillos a distancias graduadas, con distribución NO lineal
-      // para concentrar menos al centro (más espaciado interior).
-      var nRings = 4;
+      // Anillos: radios graduados con ease-out hacia los bordes.
+      // El anillo más externo cubre las esquinas (diagonal/2 + margen).
+      var diag = Math.hypot(W/2, H/2);
+      var minR = DIAL_R + 90;     // primer anillo: lejos del dial
+      var maxR = diag + 40;       // último anillo: ligeramente fuera para llenar esquinas
+      var nRings = 5;             // 5 anillos para cubrir desde dial hasta esquinas
+
+      // Offset angular global: rotación inicial aleatoria para que la
+      // simetría no esté siempre alineada igual con los ejes del viewport
+      var globalAngleOffset = Math.random() * (Math.PI * 2 / nRadii);
+
       var ringDefs = [];
       for(var ri = 0; ri < nRings; ri++){
-        var t = (ri + 1) / nRings;
-        // Curva ease-out: mayor separación entre anillos exteriores
-        var tCurved = 1 - Math.pow(1 - t, 1.4);
+        var t = ri / (nRings - 1);
+        // Ease-out: anillos exteriores más espaciados
+        var tCurved = 1 - Math.pow(1 - t, 1.5);
         var r = minR + (maxR - minR) * tCurved;
-        var circumference = 2 * Math.PI * r;
-        var nNodes = Math.max(6, Math.floor(circumference / 140));
-        var baseColor = PALETTE[ri % PALETTE.length];
-        ringDefs.push({ r: r, n: nNodes, color: baseColor, ringIdx: ri });
+        var color = PALETTE[ri % PALETTE.length];
+        ringDefs.push({ r: r, color: color, ringIdx: ri, nodes: [] });
       }
 
-      // Crear nodos de cada anillo, distribuidos angularmente con jitter pequeño
-      ringDefs.forEach(function(rd){
-        // Offset angular aleatorio para que los anillos no estén alineados
-        var angleOffset = Math.random() * Math.PI * 2;
-        // Inverso: anillos pares giran en sentido opuesto
-        var direction = rd.ringIdx % 2 === 0 ? 1 : -1;
-        rd.nodes = [];
-        for(var k = 0; k < rd.n; k++){
-          var baseAngle = angleOffset + direction * (k / rd.n) * Math.PI * 2;
-          // Jitter angular y radial muy pequeño (mantener forma del anillo)
-          var jitterAngle = (Math.random() - 0.5) * (Math.PI * 2 / rd.n) * 0.3;
-          var jitterR = (Math.random() - 0.5) * 25;
-          var angle = baseAngle + jitterAngle;
-          var r = rd.r + jitterR;
+      // Crear nodos: por cada radio, un nodo en cada anillo, mismo ángulo base.
+      // Esto garantiza alineación radial perfecta.
+      for(var ai = 0; ai < nRadii; ai++){
+        var baseAngle = globalAngleOffset + (ai / nRadii) * Math.PI * 2;
+        for(var ri2 = 0; ri2 < nRings; ri2++){
+          var rd = ringDefs[ri2];
+          // Jitter mínimo (igual para todos los anillos en este radio para preservar alineación)
+          var angle = baseAngle;
+          var r = rd.r;
           var x = CX + Math.cos(angle) * r;
           var y = CY + Math.sin(angle) * r;
-          // Si el nodo cae fuera del viewport con margen, descartar
-          if(x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+          // Descartar si está completamente fuera del viewport con margen
+          if(x < -40 || x > W + 40 || y < -40 || y > H + 40){
+            rd.nodes.push(null); // placeholder para mantener index sincronizado
+            continue;
+          }
+          // Hubs: cada 3 radios (simétrico, no aleatorio)
+          var isHub = (ai % 3 === 0) && (ri2 === 0 || ri2 === Math.floor(nRings/2));
           var node = {
             x: x, y: y,
             angle: angle,
-            baseAngle: angle, // v5.155: ángulo de equilibrio para decay de vórtices
+            baseAngle: angle,
+            radialIdx: ai,           // índice del radio (0..nRadii-1)
             ringR: rd.r,
-            ringIdx: rd.ringIdx,
+            ringIdx: ri2,
             color: rd.color,
-            phase: Math.random() * Math.PI * 2,
-            speed: 0.5 + Math.random() * 0.7,
-            baseR: 0.9 + Math.random() * 1.0,
-            isHub: Math.random() < 0.18,
+            phase: ai * 0.4 + ri2 * 0.7, // fase determinista para que la sin-wave no sea caótica
+            speed: 0.5 + (ri2 * 0.1),
+            baseR: isHub ? 1.8 : 0.95,
+            isHub: isHub,
           };
-          if(node.isHub){
-            node.baseR = 1.7 + Math.random() * 1.0;
-          }
           rd.nodes.push(node);
           nodes.push(node);
         }
-      });
+      }
 
       // ── CONEXIONES TANGENCIALES (entre nodos vecinos del mismo anillo) ──
-      // v5.153: solo dibujar segmentos alternos para no saturar (arcos discontinuos)
+      // Una edge por cada par consecutivo. Mismo color del anillo.
       ringDefs.forEach(function(rd){
-        for(var i = 0; i < rd.nodes.length; i++){
-          // Saltar nodos alternos: solo dibujar conexión en índices pares
-          if(i % 2 !== 0) continue;
+        for(var i = 0; i < nRadii; i++){
           var a = rd.nodes[i];
-          var b = rd.nodes[(i + 1) % rd.nodes.length];
-          // Punto de control: en el punto medio angular pero al radio del anillo
-          // (esto curva la línea siguiendo la circunferencia)
-          var midAngle = (a.angle + b.angle) / 2;
-          // Si los ángulos se cruzan, ajustar
-          var diff = b.angle - a.angle;
-          if(Math.abs(diff) > Math.PI){
-            midAngle = midAngle + Math.PI;
-          }
-          // El control point queda un poco más afuera del radio (curva orgánica hacia afuera)
-          var cpR = rd.r + 8;
+          var b = rd.nodes[(i + 1) % nRadii];
+          if(!a || !b) continue;
+          var midAngle = a.angle + (Math.PI * 2 / nRadii) / 2;
+          var cpR = rd.r + 6;
           var cpx = CX + Math.cos(midAngle) * cpR;
           var cpy = CY + Math.sin(midAngle) * cpR;
           edges.push({
@@ -859,123 +859,51 @@ function _crearDialOverlay(){
         }
       });
 
-      // ── CONEXIONES RADIALES (del dial hacia cada nodo del primer anillo,
-      //    y entre anillos adyacentes) ──
-      // Del dial a cada nodo del anillo 0
-      ringDefs[0].nodes.forEach(function(n){
-        // Origen en el borde del dial (en la dirección del nodo)
-        var dx = n.x - CX, dy = n.y - CY;
-        var dist = Math.hypot(dx, dy) || 1;
-        var ox = CX + (dx / dist) * DIAL_R;
-        var oy = CY + (dy / dist) * DIAL_R;
-        var virtualOrigin = { x: ox, y: oy, color: n.color, isVirtual: true };
-        // Control point: ligeramente desviado perpendicularmente para curva orgánica
-        var mx = (ox + n.x) / 2, my = (oy + n.y) / 2;
-        var perpX = -dy / dist, perpY = dx / dist;
-        var off = (Math.random() - 0.5) * 25;
-        edges.push({
-          a: virtualOrigin, b: n,
-          cp: { x: mx + perpX * off, y: my + perpY * off },
-          color: n.color,
-          type: 'root',
-          ringIdx: 0,
-        });
-      });
-
-      // Entre anillos adyacentes: cada nodo de anillo i conecta con el más cercano del anillo i+1
-      for(var rIdx = 0; rIdx < ringDefs.length - 1; rIdx++){
-        var inner = ringDefs[rIdx];
-        var outer = ringDefs[rIdx + 1];
-        // Solo conectar algunos (no todos) para no saturar
-        inner.nodes.forEach(function(n1){
-          if(Math.random() > 0.25) return; // v5.153: ~25% (antes 55%) — menos saturación
-          // Nodo más cercano por ángulo en el anillo externo
-          var nearest = null, minDA = Infinity;
-          outer.nodes.forEach(function(n2){
-            var dA = Math.abs(n2.angle - n1.angle);
-            if(dA > Math.PI) dA = Math.PI * 2 - dA;
-            if(dA < minDA){ minDA = dA; nearest = n2; }
-          });
-          if(!nearest) return;
-          // Curva radial entre los dos
-          var mx = (n1.x + nearest.x) / 2;
-          var my = (n1.y + nearest.y) / 2;
-          var dx = nearest.x - n1.x, dy = nearest.y - n1.y;
+      // ── CONEXIONES RADIALES (entre anillos adyacentes en el mismo radio) ──
+      // SISTEMÁTICAS: cada radio tiene una línea continua desde el dial
+      // hasta el anillo más externo. No aleatorio.
+      for(var ai2 = 0; ai2 < nRadii; ai2++){
+        for(var ri3 = 0; ri3 < nRings - 1; ri3++){
+          var n1 = ringDefs[ri3].nodes[ai2];
+          var n2 = ringDefs[ri3 + 1].nodes[ai2];
+          if(!n1 || !n2) continue;
+          // Curva muy sutil (los nodos están alineados radialmente; mucha
+          // curvatura rompería la simetría)
+          var mx = (n1.x + n2.x) / 2;
+          var my = (n1.y + n2.y) / 2;
+          // Curva mínima perpendicular — alterna lado por radio (para variedad simétrica)
+          var dx = n2.x - n1.x, dy = n2.y - n1.y;
           var len = Math.hypot(dx, dy) || 1;
           var perpX = -dy / len, perpY = dx / len;
-          var off = (Math.random() - 0.5) * 30;
+          var off = (ai2 % 2 === 0 ? 1 : -1) * 6; // ±6 perpendicular, alternado
           edges.push({
-            a: n1, b: nearest,
+            a: n1, b: n2,
             cp: { x: mx + perpX * off, y: my + perpY * off },
             color: n1.color,
             type: 'radial',
-            ringIdx: rIdx,
+            ringIdx: ri3,
           });
-        });
+        }
       }
 
-      // ── v5.156: NODOS SATÉLITE EN BORDES ──
-      // Distribución estratégica en esquinas y midpoints para que los
-      // rincones del viewport no queden vacíos. Cada satélite se conecta
-      // al nodo del anillo más externo más cercano angularmente.
-      var outerRing = ringDefs[ringDefs.length - 1];
-      var edgeMargin = 60;
-      var satelliteSpots = [
-        { x: edgeMargin, y: edgeMargin },              // esquina TL
-        { x: W - edgeMargin, y: edgeMargin },          // esquina TR
-        { x: edgeMargin, y: H - edgeMargin },          // esquina BL
-        { x: W - edgeMargin, y: H - edgeMargin },      // esquina BR
-        { x: W / 2, y: edgeMargin },                   // mid top
-        { x: W / 2, y: H - edgeMargin },               // mid bottom
-        { x: edgeMargin, y: H / 2 },                   // mid left
-        { x: W - edgeMargin, y: H / 2 },               // mid right
-      ];
-      satelliteSpots.forEach(function(spot, sIdx){
-        var jx = spot.x + (Math.random() - 0.5) * 40;
-        var jy = spot.y + (Math.random() - 0.5) * 40;
-        jx = Math.max(20, Math.min(W - 20, jx));
-        jy = Math.max(20, Math.min(H - 20, jy));
-        if(Math.hypot(jx - CX, jy - CY) < DIAL_R + 20) return;
-        var sAngle = Math.atan2(jy - CY, jx - CX);
-        var sat = {
-          x: jx, y: jy,
-          angle: sAngle,
-          baseAngle: sAngle,
-          ringR: Math.hypot(jx - CX, jy - CY),
-          ringIdx: 99,                          // marcador: satélite de borde
-          color: PALETTE[sIdx % PALETTE.length],
-          phase: Math.random() * Math.PI * 2,
-          speed: 0.4 + Math.random() * 0.5,
-          baseR: 1.0 + Math.random() * 0.8,
-          isHub: Math.random() < 0.4,           // satélites más probables de hub
-          isEdgeSat: true,
-        };
-        nodes.push(sat);
-
-        // Conectar al nodo del anillo externo más cercano angularmente
-        if(outerRing && outerRing.nodes && outerRing.nodes.length){
-          var nearest = null, minDA = Infinity;
-          outerRing.nodes.forEach(function(rn){
-            var dA = Math.abs(rn.angle - sAngle);
-            if(dA > Math.PI) dA = Math.PI * 2 - dA;
-            if(dA < minDA){ minDA = dA; nearest = rn; }
-          });
-          if(nearest){
-            var mx = (nearest.x + jx) / 2, my = (nearest.y + jy) / 2;
-            var dx = jx - nearest.x, dy = jy - nearest.y;
-            var len = Math.hypot(dx, dy) || 1;
-            var perpX = -dy / len, perpY = dx / len;
-            var off = (Math.random() - 0.5) * 50;
-            edges.push({
-              a: nearest, b: sat,
-              cp: { x: mx + perpX * off, y: my + perpY * off },
-              color: sat.color,
-              type: 'edge-sat',
-              ringIdx: 99,
-            });
-          }
-        }
-      });
+      // ── RAÍCES DEL DIAL → primer anillo (una por radio) ──
+      for(var ai3 = 0; ai3 < nRadii; ai3++){
+        var firstNode = ringDefs[0].nodes[ai3];
+        if(!firstNode) continue;
+        var ang = firstNode.angle;
+        var ox = CX + Math.cos(ang) * DIAL_R;
+        var oy = CY + Math.sin(ang) * DIAL_R;
+        var virtualOrigin = { x: ox, y: oy, color: firstNode.color, isVirtual: true };
+        var mx = (ox + firstNode.x) / 2;
+        var my = (oy + firstNode.y) / 2;
+        edges.push({
+          a: virtualOrigin, b: firstNode,
+          cp: { x: mx, y: my }, // sin curvatura: la raíz es recta radial
+          color: firstNode.color,
+          type: 'root',
+          ringIdx: 0,
+        });
+      }
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -1175,7 +1103,6 @@ function _crearDialOverlay(){
       });
       // Decay: cada nodo vuelve poco a poco a su baseAngle
       nodes.forEach(function(n){
-        if(n.isEdgeSat) return; // v5.156: satélites de borde son inmunes
         if(n.baseAngle === undefined) n.baseAngle = n.angle;
         var deviation = n.angle - n.baseAngle;
         while(deviation > Math.PI) deviation -= Math.PI * 2;
@@ -1185,7 +1112,7 @@ function _crearDialOverlay(){
       // Aplicar influencia activa de cada vórtice
       vortices.forEach(function(vx){
         nodes.forEach(function(n){
-          if(n === vx.hub || n.isEdgeSat) return; // satélites no se afectan
+          if(n === vx.hub) return;
           var dx = n.x - vx.hub.x, dy = n.y - vx.hub.y;
           var d = Math.hypot(dx, dy);
           if(d > vx.radius || d < 5) return;
@@ -1195,7 +1122,6 @@ function _crearDialOverlay(){
       });
       // Recalcular posiciones
       nodes.forEach(function(n){
-        if(n.isEdgeSat) return;
         n.x = CX + Math.cos(n.angle) * n.ringR;
         n.y = CY + Math.sin(n.angle) * n.ringR;
       });
@@ -1333,17 +1259,17 @@ function _crearDialOverlay(){
 
       // 2) Lentísima rotación orbital de los nodos sobre su anillo
       //    (galaxia que rota muy despacio)
+      // v5.157: TODOS los nodos pertenecen a un anillo (sin satélites sueltos)
+      // → todos rotan con su anillo. Anillos pares en sentido horario,
+      // impares antihorario.
       for(var ni = 0; ni < nodes.length; ni++){
         var n = nodes[ni];
-        // v5.156: satélites de borde NO rotan (están fijos en su posición)
-        if(!n.isEdgeSat){
-          var dir = n.ringIdx % 2 === 0 ? 1 : -1;
-          var angVel = dir * 0.02 / (1 + n.ringIdx * 0.4);
-          n.angle += angVel * dt;
-          n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
-          n.x = CX + Math.cos(n.angle) * n.ringR;
-          n.y = CY + Math.sin(n.angle) * n.ringR;
-        }
+        var dir = n.ringIdx % 2 === 0 ? 1 : -1;
+        var angVel = dir * 0.018 / (1 + n.ringIdx * 0.35);
+        n.angle += angVel * dt;
+        n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
+        n.x = CX + Math.cos(n.angle) * n.ringR;
+        n.y = CY + Math.sin(n.angle) * n.ringR;
 
         // Pulso visual del nodo
         n.phase += n.speed * dt;
