@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.169
+/* RAW Entry — Overlay v.5.170
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -963,9 +963,14 @@ function _crearDialOverlay(){
         l.z += dz * step;
         var px = l.centerX + l.x * l.scale * 0.5;
         var py = l.centerY + (l.z - 28) * l.scale * 0.5;
-        if(px < 0 || px > W || py < 0 || py > H){
-          l.age = l.maxAge;
-          continue;
+        // v5.170: si se sale del viewport, acelerar el fin de vida
+        // pero gradualmente — NO morir de golpe. Lo dejamos en la fase de
+        // fade-out (>0.8 del lifespan) en lugar de matar instantáneamente.
+        if(px < -50 || px > W + 50 || py < -50 || py > H + 50){
+          // Llevarlo al 82% de la vida (en fase fade-out) si no está ya ahí
+          var targetAge = l.maxAge * 0.82;
+          if(l.age < targetAge) l.age = targetAge;
+          continue; // no agregar al history este punto
         }
         l.history.push({ x: px, y: py });
         if(l.history.length > 45) l.history.shift();
@@ -1007,7 +1012,7 @@ function _crearDialOverlay(){
       synapses.push({
         s1: s1, s2: best,
         age: 0,
-        lifespan: 1.0 + Math.random() * 1.5,
+        lifespan: 2.0 + Math.random() * 2.5,   // v5.170: 2-4.5s (antes 1-2.5)
         color: s1.color,
       });
     }
@@ -1116,8 +1121,8 @@ function _crearDialOverlay(){
         }
         var lifeFrac = s.age / s.lifespan;
         var lifeAlpha;
-        if(lifeFrac < 0.10) lifeAlpha = lifeFrac / 0.10;
-        else if(lifeFrac > 0.85) lifeAlpha = (1 - lifeFrac) / 0.15;
+        if(lifeFrac < 0.20) lifeAlpha = lifeFrac / 0.20;  // v5.170: fade in más largo
+        else if(lifeFrac > 0.75) lifeAlpha = (1 - lifeFrac) / 0.25;  // v5.170: fade out más largo
         else lifeAlpha = 1;
         if(lifeAlpha <= 0){ s._cachedX = null; continue; }
         var twinkle = (Math.sin(s.phase) + 1) / 2;
@@ -1153,8 +1158,8 @@ function _crearDialOverlay(){
         }
         var lifeFrac = con.age / con.lifespan;
         var lifeAlpha;
-        if(lifeFrac < 0.10) lifeAlpha = lifeFrac / 0.10;
-        else if(lifeFrac > 0.85) lifeAlpha = (1 - lifeFrac) / 0.15;
+        if(lifeFrac < 0.20) lifeAlpha = lifeFrac / 0.20;  // v5.170: fade in más largo
+        else if(lifeFrac > 0.75) lifeAlpha = (1 - lifeFrac) / 0.25;  // v5.170: fade out más largo
         else lifeAlpha = 1;
         if(lifeAlpha <= 0) continue;
 
@@ -1240,15 +1245,20 @@ function _crearDialOverlay(){
         v.theta += v.omega * dt;
         var p = polar2cart(v.r, v.theta);
         var frac = v.age / v.lifespan;
+        // v5.170: fade in/out global del vórtice
+        var globalAlpha;
+        if(frac < 0.15) globalAlpha = frac / 0.15;
+        else if(frac > 0.80) globalAlpha = (1 - frac) / 0.20;
+        else globalAlpha = 1;
         for(var k = 0; k < 3; k++){
           var phaseFrac = (frac + k * 0.25) % 1;
           var radius = phaseFrac * v.maxRadius;
-          var a = (1 - phaseFrac) * 0.40;
+          var a = (1 - phaseFrac) * 0.40 * globalAlpha;
           if(a < 0.02) continue;
           pctx.strokeStyle = v.color + Math.floor(a * 255).toString(16).padStart(2, '0');
           pctx.lineWidth = 1.0;
           pctx.shadowColor = v.color;
-          pctx.shadowBlur = 5;
+          pctx.shadowBlur = 5 * globalAlpha;
           pctx.beginPath();
           pctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
           pctx.stroke();
@@ -1343,24 +1353,47 @@ function _crearDialOverlay(){
 
     // ══════════════════════════════════════════════════════════════════
     //  v5.169: METEOROS (estrellas fugaces)
+    //  v5.170: las trayectorias se extienden MÁS ALLÁ del viewport para
+    //  que parezca que se pierden en el horizonte, no que mueren en el borde
     // ══════════════════════════════════════════════════════════════════
     function spawnMeteor(){
-      // Aparece en un borde y viaja en dirección al lado opuesto con curva
+      // El meteoro parte de fuera del viewport y termina MÁS allá del lado opuesto
       var side = Math.floor(Math.random() * 4);
       var startX, startY, endX, endY;
+      var OVERSHOOT = 250;  // v5.170: distancia más allá del viewport
       switch(side){
-        case 0: startX = Math.random() * W; startY = -20; endX = startX + (Math.random() - 0.5) * 600; endY = H + 20; break;
-        case 1: startX = W + 20; startY = Math.random() * H; endX = -20; endY = startY + (Math.random() - 0.5) * 600; break;
-        case 2: startX = Math.random() * W; startY = H + 20; endX = startX + (Math.random() - 0.5) * 600; endY = -20; break;
-        case 3: startX = -20; startY = Math.random() * H; endX = W + 20; endY = startY + (Math.random() - 0.5) * 600; break;
+        case 0:
+          startX = Math.random() * W;
+          startY = -OVERSHOOT;
+          endX = startX + (Math.random() - 0.5) * 600;
+          endY = H + OVERSHOOT;
+          break;
+        case 1:
+          startX = W + OVERSHOOT;
+          startY = Math.random() * H;
+          endX = -OVERSHOOT;
+          endY = startY + (Math.random() - 0.5) * 600;
+          break;
+        case 2:
+          startX = Math.random() * W;
+          startY = H + OVERSHOOT;
+          endX = startX + (Math.random() - 0.5) * 600;
+          endY = -OVERSHOOT;
+          break;
+        case 3:
+          startX = -OVERSHOOT;
+          startY = Math.random() * H;
+          endX = W + OVERSHOOT;
+          endY = startY + (Math.random() - 0.5) * 600;
+          break;
       }
       meteors.push({
         startX: startX, startY: startY,
         endX: endX, endY: endY,
         t: 0,
-        speed: 0.7 + Math.random() * 0.6,    // 0.7-1.3 unidades/seg (rápidos)
+        speed: 0.45 + Math.random() * 0.35,    // v5.170: un poco más lentos para que se vean
         color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
-        trailLen: 90 + Math.random() * 80,   // longitud del rastro
+        trailLen: 120 + Math.random() * 100,
       });
     }
 
@@ -1369,32 +1402,38 @@ function _crearDialOverlay(){
         var m = meteors[i];
         m.t += m.speed * dt;
         if(m.t >= 1){ meteors.splice(i, 1); continue; }
+        // v5.170: fade in al inicio (primeros 0.10) y fade out al final (últimos 0.10)
+        var lifeAlpha;
+        if(m.t < 0.10) lifeAlpha = m.t / 0.10;
+        else if(m.t > 0.90) lifeAlpha = (1 - m.t) / 0.10;
+        else lifeAlpha = 1;
+        if(lifeAlpha <= 0) continue;
         // Posición actual
         var hx = m.startX + (m.endX - m.startX) * m.t;
         var hy = m.startY + (m.endY - m.startY) * m.t;
-        // Posición de la cola (atrás en el camino)
+        // Posición de la cola
         var totalDist = Math.hypot(m.endX - m.startX, m.endY - m.startY);
         var tailFrac = m.trailLen / totalDist;
         var tt = Math.max(0, m.t - tailFrac);
         var tx = m.startX + (m.endX - m.startX) * tt;
         var ty = m.startY + (m.endY - m.startY) * tt;
-        // Gradiente lineal del rastro
+        // Gradiente lineal del rastro, modulado por lifeAlpha
         var grad = pctx.createLinearGradient(tx, ty, hx, hy);
         grad.addColorStop(0, m.color + '00');
-        grad.addColorStop(1, m.color + 'ee');
+        grad.addColorStop(1, m.color + Math.floor(0.93 * lifeAlpha * 255).toString(16).padStart(2, '0'));
         pctx.strokeStyle = grad;
-        pctx.lineWidth = 1.6;
+        pctx.lineWidth = 1.6 * lifeAlpha;
         pctx.shadowColor = m.color;
-        pctx.shadowBlur = 10;
+        pctx.shadowBlur = 10 * lifeAlpha;
         pctx.beginPath();
         pctx.moveTo(tx, ty);
         pctx.lineTo(hx, hy);
         pctx.stroke();
         // Cabeza brillante
-        pctx.fillStyle = m.color;
-        pctx.shadowBlur = 14;
+        pctx.fillStyle = m.color + Math.floor(lifeAlpha * 255).toString(16).padStart(2, '0');
+        pctx.shadowBlur = 14 * lifeAlpha;
         pctx.beginPath();
-        pctx.arc(hx, hy, 2.2, 0, Math.PI * 2);
+        pctx.arc(hx, hy, 2.2 * lifeAlpha, 0, Math.PI * 2);
         pctx.fill();
         pctx.shadowBlur = 0;
       }
