@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.161
+/* RAW Entry — Overlay v.5.163
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -765,172 +765,214 @@ function _crearDialOverlay(){
     //  vecinos del mismo anillo, en arco curvo).
     // ══════════════════════════════════════════════════════════════════
     // ══════════════════════════════════════════════════════════════════
-    //  v5.160: ESTRUCTURA NEBULAR (cosmic web)
-    //  Inspirado en el "cosmic web" real: distribución filamentosa donde
-    //  algunas zonas tienen densidad y otras son voids respirables.
-    //  • Mallado simétrico 12 radios × 4 anillos
-    //  • FUNCIÓN DE MODULACIÓN angular: cada radio tiene "fuerza" 0..1
-    //    derivada de armónicos superpuestos (campo suave, no aleatorio)
-    //  • Edges con alpha proporcional a la fuerza del radio
-    //  • Tangenciales/radiales solo en zonas con fuerza suficiente
-    //  • Raíces del dial SIEMPRE 360° (intensidad variable)
-    //  • Niebla nebular: gradientes radiales tenues en zonas densas
+    //  v5.162: DISTRIBUCIÓN ESPACIAL UNIFORME (Poisson-disk + curvas largas)
+    //  La animación cubre TODA la pantalla, no se aglomera al centro.
+    //  • Zona de exclusión grande alrededor del dial — la información del
+    //    dial no se interfiere con la animación
+    //  • Nodos distribuidos por Poisson-disk sampling (espaciado uniforme
+    //    con jitter natural) — cubre toda la pantalla sin patrón visible
+    //  • Conexiones a vecinos cercanos (no anillos concéntricos)
+    //  • Curvas largas que cruzan la pantalla (filamentos cosmic web)
     // ══════════════════════════════════════════════════════════════════
-    var radialStrength = [];
-    var nebulaFog = [];
-
     function buildNetwork(){
       nodes = [];
       edges = [];
       pulses = [];
-      nebulaFog = [];
 
-      var nRadii = 12;
-      var diag = Math.hypot(W/2, H/2);
-      var minR = DIAL_R + 85;
-      var maxR = diag + 20;
-      var nRings = 4;
+      // v5.163: zona de exclusión MUY GRANDE — el dial debe quedar
+      // completamente despejado, no solo el círculo central sino
+      // toda el área de cards e información circundante.
+      var exclusionR = DIAL_R + 180;
 
-      var globalAngleOffset = Math.random() * (Math.PI * 2 / nRadii);
+      // ── DISTRIBUCIÓN POISSON-DISK: nodos uniformemente esparcidos ──
+      // Espaciado mínimo entre nodos: 80px. Algorítmico simple (rejilla
+      // hash + candidatos aleatorios).
+      var minDist = 95;
+      var cellSize = minDist / Math.SQRT2;
+      var cols = Math.ceil(W / cellSize);
+      var rows = Math.ceil(H / cellSize);
+      var grid = new Array(cols * rows).fill(null);
 
-      // ── MODULACIÓN angular: suma de armónicos no resonantes ──
-      var seedA = Math.random() * Math.PI * 2;
-      var seedB = Math.random() * Math.PI * 2;
-      var seedC = Math.random() * Math.PI * 2;
-      radialStrength = [];
-      for(var ai0 = 0; ai0 < nRadii; ai0++){
-        var theta = (ai0 / nRadii) * Math.PI * 2;
-        var v = 0.5
-              + 0.30 * Math.sin(theta + seedA)
-              + 0.18 * Math.sin(2 * theta + seedB)
-              + 0.10 * Math.sin(3 * theta + seedC);
-        v = Math.max(0.15, Math.min(1.0, v));
-        radialStrength.push(v);
-      }
-
-      var ringDefs = [];
-      for(var ri = 0; ri < nRings; ri++){
-        var t = ri / (nRings - 1);
-        var r = minR + (maxR - minR) * t;
-        ringDefs.push({ r: r, color: PALETTE[ri % PALETTE.length], ringIdx: ri, nodes: [] });
-      }
-
-      // Nodos (todos creados; el render usará strength)
-      for(var ai = 0; ai < nRadii; ai++){
-        var baseAngle = globalAngleOffset + (ai / nRadii) * Math.PI * 2;
-        var strength = radialStrength[ai];
-        for(var ri2 = 0; ri2 < nRings; ri2++){
-          var rd = ringDefs[ri2];
-          var x = CX + Math.cos(baseAngle) * rd.r;
-          var y = CY + Math.sin(baseAngle) * rd.r;
-          if(x < -40 || x > W + 40 || y < -40 || y > H + 40){
-            rd.nodes.push(null);
-            continue;
+      function gridIdx(gx, gy){ return gy * cols + gx; }
+      function valid(x, y){
+        if(x < 20 || x > W - 20 || y < 20 || y > H - 20) return false;
+        if(Math.hypot(x - CX, y - CY) < exclusionR) return false;
+        var gx = Math.floor(x / cellSize);
+        var gy = Math.floor(y / cellSize);
+        for(var dy = -2; dy <= 2; dy++){
+          for(var dx = -2; dx <= 2; dx++){
+            var nx = gx + dx, ny = gy + dy;
+            if(nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
+            var other = grid[gridIdx(nx, ny)];
+            if(other && Math.hypot(other.x - x, other.y - y) < minDist) return false;
           }
-          var isHub = strength > 0.75 && (ri2 === 1 || ri2 === 2);
-          var node = {
-            x: x, y: y,
-            angle: baseAngle,
-            baseAngle: baseAngle,
-            radialIdx: ai,
-            ringR: rd.r,
-            ringIdx: ri2,
-            color: rd.color,
-            phase: ai * 0.4 + ri2 * 0.7,
-            speed: 0.4 + (ri2 * 0.08),
-            baseR: isHub ? 1.7 : 0.8,
-            isHub: isHub,
-            strength: strength,
-          };
-          rd.nodes.push(node);
-          nodes.push(node);
         }
+        return true;
       }
 
-      // Tangenciales: solo si la fuerza media entre radios adyacentes es alta
-      ringDefs.forEach(function(rd){
-        for(var i = 0; i < nRadii; i++){
-          var a = rd.nodes[i];
-          var b = rd.nodes[(i + 1) % nRadii];
-          if(!a || !b) continue;
-          var midStrength = (radialStrength[i] + radialStrength[(i+1) % nRadii]) / 2;
-          if(midStrength < 0.20) continue;
-          var midAngle = a.angle + (Math.PI * 2 / nRadii) / 2;
-          var cpx = CX + Math.cos(midAngle) * rd.r;
-          var cpy = CY + Math.sin(midAngle) * rd.r;
-          edges.push({
-            a: a, b: b,
-            cp: { x: cpx, y: cpy },
-            color: rd.color,
-            type: 'tangential',
-            ringIdx: rd.ringIdx,
-            strength: midStrength,
-          });
+      var allNodes = [];
+      // Semillas iniciales: 8 puntos en perímetro para garantizar cobertura
+      var seeds = [
+        { x: 60, y: 60 },
+        { x: W - 60, y: 60 },
+        { x: 60, y: H - 60 },
+        { x: W - 60, y: H - 60 },
+        { x: W/2, y: 60 },
+        { x: W/2, y: H - 60 },
+        { x: 60, y: H/2 },
+        { x: W - 60, y: H/2 },
+      ];
+      var active = [];
+      seeds.forEach(function(s){
+        if(valid(s.x, s.y)){
+          var gx = Math.floor(s.x / cellSize);
+          var gy = Math.floor(s.y / cellSize);
+          var node = { x: s.x, y: s.y };
+          grid[gridIdx(gx, gy)] = node;
+          allNodes.push(node);
+          active.push(node);
         }
       });
 
-      // Radiales: solo en radios con fuerza media o alta
-      for(var ai3 = 0; ai3 < nRadii; ai3++){
-        if(radialStrength[ai3] < 0.20) continue;
-        for(var ri3 = 0; ri3 < nRings - 1; ri3++){
-          var n1 = ringDefs[ri3].nodes[ai3];
-          var n2 = ringDefs[ri3 + 1].nodes[ai3];
-          if(!n1 || !n2) continue;
-          var mx = (n1.x + n2.x) / 2;
-          var my = (n1.y + n2.y) / 2;
-          var dx = n2.x - n1.x, dy = n2.y - n1.y;
+      // Crecimiento Poisson: para cada nodo activo, intentar agregar vecinos
+      var maxAttempts = 25;
+      while(active.length > 0 && allNodes.length < 80){
+        var idx = Math.floor(Math.random() * active.length);
+        var base = active[idx];
+        var found = false;
+        for(var att = 0; att < maxAttempts; att++){
+          var ang = Math.random() * Math.PI * 2;
+          var dist = minDist + Math.random() * minDist;
+          var nx = base.x + Math.cos(ang) * dist;
+          var ny = base.y + Math.sin(ang) * dist;
+          if(valid(nx, ny)){
+            var gx = Math.floor(nx / cellSize);
+            var gy = Math.floor(ny / cellSize);
+            var newNode = { x: nx, y: ny };
+            grid[gridIdx(gx, gy)] = newNode;
+            allNodes.push(newNode);
+            active.push(newNode);
+            found = true;
+            break;
+          }
+        }
+        if(!found) active.splice(idx, 1);
+      }
+
+      // Convertir a nodos finales con propiedades de animación
+      allNodes.forEach(function(p, i){
+        // Color alternado por posición (variedad sutil)
+        var colorIdx = (Math.floor(p.x / 120) + Math.floor(p.y / 120)) % PALETTE.length;
+        // Hubs distribuidos: ~15% son hubs, determinístico
+        var isHub = (i % 7 === 0);
+        nodes.push({
+          x: p.x, y: p.y,
+          color: PALETTE[colorIdx],
+          phase: (p.x * 0.013 + p.y * 0.017) % (Math.PI * 2),
+          speed: 0.4 + ((i * 7) % 5) * 0.1,
+          baseR: isHub ? 1.6 : 0.85,
+          isHub: isHub,
+          isFreeNode: true,   // marca: nodo libre (no de anillo, no rota)
+        });
+      });
+
+      // ── CONEXIONES: cada nodo a sus 2-3 vecinos más cercanos ──
+      // v5.163: descartar conexiones cuyo punto medio o curva pase cerca
+      // del dial. El centro debe quedar limpio y respirable.
+      var meshExclusion = exclusionR - 30; // un poco menos estricto que la exclusión de nodos
+      function passesNearDial(ax, ay, bx, by, cpx, cpy){
+        // Muestrear varios puntos de la Bézier y verificar distancia al dial
+        for(var s = 0; s <= 5; s++){
+          var t = s / 5;
+          var u = 1 - t;
+          var px = u*u*ax + 2*u*t*cpx + t*t*bx;
+          var py = u*u*ay + 2*u*t*cpy + t*t*by;
+          if(Math.hypot(px - CX, py - CY) < meshExclusion) return true;
+        }
+        return false;
+      }
+
+      for(var i = 0; i < nodes.length; i++){
+        var n1 = nodes[i];
+        var dists = [];
+        for(var j = 0; j < nodes.length; j++){
+          if(i === j) continue;
+          var n2 = nodes[j];
+          dists.push({ idx: j, d: Math.hypot(n1.x - n2.x, n1.y - n2.y) });
+        }
+        dists.sort(function(a, b){ return a.d - b.d; });
+        var nConn = 2 + (i % 2);
+        var added = 0;
+        for(var k = 0; k < dists.length && added < nConn; k++){
+          var nb = nodes[dists[k].idx];
+          if(dists[k].idx < i) continue;
+          // No conectar nodos demasiado lejanos (evita líneas que cruzan toda la pantalla)
+          if(dists[k].d > 220) break;
+          var mx = (n1.x + nb.x) / 2;
+          var my = (n1.y + nb.y) / 2;
+          var dx = nb.x - n1.x, dy = nb.y - n1.y;
           var len = Math.hypot(dx, dy) || 1;
           var perpX = -dy / len, perpY = dx / len;
-          var off = (ai3 % 2 === 0 ? 1 : -1) * 3;
+          var off = ((i + k) % 3 - 1) * 12;
+          var cpx = mx + perpX * off;
+          var cpy = my + perpY * off;
+          // v5.163: descartar si la curva pasa cerca del dial
+          if(passesNearDial(n1.x, n1.y, nb.x, nb.y, cpx, cpy)) continue;
           edges.push({
-            a: n1, b: n2,
-            cp: { x: mx + perpX * off, y: my + perpY * off },
+            a: n1, b: nb,
+            cp: { x: cpx, y: cpy },
             color: n1.color,
-            type: 'radial',
-            ringIdx: ri3,
-            strength: radialStrength[ai3],
+            type: 'mesh',
+            strength: 0.6,
           });
+          added++;
         }
       }
 
-      // Raíces del dial: SIEMPRE 360°, intensidad variable
-      for(var ai4 = 0; ai4 < nRadii; ai4++){
-        var firstNode = ringDefs[0].nodes[ai4];
-        if(!firstNode) continue;
-        var ang = firstNode.angle;
-        var ox = CX + Math.cos(ang) * DIAL_R;
-        var oy = CY + Math.sin(ang) * DIAL_R;
-        var virtualOrigin = { x: ox, y: oy, color: firstNode.color, isVirtual: true };
-        var mx2 = (ox + firstNode.x) / 2;
-        var my2 = (oy + firstNode.y) / 2;
+      // ── FILAMENTOS LARGOS: 4-6 curvas que cruzan la pantalla ──
+      // Bézier que va de un borde a otro, pasando lejos del dial.
+      // Esto da la sensación de "filamentos cosmic web" recorriendo la escena.
+      var nFilaments = 5;
+      for(var f = 0; f < nFilaments; f++){
+        var sideA = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+        var sideB = (sideA + 2) % 4;               // lado opuesto
+        var startPt = randomPointOnSide(sideA);
+        var endPt   = randomPointOnSide(sideB);
+        // Punto de control: lejos del centro (no atravesar el dial)
+        var midX = (startPt.x + endPt.x) / 2;
+        var midY = (startPt.y + endPt.y) / 2;
+        var dx = midX - CX, dy = midY - CY;
+        var distFromCenter = Math.hypot(dx, dy);
+        var pushOut = exclusionR + 100;
+        if(distFromCenter < pushOut){
+          // Empujar el control point fuera de la zona del dial
+          var ang = Math.atan2(dy, dx);
+          if(distFromCenter < 1){ ang = Math.random() * Math.PI * 2; }
+          midX = CX + Math.cos(ang) * pushOut;
+          midY = CY + Math.sin(ang) * pushOut;
+        }
+        // Origen y destino virtuales (no son nodos, son puntos del filamento)
+        var origin = { x: startPt.x, y: startPt.y, color: PALETTE[f % PALETTE.length], isVirtual: true };
+        var dest   = { x: endPt.x,   y: endPt.y,   color: PALETTE[f % PALETTE.length], isVirtual: true };
         edges.push({
-          a: virtualOrigin, b: firstNode,
-          cp: { x: mx2, y: my2 },
-          color: firstNode.color,
-          type: 'root',
-          ringIdx: 0,
-          strength: radialStrength[ai4],
+          a: origin, b: dest,
+          cp: { x: midX, y: midY },
+          color: PALETTE[f % PALETTE.length],
+          type: 'filament',
+          strength: 0.5,
         });
       }
+    }
 
-      // Niebla nebular en zonas densas (top 3-4 radios)
-      var sortedByStrength = radialStrength
-        .map(function(s, i){ return { i: i, s: s }; })
-        .sort(function(a, b){ return b.s - a.s; })
-        .slice(0, 3);
-      sortedByStrength.forEach(function(item){
-        var midAngle = globalAngleOffset + (item.i / nRadii) * Math.PI * 2;
-        var fogR = (DIAL_R + diag) / 2;
-        var fx = CX + Math.cos(midAngle) * fogR;
-        var fy = CY + Math.sin(midAngle) * fogR;
-        nebulaFog.push({
-          x: fx, y: fy,
-          radius: 200 + item.s * 80,
-          color: PALETTE[item.i % PALETTE.length],
-          baseAlpha: 0.04 + item.s * 0.04,
-          phase: Math.random() * Math.PI * 2,
-        });
-      });
+    function randomPointOnSide(side){
+      var margin = 30;
+      switch(side){
+        case 0: return { x: margin + Math.random() * (W - 2*margin), y: margin };           // top
+        case 1: return { x: W - margin, y: margin + Math.random() * (H - 2*margin) };       // right
+        case 2: return { x: margin + Math.random() * (W - 2*margin), y: H - margin };       // bottom
+        case 3: return { x: margin, y: margin + Math.random() * (H - 2*margin) };           // left
+      }
+      return { x: W/2, y: H/2 };
     }
 
     //  ECUACIONES Y CAOS — v5.154
@@ -1194,38 +1236,9 @@ function _crearDialOverlay(){
     }
 
     function applyVortexDeflection(){
-      // v5.155: la deflexión se REINICIA cada vez (no acumula permanentemente).
-      // Cada nodo tiene un baseAngle. Los vórtices crean un offset temporal.
-      // Cuando se aleja del vórtice o este "se mueve", el nodo se relaja a baseAngle.
-      vortices.forEach(function(vx){
-        vx.phase += 0.015;
-      });
-      // Decay: cada nodo de ANILLO vuelve poco a poco a su baseAngle
-      nodes.forEach(function(n){
-        if(n.isConstellation || n.isBgStar) return;
-        if(n.baseAngle === undefined) n.baseAngle = n.angle;
-        var deviation = n.angle - n.baseAngle;
-        while(deviation > Math.PI) deviation -= Math.PI * 2;
-        while(deviation < -Math.PI) deviation += Math.PI * 2;
-        n.angle -= deviation * 0.008;
-      });
-      // Aplicar influencia activa de cada vórtice (solo a nodos de anillo)
-      vortices.forEach(function(vx){
-        nodes.forEach(function(n){
-          if(n === vx.hub || n.isConstellation || n.isBgStar) return;
-          var dx = n.x - vx.hub.x, dy = n.y - vx.hub.y;
-          var d = Math.hypot(dx, dy);
-          if(d > vx.radius || d < 5) return;
-          var influence = (1 - d / vx.radius) * vx.strength * 0.0008;
-          n.angle += influence;
-        });
-      });
-      // Recalcular posiciones (solo nodos de anillo)
-      nodes.forEach(function(n){
-        if(n.isConstellation || n.isBgStar) return;
-        n.x = CX + Math.cos(n.angle) * n.ringR;
-        n.y = CY + Math.sin(n.angle) * n.ringR;
-      });
+      // v5.162: los nodos ya no rotan ni se ven afectados por vórtices.
+      // Solo avanzar la fase para que los hints visuales sigan girando.
+      vortices.forEach(function(vx){ vx.phase += 0.015; });
     }
 
     function drawVortexHints(){
@@ -1295,33 +1308,21 @@ function _crearDialOverlay(){
     }
 
     function drawEdge(e){
-      // v5.161: alphas base subidos para que la malla sea visible
-      //   antes de la modulación. Raíces (tipo root) MÁS DISCRETAS:
-      //   ya no son los "rayos" largos que dominaban la escena.
-      var alphaHex = '50';   // base radial/otros más visible (era '22')
+      // v5.162: tipos nuevos — mesh (nodos cercanos), filament (cruza pantalla)
+      var alphaHex = '50';
       var lw = 0.8;
-      var immune = false;
-      if(e.type === 'root'){
-        // v5.161: raíces ya NO son inmunes ni gruesas — son una línea más del mallado
-        alphaHex = '55';
-        lw = 0.8;
-        immune = false;
-      }
-      else if(e.type === 'tangential'){ alphaHex = '55'; lw = 1.0; }   // antes '2a'
+      if(e.type === 'mesh'){ alphaHex = '50'; lw = 0.85; }
+      else if(e.type === 'filament'){ alphaHex = '40'; lw = 1.1; }
+      else if(e.type === 'tangential'){ alphaHex = '55'; lw = 1.0; }
       else if(e.type === 'radial'){ alphaHex = '50'; lw = 0.9; }
-      else if(e.type === 'constellation'){
-        alphaHex = '38';
-        lw = 0.6;
-      }
+      else if(e.type === 'root'){ alphaHex = '55'; lw = 0.8; }
       // Aplicar modulación de nebulosa + respiración global
       var alpha = parseInt(alphaHex, 16) / 255;
-      if(!immune){
-        var midX = (e.a.x + e.b.x) / 2;
-        var midY = (e.a.y + e.b.y) / 2;
-        var neb = nebulaDensityAt(midX, midY);
-        var breath = 0.82 + 0.18 * (Math.sin(globalBreathPhase) + 1) / 2;
-        alpha = alpha * neb * breath;
-      }
+      var midX = (e.a.x + e.b.x) / 2;
+      var midY = (e.a.y + e.b.y) / 2;
+      var neb = nebulaDensityAt(midX, midY);
+      var breath = 0.82 + 0.18 * (Math.sin(globalBreathPhase) + 1) / 2;
+      alpha = alpha * neb * breath;
       var finalHex = Math.max(0, Math.min(255, Math.floor(alpha * 255))).toString(16).padStart(2, '0');
       pctx.strokeStyle = e.color + finalHex;
       pctx.lineWidth = lw;
@@ -1380,34 +1381,21 @@ function _crearDialOverlay(){
       // 0b) Hints visuales de vórtices
       drawVortexHints();
 
-      // 1) Dibujar edges en 2 pasadas:
-      //    primero las no-root (fondo del mallado),
-      //    luego las roots encima para que las trayectorias del centro
-      //    sean siempre claramente visibles a 360° (v5.159)
+      // 1) Dibujar todas las edges en una sola pasada
+      //    (v5.162: ya no hay roots privilegiadas; mesh + filament cubren toda la pantalla)
       for(var ei = 0; ei < edges.length; ei++){
-        if(edges[ei].type !== 'root') drawEdge(edges[ei]);
-      }
-      for(var er = 0; er < edges.length; er++){
-        if(edges[er].type === 'root') drawEdge(edges[er]);
+        drawEdge(edges[ei]);
       }
 
       // 1b) Vórtices: deflexión angular sobre nodos cercanos
       applyVortexDeflection();
 
-      // 2) Rotación orbital + render de nodos
+      // 2) Render de nodos (v5.162: ya no hay rotación orbital — son nodos libres)
       for(var ni = 0; ni < nodes.length; ni++){
         var n = nodes[ni];
-        // Solo los nodos de anillos rotan; constelaciones y bg-stars son fijos
-        if(!n.isConstellation && !n.isBgStar){
-          var dir = n.ringIdx % 2 === 0 ? 1 : -1;
-          var angVel = dir * 0.05 / (1 + n.ringIdx * 0.35);
-          n.angle += angVel * dt;
-          n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
-          n.x = CX + Math.cos(n.angle) * n.ringR;
-          n.y = CY + Math.sin(n.angle) * n.ringR;
-        }
+        // Nodos libres no rotan (son fijos en su posición Poisson)
 
-        // Pulso visual del nodo (con modulación de nebulosa para nodos exteriores)
+        // Pulso visual del nodo
         n.phase += (n.twinkleSpeed || n.speed) * dt;
         var pulse = (Math.sin(n.phase) + 1) / 2;
         var r, alpha, blur;
@@ -1420,17 +1408,15 @@ function _crearDialOverlay(){
           alpha = 0.5 + pulse * 0.5;
           blur = 4 + pulse * 8;
         } else {
+          // Nodos libres y de anillo
           r = n.baseR + pulse * (n.isHub ? 1.8 : 1.2);
           alpha = 0.4 + pulse * 0.5;
           blur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
         }
-        // v5.160: modular por nebulosa (excepto primer anillo que es "núcleo")
-        var coreImmune = (!n.isBgStar && !n.isConstellation && n.ringIdx === 0);
-        if(!coreImmune){
-          var neb = nebulaDensityAt(n.x, n.y);
-          var breath = 0.82 + 0.18 * (Math.sin(globalBreathPhase) + 1) / 2;
-          alpha = alpha * neb * breath;
-        }
+        // Modular TODOS los nodos por nebulosa (ya no hay "core")
+        var neb = nebulaDensityAt(n.x, n.y);
+        var breath = 0.82 + 0.18 * (Math.sin(globalBreathPhase) + 1) / 2;
+        alpha = alpha * neb * breath;
         pctx.fillStyle = n.color + Math.max(0, Math.min(255, Math.floor(alpha * 220))).toString(16).padStart(2, '0');
         pctx.shadowColor = n.color;
         pctx.shadowBlur = blur;
