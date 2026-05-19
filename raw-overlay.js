@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.164
+/* RAW Entry — Overlay v.5.165
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -980,6 +980,46 @@ function _crearDialOverlay(){
         }
       }
 
+      // ══════════════════════════════════════════════════════════════════
+      //  v5.165: RAYOS DESDE EL CENTRO DEL DIAL (atraviesan detrás)
+      //  Líneas curvas que parten del CENTRO ABSOLUTO (CX, CY) y se
+      //  extienden hacia afuera atravesando el dial por debajo (el canvas
+      //  ya está a z-index:0, debajo del dial). Esto da la sensación de
+      //  que la energía emana del corazón del dial, no de su borde.
+      // ══════════════════════════════════════════════════════════════════
+      var nCenterRays = 8;                          // pocos, para no saturar
+      var centerOffset = Math.random() * (Math.PI * 2 / nCenterRays);
+      for(var cr = 0; cr < nCenterRays; cr++){
+        var rayAng = centerOffset + (cr / nCenterRays) * Math.PI * 2;
+        // Variar longitud: algunos llegan hasta cerca del borde, otros más cortos
+        var lengthFactor = 0.55 + ((cr * 11) % 5) * 0.10;  // 0.55 - 0.95
+        var diagonal = Math.hypot(W/2, H/2);
+        var rayLength = diagonal * lengthFactor;
+        // Origen: CENTRO ABSOLUTO (no el borde del dial)
+        var rayOrigin = { x: CX, y: CY, color: PALETTE[cr % PALETTE.length], isVirtual: true };
+        // Destino: lejos en la dirección del ángulo
+        var endX = CX + Math.cos(rayAng) * rayLength;
+        var endY = CY + Math.sin(rayAng) * rayLength;
+        endX = Math.max(20, Math.min(W - 20, endX));
+        endY = Math.max(20, Math.min(H - 20, endY));
+        // Control point: curvado perpendicularmente para dar forma curva
+        var midR = rayLength * 0.5;
+        var curveBend = ((cr % 2 === 0) ? 1 : -1) * (40 + (cr % 3) * 20);
+        // Offset perpendicular al rayo en el punto medio
+        var perpAng = rayAng + Math.PI / 2;
+        var cpRayX = CX + Math.cos(rayAng) * midR + Math.cos(perpAng) * curveBend;
+        var cpRayY = CY + Math.sin(rayAng) * midR + Math.sin(perpAng) * curveBend;
+        // Destino virtual (sin nodo físico, solo es el extremo de la línea)
+        var rayEnd = { x: endX, y: endY, color: rayOrigin.color, isVirtual: true };
+        edges.push({
+          a: rayOrigin, b: rayEnd,
+          cp: { x: cpRayX, y: cpRayY },
+          color: rayOrigin.color,
+          type: 'center-ray',
+          strength: 0.6,
+        });
+      }
+
       // ── v5.164: PUENTE entre capa radial y capa orgánica ──
       // Conectar algunos radial-tips con el nodo Poisson más cercano.
       // Esto integra las 2 capas — el universo se siente conectado.
@@ -1394,8 +1434,10 @@ function _crearDialOverlay(){
       // mesh (orgánico), filament (cruza pantalla)
       var alphaHex = '50';
       var lw = 0.8;
-      if(e.type === 'radial-inner'){ alphaHex = '70'; lw = 1.1; }   // capa radial visible
-      else if(e.type === 'bridge'){ alphaHex = '48'; lw = 0.85; }    // puente entre capas
+      var nebImmune = false; // v5.165: algunos tipos no se atenúan por la nebulosa
+      if(e.type === 'center-ray'){ alphaHex = '55'; lw = 0.95; nebImmune = true; } // v5.165: emanan del centro, visibles 360°
+      else if(e.type === 'radial-inner'){ alphaHex = '70'; lw = 1.1; }
+      else if(e.type === 'bridge'){ alphaHex = '48'; lw = 0.85; }
       else if(e.type === 'mesh'){ alphaHex = '50'; lw = 0.85; }
       else if(e.type === 'filament'){ alphaHex = '40'; lw = 1.1; }
       else if(e.type === 'tangential'){ alphaHex = '55'; lw = 1.0; }
@@ -1403,11 +1445,16 @@ function _crearDialOverlay(){
       else if(e.type === 'root'){ alphaHex = '55'; lw = 0.8; }
       // Aplicar modulación de nebulosa + respiración global
       var alpha = parseInt(alphaHex, 16) / 255;
-      var midX = (e.a.x + e.b.x) / 2;
-      var midY = (e.a.y + e.b.y) / 2;
-      var neb = nebulaDensityAt(midX, midY);
       var breath = 0.82 + 0.18 * (Math.sin(globalBreathPhase) + 1) / 2;
-      alpha = alpha * neb * breath;
+      if(nebImmune){
+        // Solo respiración global, sin nebulosa (visibilidad garantizada a 360°)
+        alpha = alpha * breath;
+      } else {
+        var midX = (e.a.x + e.b.x) / 2;
+        var midY = (e.a.y + e.b.y) / 2;
+        var neb = nebulaDensityAt(midX, midY);
+        alpha = alpha * neb * breath;
+      }
       var finalHex = Math.max(0, Math.min(255, Math.floor(alpha * 255))).toString(16).padStart(2, '0');
       pctx.strokeStyle = e.color + finalHex;
       pctx.lineWidth = lw;
