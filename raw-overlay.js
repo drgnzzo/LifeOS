@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.173
+/* RAW Entry — Overlay v.5.175
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -1096,15 +1096,32 @@ function _crearDialOverlay(){
         ray._b = { x: endX, y: endY };
         ray._cp = { x: cpx, y: cpy };
 
-        pctx.strokeStyle = ray.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        // v5.174: GRADIENTE biselado — el rayo es tenue cerca del centro
+        // (debajo del dial) y se intensifica al salir del radio del dial.
+        // El dial visualmente "domina" su zona.
+        var grad = pctx.createLinearGradient(CX, CY, endX, endY);
+        var fadeFrac = (DIAL_R + 30) / rayLen;       // hasta qué fracción del rayo es "interior"
+        fadeFrac = Math.max(0.05, Math.min(0.6, fadeFrac));
+        // Alpha mínimo dentro del dial (muy tenue) y alpha pleno fuera
+        var innerAlpha = alpha * 0.18;                // 18% del alpha normal en el centro
+        var midAlpha   = alpha * 0.55;                // 55% en la transición
+        var outerAlpha = alpha;                       // 100% afuera
+        function hex(a){ return Math.floor(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0'); }
+        grad.addColorStop(0, ray.color + hex(innerAlpha));
+        grad.addColorStop(fadeFrac * 0.5, ray.color + hex(innerAlpha));
+        grad.addColorStop(fadeFrac, ray.color + hex(midAlpha));
+        grad.addColorStop(Math.min(0.98, fadeFrac + 0.15), ray.color + hex(outerAlpha));
+        grad.addColorStop(1, ray.color + hex(outerAlpha * 0.85));
+
+        pctx.strokeStyle = grad;
         pctx.lineWidth = 1.0 + pulse * 0.8;
-        pctx.shadowColor = ray.color;
-        pctx.shadowBlur = 6 + pulse * 8;
+        // Sin shadow para no contaminar la zona del dial; el glow vive
+        // solo en los pulsos que viajan
+        pctx.shadowBlur = 0;
         pctx.beginPath();
         pctx.moveTo(CX, CY);
         pctx.quadraticCurveTo(cpx, cpy, endX, endY);
         pctx.stroke();
-        pctx.shadowBlur = 0;
       });
     }
 
@@ -2068,6 +2085,129 @@ function _crearDialOverlay(){
       '@keyframes dialDotPulse{0%,100%{opacity:.7;r:5}50%{opacity:1;r:9}}';
     document.head.appendChild(rkf);
   }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  v5.175: HUD cosmic vibes para los cards
+  //  Bordes con glow pulsante, esquinas geométricas HUD, sweep de luz
+  // ══════════════════════════════════════════════════════════════════
+  if(!document.getElementById('hud-cosmic-kf')){
+    var ckf = document.createElement('style');
+    ckf.id = 'hud-cosmic-kf';
+    ckf.textContent = [
+      // Respiración del borde — pulsa muy lento con el color accent
+      '@keyframes hudBorderBreathe{',
+        '0%,100%{box-shadow:0 0 0 1px rgba(255,255,255,.04), 0 0 8px rgba(var(--ac-rgb,167,139,250),.06), inset 0 0 0 1px rgba(var(--ac-rgb,167,139,250),.05)}',
+        '50%{box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 0 18px rgba(var(--ac-rgb,167,139,250),.18), inset 0 0 0 1px rgba(var(--ac-rgb,167,139,250),.12)}',
+      '}',
+      // Sweep de luz que recorre el borde superior (como radar)
+      '@keyframes hudSweep{',
+        '0%{transform:translateX(-100%);opacity:0}',
+        '15%{opacity:1}',
+        '85%{opacity:1}',
+        '100%{transform:translateX(200%);opacity:0}',
+      '}',
+      // Pulso de las esquinas HUD
+      '@keyframes hudCornerPulse{',
+        '0%,100%{opacity:.45}',
+        '50%{opacity:.85}',
+      '}',
+      // Aplicar a todos los paneles HUD
+      // Selector amplio: cualquier card del overlay del dial
+      '#dial-overlay [id^="_p"]{',
+        'animation:hudBorderBreathe 5.5s ease-in-out infinite;',
+        'position:relative;',
+      '}',
+      // Cards con delay individual (para que no respiren todas igual)
+      '#dial-overlay #_pUser{animation-delay:0s}',
+      '#dial-overlay #_pSim{animation-delay:0.5s}',
+      '#dial-overlay #_pStats{animation-delay:1.0s}',
+      '#dial-overlay #_p1{animation-delay:1.5s}',
+      '#dial-overlay #_p2{animation-delay:2.0s}',
+      '#dial-overlay #_p3{animation-delay:2.5s}',
+      '#dial-overlay #_p4{animation-delay:3.0s}',
+      '#dial-overlay #_p5{animation-delay:3.5s}',
+      '#dial-overlay #_p7{animation-delay:4.0s}',
+      '#dial-overlay #_p8{animation-delay:4.5s}',
+      '#dial-overlay #_pTrack{animation-delay:0.8s}',
+      '#dial-overlay #_pMision{animation-delay:1.3s}',
+      '#dial-overlay #_pLogro{animation-delay:1.8s}',
+      '#dial-overlay #_pNivel{animation-delay:2.3s}',
+      // ── Esquinas HUD (tipo sci-fi) ──
+      '#dial-overlay [id^="_p"]::before,',
+      '#dial-overlay [id^="_p"]::after{',
+        'content:"";position:absolute;pointer-events:none;',
+        'width:10px;height:10px;',
+        'animation:hudCornerPulse 3.5s ease-in-out infinite;',
+      '}',
+      '#dial-overlay [id^="_p"]::before{',
+        'top:4px;left:4px;',
+        'border-top:1px solid rgba(var(--ac-rgb,167,139,250),.5);',
+        'border-left:1px solid rgba(var(--ac-rgb,167,139,250),.5);',
+      '}',
+      '#dial-overlay [id^="_p"]::after{',
+        'bottom:4px;right:4px;',
+        'border-bottom:1px solid rgba(var(--ac-rgb,167,139,250),.5);',
+        'border-right:1px solid rgba(var(--ac-rgb,167,139,250),.5);',
+      '}',
+      // ── Sweep de luz superior (línea fina que cruza el card) ──
+      '#dial-overlay .hud-sweep{',
+        'position:absolute;top:0;left:0;right:0;height:1px;',
+        'background:linear-gradient(90deg, transparent 0%, rgba(var(--ac-rgb,167,139,250),.0) 10%, rgba(var(--ac-rgb,167,139,250),.7) 50%, rgba(var(--ac-rgb,167,139,250),.0) 90%, transparent 100%);',
+        'pointer-events:none;',
+        'animation:hudSweep 7s ease-in-out infinite;',
+        'opacity:0;',
+        'z-index:2;',
+      '}',
+      // Banda Sim superior: scanline horizontal de luz
+      '#dial-overlay #_pSim{overflow:hidden}',
+      '#dial-overlay #_pSim::before{',
+        'background:linear-gradient(180deg, rgba(var(--ac-rgb,167,139,250),.18) 0%, transparent 100%);',
+        'top:0;left:0;width:100%;height:2px;',
+        'border:none;animation:none;opacity:.6;',
+      '}',
+    ].join('');
+    document.head.appendChild(ckf);
+  }
+
+  // Inyectar el sweep element a cada card y setear --ac-rgb desde el color del card
+  function _inyectarHudEffectsACards(){
+    if(!window._hudPanels) return;
+    // RGB de colores accent comunes (paleta del proyecto)
+    var COLOR_RGB = {
+      '#A78BFA':'167,139,250', '#22D3EE':'34,211,238', '#4ADE80':'74,222,128',
+      '#C4B5FD':'196,181,253', '#67E8F9':'103,232,249', '#86EFAC':'134,239,172',
+      '#F472B6':'244,114,182', '#FBBF24':'251,191,36', '#FB7185':'251,113,133',
+      '#34D399':'52,211,153', '#60A5FA':'96,165,250',
+    };
+    window._hudPanels.forEach(function(hp){
+      var card = hp.el;
+      if(!card || card._hudFXApplied) return;
+      card._hudFXApplied = true;
+      // Detectar accent color del card desde inline style --ac, computed style o default
+      var ac = card.style.getPropertyValue('--ac').trim();
+      if(!ac){
+        // Buscar dentro del card algún hijo con --ac
+        var child = card.querySelector('[style*="--ac"]');
+        if(child) ac = child.style.getPropertyValue('--ac').trim();
+      }
+      if(!ac) ac = '#A78BFA';
+      var rgb = COLOR_RGB[ac.toUpperCase()] || '167,139,250';
+      card.style.setProperty('--ac-rgb', rgb);
+      // Inyectar el sweep (línea de luz que cruza el card)
+      if(!card.querySelector(':scope > .hud-sweep')){
+        var sweep = document.createElement('div');
+        sweep.className = 'hud-sweep';
+        // Delay aleatorio para que cada card sweep en momento distinto
+        sweep.style.animationDelay = (Math.random() * 7).toFixed(2) + 's';
+        card.appendChild(sweep);
+      }
+    });
+  }
+
+  // Aplicar tras un breve delay para que window._hudPanels esté listo
+  setTimeout(_inyectarHudEffectsACards, 800);
+  setTimeout(_inyectarHudEffectsACards, 2000);
+  window._inyectarHudEffectsACards = _inyectarHudEffectsACards;
 
   // ── Keyframes mini-panels ──
   (function(){
