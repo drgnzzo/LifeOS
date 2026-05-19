@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.166
+/* RAW Entry — Overlay v.5.167
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -727,27 +727,28 @@ function _crearDialOverlay(){
   _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.70';
   _dialOverlay.appendChild(_particlesCanvas);
 
-  (function initCosmicWeb(){
+  (function initGalaxy(){
     // ══════════════════════════════════════════════════════════════════
-    //  v5.166: COSMIC WEB VIVO
-    //  Reescritura completa con vida real, no estructuras estáticas:
-    //  • Líneas que aparecen, brillan y desaparecen (ciclo de vida)
-    //  • Brazos giratorios desde el centro del dial (rotación continua)
-    //  • Pulsos sinápticos viajando por todas las edges activas
-    //  • Glow real en todas las líneas
-    //  • Nodos pulsando suavemente, distribuidos por toda la pantalla
+    //  v5.167: GALAXIA ROTATORIA
+    //  TODO parte del centro y gira con rotación kepleriana.
+    //  • Estrellas en órbitas (ω = k/√r) — más rápido cerca del centro
+    //  • Brazos espirales que giran como brazos de galaxia
+    //  • Sinapsis fugaces entre estrellas cercanas (aparecen y mueren)
+    //  • Vórtices puntuales con ondas concéntricas (caos)
+    //  • Todo pasa detrás del dial (z-index 0 del canvas)
+    //  • El dial queda visualmente intacto
     // ══════════════════════════════════════════════════════════════════
     var pctx, lastT = 0, animId = null;
-    var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0;
+    var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0, MAX_R = 0;
     var PALETTE = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9', '#86EFAC'];
 
-    // Estructuras
-    var nodes = [];        // puntos distribuidos en la pantalla
-    var webLinks = [];     // líneas del cosmic web (con vida)
-    var spokes = [];       // brazos giratorios desde el centro
-    var pulses = [];       // sinapsis viajando por edges
+    var stars = [];        // estrellas en órbita
+    var arms  = [];        // brazos espirales (3-4)
+    var synapses = [];     // líneas fugaces entre estrellas
+    var pulses = [];       // pulsos viajando por arms y synapses
+    var vortices = [];     // vórtices puntuales con ondas
 
-    var globalTime = 0;    // tiempo global para fases
+    var globalT = 0;       // tiempo global
 
     function resize(){
       var dpr = window.devicePixelRatio || 1;
@@ -755,6 +756,7 @@ function _crearDialOverlay(){
       H = window.innerHeight;
       CX = W / 2; CY = H / 2;
       DIAL_R = Math.min(W, H) * 0.22;
+      MAX_R = Math.hypot(W/2, H/2) + 30;
       _particlesCanvas.width = W * dpr;
       _particlesCanvas.height = H * dpr;
       _particlesCanvas.style.width = W + 'px';
@@ -763,376 +765,431 @@ function _crearDialOverlay(){
       pctx.scale(dpr, dpr);
     }
 
-    // ── DISTRIBUCIÓN POISSON-DISK ──────────────────────────────────
-    function buildNodes(){
-      nodes = [];
-      var exclusionR = DIAL_R + 150;  // zona despejada alrededor del dial
-      var minDist = 110;
-      var cellSize = minDist / Math.SQRT2;
-      var cols = Math.ceil(W / cellSize);
-      var rows = Math.ceil(H / cellSize);
-      var grid = new Array(cols * rows).fill(null);
-
-      function gi(x, y){ return y * cols + x; }
-      function valid(x, y){
-        if(x < 30 || x > W - 30 || y < 30 || y > H - 30) return false;
-        if(Math.hypot(x - CX, y - CY) < exclusionR) return false;
-        var gx = Math.floor(x / cellSize);
-        var gy = Math.floor(y / cellSize);
-        for(var dy = -2; dy <= 2; dy++){
-          for(var dx = -2; dx <= 2; dx++){
-            var nx = gx + dx, ny = gy + dy;
-            if(nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
-            var o = grid[gi(nx, ny)];
-            if(o && Math.hypot(o.x - x, o.y - y) < minDist) return false;
-          }
-        }
-        return true;
-      }
-
-      var active = [];
-      var seeds = [
-        {x:60,y:60}, {x:W-60,y:60}, {x:60,y:H-60}, {x:W-60,y:H-60},
-        {x:W/2,y:60}, {x:W/2,y:H-60}, {x:60,y:H/2}, {x:W-60,y:H/2}
-      ];
-      seeds.forEach(function(s){
-        if(valid(s.x, s.y)){
-          var gx = Math.floor(s.x / cellSize), gy = Math.floor(s.y / cellSize);
-          var n = { x:s.x, y:s.y };
-          grid[gi(gx,gy)] = n;
-          nodes.push(n);
-          active.push(n);
-        }
-      });
-
-      while(active.length > 0 && nodes.length < 60){
-        var idx = Math.floor(Math.random() * active.length);
-        var base = active[idx];
-        var found = false;
-        for(var att = 0; att < 25; att++){
-          var ang = Math.random() * Math.PI * 2;
-          var d = minDist + Math.random() * minDist;
-          var nx = base.x + Math.cos(ang) * d;
-          var ny = base.y + Math.sin(ang) * d;
-          if(valid(nx, ny)){
-            var gx = Math.floor(nx / cellSize), gy = Math.floor(ny / cellSize);
-            var node = { x:nx, y:ny };
-            grid[gi(gx,gy)] = node;
-            nodes.push(node);
-            active.push(node);
-            found = true;
-            break;
-          }
-        }
-        if(!found) active.splice(idx, 1);
-      }
-
-      // Atributos visuales
-      nodes.forEach(function(n, i){
-        n.color = PALETTE[(Math.floor(n.x / 130) + Math.floor(n.y / 130)) % PALETTE.length];
-        n.phase = (n.x * 0.013 + n.y * 0.017) % (Math.PI * 2);
-        n.speed = 0.5 + ((i * 7) % 5) * 0.12;
-        n.baseR = (i % 8 === 0) ? 1.7 : 0.85;
-        n.isHub = (i % 8 === 0);
-      });
+    // ── PARÁMETROS GLOBALES DE ROTACIÓN ────────────────────────────
+    // Velocidad angular kepleriana: ω(r) = K / √r (más rápido cerca,
+    // más lento lejos). Constante K ajustada para que el ciclo más
+    // rápido sea ~80 segundos y el más lento ~250 segundos.
+    var KEPLER_K = 0.18;
+    function angularVel(r){
+      var safeR = Math.max(DIAL_R, r);
+      return KEPLER_K / Math.sqrt(safeR);
     }
 
-    // ── COSMIC WEB LINKS CON CICLO DE VIDA ─────────────────────────
-    // Pre-construye TODOS los enlaces potenciales entre vecinos.
-    // Luego solo una fracción ~30% están activos en cualquier momento.
-    // Cada link tiene vida: born → alive → dying → reborn (en otro lugar)
-    var allPotentialLinks = [];
-
-    function buildPotentialLinks(){
-      allPotentialLinks = [];
-      // Para cada nodo, sus 4 vecinos más cercanos (sin duplicar)
-      for(var i = 0; i < nodes.length; i++){
-        var n1 = nodes[i];
-        var dists = [];
-        for(var j = 0; j < nodes.length; j++){
-          if(i === j) continue;
-          var n2 = nodes[j];
-          var d = Math.hypot(n1.x - n2.x, n1.y - n2.y);
-          if(d > 240) continue;
-          dists.push({ idx:j, d:d });
-        }
-        dists.sort(function(a,b){ return a.d - b.d; });
-        for(var k = 0; k < Math.min(4, dists.length); k++){
-          var jj = dists[k].idx;
-          if(jj < i) continue;
-          var nb = nodes[jj];
-          // Verificar que no pase cerca del dial
-          var mx = (n1.x + nb.x) / 2;
-          var my = (n1.y + nb.y) / 2;
-          if(Math.hypot(mx - CX, my - CY) < DIAL_R + 100) continue;
-          // Control point curvado
-          var dx = nb.x - n1.x, dy = nb.y - n1.y;
-          var len = Math.hypot(dx, dy) || 1;
-          var perpX = -dy / len, perpY = dx / len;
-          var off = ((i + k * 3) % 5 - 2) * 16;
-          allPotentialLinks.push({
-            a: n1, b: nb,
-            cp: { x: mx + perpX * off, y: my + perpY * off },
-            color: n1.color,
-          });
-        }
-      }
-    }
-
-    // Spawn de webLinks activos: extraer de allPotentialLinks aleatoriamente
-    function spawnWebLink(){
-      if(!allPotentialLinks.length) return;
-      // Tomar un link cualquiera
-      var pot = allPotentialLinks[Math.floor(Math.random() * allPotentialLinks.length)];
-      webLinks.push({
-        a: pot.a, b: pot.b, cp: pot.cp, color: pot.color,
-        age: 0,
-        maxAge: 4 + Math.random() * 4,  // 4-8 segundos de vida total
-        fadeIn: 1.5,                     // 1.5s de aparición
-        fadeOut: 1.8,                    // 1.8s de desaparición
-      });
-    }
-
-    // ── BRAZOS GIRATORIOS DESDE EL CENTRO ──────────────────────────
-    function buildSpokes(){
-      spokes = [];
-      var nSpokes = 6;
-      var baseOffset = Math.random() * Math.PI * 2;
-      for(var s = 0; s < nSpokes; s++){
-        spokes.push({
-          baseAngle: baseOffset + (s / nSpokes) * Math.PI * 2,
-          length: 0.55 + ((s * 13) % 5) * 0.10,  // factor 0.55 - 0.95 de la diagonal/2
-          rotSpeed: (s % 2 === 0 ? 1 : -1) * (0.04 + (s % 3) * 0.015),  // rad/s
-          phase: s * 0.7,        // fase de pulso de intensidad
-          curvature: ((s * 7) % 3 - 1) * 0.35,  // -0.35, 0, +0.35
-          color: PALETTE[s % PALETTE.length],
+    // ── ESTRELLAS EN ÓRBITAS ───────────────────────────────────────
+    function buildStars(){
+      stars = [];
+      // Cantidad proporcional al área visible
+      var nStars = Math.max(60, Math.min(120, Math.floor((W * H) / 14000)));
+      // Excluir zona donde está el dial: las estrellas tienen radio mínimo
+      // un poco mayor que el dial, pero algunas pueden estar muy cerca para
+      // que el efecto parta visualmente desde el centro
+      var minR = DIAL_R + 25;
+      for(var i = 0; i < nStars; i++){
+        // Radio: distribución logarítmica → más estrellas cerca, menos lejos
+        // Pero con exclusión del centro
+        var u = Math.random();
+        var r = minR + (MAX_R - minR) * Math.pow(u, 0.7);
+        var theta = Math.random() * Math.PI * 2;
+        stars.push({
+          r: r,
+          theta: theta,
+          omega: angularVel(r),
+          color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+          phase: Math.random() * Math.PI * 2,
+          twinkleSpeed: 0.8 + Math.random() * 1.6,
+          baseSize: 0.5 + Math.random() * 1.4,
+          // Ciclo de vida (las estrellas también aparecen y desaparecen)
+          age: Math.random() * 10,
+          lifespan: 8 + Math.random() * 12,
         });
       }
     }
 
-    // ── SINAPSIS ───────────────────────────────────────────────────
+    // ── BRAZOS ESPIRALES (4 brazos como galaxia) ───────────────────
+    function buildArms(){
+      arms = [];
+      var nArms = 4;
+      var armBaseOffset = Math.random() * Math.PI * 2;
+      for(var a = 0; a < nArms; a++){
+        arms.push({
+          baseAngle: armBaseOffset + (a / nArms) * Math.PI * 2,
+          spiralRate: 0.30 + Math.random() * 0.15,  // grado de espiral (radianes / unidad r)
+          rotSpeed: KEPLER_K / Math.sqrt(DIAL_R * 3) * (a % 2 === 0 ? 1 : 0.9), // misma direccion (galaxia rota como un todo)
+          color: PALETTE[a % PALETTE.length],
+          phase: a * 0.7,
+          maxR: MAX_R * (0.7 + Math.random() * 0.3),
+        });
+      }
+    }
+
+    // ── VÓRTICES PUNTUALES ─────────────────────────────────────────
+    function spawnVortex(){
+      // Aparece en una posición orbital aleatoria (fuera del dial)
+      var r = DIAL_R + 60 + Math.random() * (MAX_R - DIAL_R - 100);
+      var theta = Math.random() * Math.PI * 2;
+      vortices.push({
+        r: r, theta: theta,
+        omega: angularVel(r),
+        color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+        age: 0,
+        lifespan: 3 + Math.random() * 2,
+        maxRadius: 60 + Math.random() * 40,
+      });
+    }
+
+    // ── SINAPSIS ENTRE ESTRELLAS ───────────────────────────────────
+    function spawnSynapse(){
+      // Tomar 2 estrellas cercanas en este momento
+      if(stars.length < 2) return;
+      var s1 = stars[Math.floor(Math.random() * stars.length)];
+      // Buscar la estrella más cercana (en distancia 2D actual)
+      var p1 = polar2cart(s1.r, s1.theta);
+      var best = null, bestD = Infinity;
+      for(var i = 0; i < stars.length; i++){
+        var s2 = stars[i];
+        if(s2 === s1) continue;
+        var p2 = polar2cart(s2.r, s2.theta);
+        var d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        // Restricción: que no pase cerca del dial
+        var mx = (p1.x + p2.x) / 2;
+        var my = (p1.y + p2.y) / 2;
+        if(Math.hypot(mx - CX, my - CY) < DIAL_R + 70) continue;
+        if(d < bestD && d < 280){
+          bestD = d;
+          best = s2;
+        }
+      }
+      if(!best) return;
+      synapses.push({
+        s1: s1, s2: best,
+        age: 0,
+        lifespan: 1.2 + Math.random() * 1.5,   // muy fugaz
+        color: s1.color,
+      });
+    }
+
+    function polar2cart(r, theta){
+      return { x: CX + Math.cos(theta) * r, y: CY + Math.sin(theta) * r };
+    }
+
+    // ── PULSOS SINÁPTICOS ──────────────────────────────────────────
     function spawnPulse(){
-      // Combinar webLinks activos + spokes como edges disponibles
+      // Elegir un brazo o una sinapsis activa
       var pool = [];
-      webLinks.forEach(function(w){
-        if(w.age > w.fadeIn * 0.5 && w.age < w.maxAge - w.fadeOut * 0.5){
-          pool.push({ type: 'web', ref: w });
+      arms.forEach(function(a){ pool.push({ type:'arm', ref:a }); });
+      synapses.forEach(function(s){
+        if(s.age > s.lifespan * 0.2 && s.age < s.lifespan * 0.8){
+          pool.push({ type:'synapse', ref:s });
         }
       });
-      // Spokes también pueden tener pulsos
-      spokes.forEach(function(sp){ pool.push({ type: 'spoke', ref: sp }); });
       if(!pool.length) return;
       var sel = pool[Math.floor(Math.random() * pool.length)];
       pulses.push({
         type: sel.type,
         ref: sel.ref,
         t: 0,
-        speed: 0.5 + Math.random() * 0.4,
-        forward: Math.random() < 0.5,
+        speed: 0.4 + Math.random() * 0.35,
+        forward: Math.random() < 0.6,
+        tailT: 0.18 + Math.random() * 0.12,
         life: 1,
-        tailT: 0.20 + Math.random() * 0.10,
       });
     }
 
-    function bezierPoint(a, cp, b, t){
-      var u = 1 - t;
-      return {
-        x: u*u*a.x + 2*u*t*cp.x + t*t*b.x,
-        y: u*u*a.y + 2*u*t*cp.y + t*t*b.y,
-      };
-    }
-
-    // ── RENDER ──────────────────────────────────────────────────────
-    function drawWebLink(w){
-      // Calcular alpha según fase del ciclo de vida
-      var lifeAlpha;
-      if(w.age < w.fadeIn){
-        lifeAlpha = w.age / w.fadeIn;
-      } else if(w.age > w.maxAge - w.fadeOut){
-        lifeAlpha = Math.max(0, (w.maxAge - w.age) / w.fadeOut);
-      } else {
-        lifeAlpha = 1;
+    // ── DIBUJO ─────────────────────────────────────────────────────
+    function drawStars(dt){
+      for(var i = 0; i < stars.length; i++){
+        var s = stars[i];
+        // Avanzar órbita
+        s.theta += s.omega * dt;
+        s.age += dt;
+        s.phase += s.twinkleSpeed * dt;
+        // Ciclo de vida: si supera lifespan, respawn en otro lugar
+        if(s.age > s.lifespan){
+          s.r = DIAL_R + 25 + (MAX_R - DIAL_R - 25) * Math.pow(Math.random(), 0.7);
+          s.theta = Math.random() * Math.PI * 2;
+          s.omega = angularVel(s.r);
+          s.age = 0;
+          s.lifespan = 8 + Math.random() * 12;
+          s.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+        }
+        // Fade in/out por ciclo de vida
+        var lifeFrac = s.age / s.lifespan;
+        var lifeAlpha;
+        if(lifeFrac < 0.10) lifeAlpha = lifeFrac / 0.10;
+        else if(lifeFrac > 0.85) lifeAlpha = (1 - lifeFrac) / 0.15;
+        else lifeAlpha = 1;
+        if(lifeAlpha <= 0) continue;
+        var twinkle = (Math.sin(s.phase) + 1) / 2;
+        var rad = s.baseSize * (0.7 + twinkle * 0.7);
+        var alpha = lifeAlpha * (0.45 + twinkle * 0.45);
+        var p = polar2cart(s.r, s.theta);
+        // Skip si invade el dial (no debería pasar pero por seguridad)
+        if(Math.hypot(p.x - CX, p.y - CY) < DIAL_R + 5) continue;
+        pctx.fillStyle = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
+        pctx.shadowColor = s.color;
+        pctx.shadowBlur = 4 + twinkle * 10;
+        pctx.beginPath();
+        pctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+        pctx.fill();
+        // Guardar pos cached para uso por sinapsis
+        s._cachedX = p.x;
+        s._cachedY = p.y;
       }
-      if(lifeAlpha <= 0) return;
-      // Brillo pulsante adicional
-      var glowPulse = 0.7 + 0.3 * Math.sin(globalTime * 0.8 + w.age * 0.5);
-      var alpha = lifeAlpha * 0.45 * glowPulse;
-
-      pctx.strokeStyle = w.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
-      pctx.lineWidth = 0.8 + lifeAlpha * 0.6;
-      pctx.shadowColor = w.color;
-      pctx.shadowBlur = 6 * lifeAlpha;
-      pctx.beginPath();
-      pctx.moveTo(w.a.x, w.a.y);
-      pctx.quadraticCurveTo(w.cp.x, w.cp.y, w.b.x, w.b.y);
-      pctx.stroke();
       pctx.shadowBlur = 0;
     }
 
-    function drawSpoke(sp, dt){
-      // Avanzar rotación
-      sp.baseAngle += sp.rotSpeed * dt;
-      sp.phase += dt * 0.6;
-      // Brillo pulsante
-      var pulse = (Math.sin(sp.phase) + 1) / 2;          // 0..1
-      var alpha = 0.30 + pulse * 0.45;                    // 0.30 - 0.75
+    function drawArms(dt){
+      // Cada brazo es una espiral logarítmica que arranca del borde del dial
+      // y se extiende hasta maxR. Rota como un todo.
+      arms.forEach(function(arm){
+        arm.baseAngle += arm.rotSpeed * dt;
+        arm.phase += dt * 0.5;
+        var pulse = (Math.sin(arm.phase) + 1) / 2;
+        var alpha = 0.25 + pulse * 0.35;
+        // Generar puntos de la espiral
+        var steps = 60;
+        var pts = [];
+        for(var i = 0; i <= steps; i++){
+          var frac = i / steps;
+          var r = DIAL_R + 15 + frac * (arm.maxR - DIAL_R - 15);
+          // Espiral: theta = baseAngle + spiralRate * (r - DIAL_R) / 50
+          var theta = arm.baseAngle + arm.spiralRate * (r - DIAL_R) / 50;
+          var x = CX + Math.cos(theta) * r;
+          var y = CY + Math.sin(theta) * r;
+          pts.push({ x: x, y: y });
+        }
+        // Cachear para uso por pulsos
+        arm._pts = pts;
+        // Dibujar la espiral como serie de segmentos con alpha gradiente
+        // (las partes lejanas más tenues, las cercanas al dial más brillantes)
+        pctx.lineCap = 'round';
+        pctx.lineJoin = 'round';
+        for(var i = 1; i < pts.length; i++){
+          var fadeOut = 1 - (i / pts.length) * 0.6;  // los puntos lejanos más tenues
+          var a = alpha * fadeOut;
+          pctx.strokeStyle = arm.color + Math.floor(a * 255).toString(16).padStart(2, '0');
+          pctx.lineWidth = 1.2 - (i / pts.length) * 0.5;
+          pctx.shadowColor = arm.color;
+          pctx.shadowBlur = 8 * fadeOut * (0.5 + pulse * 0.5);
+          pctx.beginPath();
+          pctx.moveTo(pts[i-1].x, pts[i-1].y);
+          pctx.lineTo(pts[i].x, pts[i].y);
+          pctx.stroke();
+        }
+        pctx.shadowBlur = 0;
+      });
+    }
 
-      // Geometría del brazo
-      var diagonal = Math.hypot(W/2, H/2);
-      var rayLen = diagonal * sp.length;
-      var endX = CX + Math.cos(sp.baseAngle) * rayLen;
-      var endY = CY + Math.sin(sp.baseAngle) * rayLen;
-      // Control point: desplazado perpendicularmente para curvatura
-      var midR = rayLen * 0.5;
-      var perpAng = sp.baseAngle + Math.PI / 2;
-      var bend = sp.curvature * rayLen * 0.4;
-      var cpx = CX + Math.cos(sp.baseAngle) * midR + Math.cos(perpAng) * bend;
-      var cpy = CY + Math.sin(sp.baseAngle) * midR + Math.sin(perpAng) * bend;
-      // Guardar para uso en pulsos
-      sp._a = { x: CX, y: CY };
-      sp._b = { x: endX, y: endY };
-      sp._cp = { x: cpx, y: cpy };
+    function drawSynapses(dt){
+      for(var i = synapses.length - 1; i >= 0; i--){
+        var syn = synapses[i];
+        syn.age += dt;
+        if(syn.age >= syn.lifespan){
+          synapses.splice(i, 1);
+          continue;
+        }
+        // Fade in/out muy rápido (fugaz)
+        var frac = syn.age / syn.lifespan;
+        var alpha;
+        if(frac < 0.25) alpha = frac / 0.25;
+        else if(frac > 0.65) alpha = (1 - frac) / 0.35;
+        else alpha = 1;
+        alpha *= 0.55;
+        var p1 = polar2cart(syn.s1.r, syn.s1.theta);
+        var p2 = polar2cart(syn.s2.r, syn.s2.theta);
+        // Cachear extremos
+        syn._p1 = p1;
+        syn._p2 = p2;
+        // Control point: leve curvatura
+        var mx = (p1.x + p2.x) / 2;
+        var my = (p1.y + p2.y) / 2;
+        var dx = p2.x - p1.x, dy = p2.y - p1.y;
+        var len = Math.hypot(dx, dy) || 1;
+        var perpX = -dy / len, perpY = dx / len;
+        var off = 18;
+        syn._cp = { x: mx + perpX * off, y: my + perpY * off };
+        pctx.strokeStyle = syn.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        pctx.lineWidth = 0.9;
+        pctx.shadowColor = syn.color;
+        pctx.shadowBlur = 6;
+        pctx.beginPath();
+        pctx.moveTo(p1.x, p1.y);
+        pctx.quadraticCurveTo(syn._cp.x, syn._cp.y, p2.x, p2.y);
+        pctx.stroke();
+        pctx.shadowBlur = 0;
+      }
+    }
 
-      pctx.strokeStyle = sp.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
-      pctx.lineWidth = 1.2 + pulse * 0.8;
-      pctx.shadowColor = sp.color;
-      pctx.shadowBlur = 8 + pulse * 6;
-      pctx.beginPath();
-      pctx.moveTo(CX, CY);
-      pctx.quadraticCurveTo(cpx, cpy, endX, endY);
-      pctx.stroke();
-      pctx.shadowBlur = 0;
+    function drawVortices(dt){
+      for(var i = vortices.length - 1; i >= 0; i--){
+        var v = vortices[i];
+        v.age += dt;
+        if(v.age >= v.lifespan){
+          vortices.splice(i, 1);
+          continue;
+        }
+        // El vórtice también orbita
+        v.theta += v.omega * dt;
+        var p = polar2cart(v.r, v.theta);
+        // Dibujar 3 ondas concéntricas con expansión + fade
+        var frac = v.age / v.lifespan;
+        for(var k = 0; k < 3; k++){
+          var phaseFrac = (frac + k * 0.25) % 1;
+          var radius = phaseFrac * v.maxRadius;
+          var alpha = (1 - phaseFrac) * 0.45;
+          if(alpha < 0.02) continue;
+          pctx.strokeStyle = v.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+          pctx.lineWidth = 1.0;
+          pctx.shadowColor = v.color;
+          pctx.shadowBlur = 6;
+          pctx.beginPath();
+          pctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+          pctx.stroke();
+        }
+        pctx.shadowBlur = 0;
+      }
     }
 
     function drawPulse(p){
-      var a, cp, b;
-      if(p.type === 'web'){
-        var w = p.ref;
-        // El webLink debe estar vivo
-        if(w.age >= w.maxAge) return;
-        a = w.a; cp = w.cp; b = w.b;
-      } else {
-        var sp = p.ref;
-        if(!sp._a) return;  // spoke aún no renderizado
-        a = sp._a; cp = sp._cp; b = sp._b;
-      }
-      var color = p.ref.color;
-      var t = p.forward ? p.t : (1 - p.t);
-      var samples = [];
-      var steps = 14;
-      for(var i = 0; i <= steps; i++){
-        var tt = t - (p.forward ? 1 : -1) * (i / steps) * p.tailT;
-        if(tt < 0 || tt > 1) continue;
-        samples.push({ pt: bezierPoint(a, cp, b, tt), alpha: 1 - (i / steps) });
-      }
-      if(samples.length < 2) return;
-      pctx.lineCap = 'round';
-      pctx.lineJoin = 'round';
-      for(var s = 1; s < samples.length; s++){
-        var aa = samples[s].alpha * p.life * 0.95;
-        pctx.strokeStyle = color + Math.floor(aa * 230).toString(16).padStart(2, '0');
-        pctx.lineWidth = 2.0 * samples[s].alpha;
+      var ax, ay, bx, by, cpx, cpy;
+      if(p.type === 'arm'){
+        var pts = p.ref._pts;
+        if(!pts || pts.length < 2){ return; }
+        // El "path" del brazo: usar t para indexar la lista de puntos
+        var idx = p.t * (pts.length - 1);
+        var i0 = Math.floor(idx);
+        var i1 = Math.min(pts.length - 1, i0 + 1);
+        var frac = idx - i0;
+        var headX = pts[i0].x + (pts[i1].x - pts[i0].x) * frac;
+        var headY = pts[i0].y + (pts[i1].y - pts[i0].y) * frac;
+        // Tail (puntos anteriores)
+        pctx.lineCap = 'round';
+        var tailSteps = 8;
+        for(var s = 0; s < tailSteps; s++){
+          var tailIdx = idx - s - 1;
+          if(tailIdx < 0) break;
+          var ti0 = Math.floor(tailIdx);
+          var ti1 = Math.min(pts.length - 1, ti0 + 1);
+          var tf = tailIdx - ti0;
+          var tx = pts[ti0].x + (pts[ti1].x - pts[ti0].x) * tf;
+          var ty = pts[ti0].y + (pts[ti1].y - pts[ti0].y) * tf;
+          var a = (1 - s / tailSteps) * p.life * 0.8;
+          pctx.strokeStyle = p.ref.color + Math.floor(a * 230).toString(16).padStart(2, '0');
+          pctx.lineWidth = 2.0 * (1 - s / tailSteps);
+          pctx.beginPath();
+          // Conectar segmento anterior con actual
+          var prevIdx = idx - s;
+          var pi0 = Math.floor(prevIdx);
+          var pi1 = Math.min(pts.length - 1, pi0 + 1);
+          var pf = prevIdx - pi0;
+          var px = pts[pi0].x + (pts[pi1].x - pts[pi0].x) * pf;
+          var py = pts[pi0].y + (pts[pi1].y - pts[pi0].y) * pf;
+          pctx.moveTo(px, py);
+          pctx.lineTo(tx, ty);
+          pctx.stroke();
+        }
+        // Cabeza brillante
+        pctx.fillStyle = p.ref.color;
+        pctx.shadowColor = p.ref.color;
+        pctx.shadowBlur = 14;
         pctx.beginPath();
-        pctx.moveTo(samples[s-1].pt.x, samples[s-1].pt.y);
-        pctx.lineTo(samples[s].pt.x, samples[s].pt.y);
-        pctx.stroke();
-      }
-      // Cabeza brillante
-      var head = bezierPoint(a, cp, b, t);
-      pctx.fillStyle = color;
-      pctx.shadowColor = color;
-      pctx.shadowBlur = 14;
-      pctx.beginPath();
-      pctx.arc(head.x, head.y, 2.6, 0, Math.PI * 2);
-      pctx.fill();
-      pctx.shadowBlur = 0;
-    }
-
-    function drawNodes(dt){
-      for(var i = 0; i < nodes.length; i++){
-        var n = nodes[i];
-        n.phase += n.speed * dt;
-        var pulse = (Math.sin(n.phase) + 1) / 2;
-        var r = n.baseR + pulse * (n.isHub ? 1.8 : 1.0);
-        var alpha = 0.4 + pulse * 0.5;
-        var blur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
-        pctx.fillStyle = n.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
-        pctx.shadowColor = n.color;
-        pctx.shadowBlur = blur;
-        pctx.beginPath();
-        pctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        pctx.arc(headX, headY, 2.6, 0, Math.PI * 2);
         pctx.fill();
+        pctx.shadowBlur = 0;
+      } else if(p.type === 'synapse'){
+        var syn = p.ref;
+        if(!syn._p1 || !syn._p2) return;
+        var t = p.forward ? p.t : (1 - p.t);
+        // Bezier sample
+        function bp(tt){
+          var u = 1 - tt;
+          return {
+            x: u*u*syn._p1.x + 2*u*tt*syn._cp.x + tt*tt*syn._p2.x,
+            y: u*u*syn._p1.y + 2*u*tt*syn._cp.y + tt*tt*syn._p2.y,
+          };
+        }
+        var samples = [];
+        var steps = 10;
+        for(var i = 0; i <= steps; i++){
+          var tt = t - (p.forward ? 1 : -1) * (i / steps) * p.tailT;
+          if(tt < 0 || tt > 1) continue;
+          samples.push({ pt: bp(tt), alpha: 1 - i / steps });
+        }
+        if(samples.length < 2) return;
+        pctx.lineCap = 'round';
+        for(var s = 1; s < samples.length; s++){
+          var a = samples[s].alpha * p.life * 0.95;
+          pctx.strokeStyle = syn.color + Math.floor(a * 230).toString(16).padStart(2, '0');
+          pctx.lineWidth = 1.8 * samples[s].alpha;
+          pctx.beginPath();
+          pctx.moveTo(samples[s-1].pt.x, samples[s-1].pt.y);
+          pctx.lineTo(samples[s].pt.x, samples[s].pt.y);
+          pctx.stroke();
+        }
+        var head = bp(t);
+        pctx.fillStyle = syn.color;
+        pctx.shadowColor = syn.color;
+        pctx.shadowBlur = 10;
+        pctx.beginPath();
+        pctx.arc(head.x, head.y, 2.0, 0, Math.PI * 2);
+        pctx.fill();
+        pctx.shadowBlur = 0;
       }
-      pctx.shadowBlur = 0;
     }
 
-    // ── FRAME ─────────────────────────────────────────────────────
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
       lastT = t;
       if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
-      globalTime += dt;
+      globalT += dt;
 
-      // 1) Avanzar y dibujar webLinks (con ciclo de vida)
-      for(var wi = webLinks.length - 1; wi >= 0; wi--){
-        webLinks[wi].age += dt;
-        if(webLinks[wi].age >= webLinks[wi].maxAge){
-          webLinks.splice(wi, 1);
-          continue;
-        }
-        drawWebLink(webLinks[wi]);
-      }
-      // Mantener un número activo: spawn si faltan
-      var targetActive = Math.min(28, Math.floor(allPotentialLinks.length * 0.40));
-      while(webLinks.length < targetActive){
-        spawnWebLink();
-      }
+      // 1) Brazos espirales (rotando, debajo de las estrellas)
+      drawArms(dt);
 
-      // 2) Dibujar spokes giratorios (también avanzan su angle)
-      for(var si = 0; si < spokes.length; si++){
-        drawSpoke(spokes[si], dt);
-      }
+      // 2) Vórtices puntuales (ondas concéntricas)
+      drawVortices(dt);
 
-      // 3) Avanzar y dibujar pulsos sinápticos
+      // 3) Sinapsis fugaces
+      drawSynapses(dt);
+
+      // 4) Estrellas en órbita (encima de las líneas, brillan más)
+      drawStars(dt);
+
+      // 5) Pulsos sinápticos
       for(var pi = pulses.length - 1; pi >= 0; pi--){
         var p = pulses[pi];
         p.t += p.speed * dt;
-        if(p.t > 1 + p.tailT){
-          pulses.splice(pi, 1);
-          continue;
-        }
+        if(p.t > 1 + p.tailT){ pulses.splice(pi, 1); continue; }
         if(p.t > 1) p.life = Math.max(0, 1 - (p.t - 1) / p.tailT);
         drawPulse(p);
       }
-      // Spawn pulsos para mantener actividad
-      if(pulses.length < 8 && Math.random() < 0.08){
+
+      // Spawns periódicos
+      // Sinapsis fugaces: spawn frecuente
+      if(synapses.length < 4 && Math.random() < 0.08){
+        spawnSynapse();
+      }
+      // Pulsos: mantener actividad
+      if(pulses.length < 6 && Math.random() < 0.05){
         spawnPulse();
       }
-
-      // 4) Dibujar nodos (encima de las líneas)
-      drawNodes(dt);
+      // Vórtices: raros, dramáticos
+      if(vortices.length < 2 && Math.random() < 0.008){
+        spawnVortex();
+      }
 
       animId = requestAnimationFrame(frame);
     }
 
     function start(){
       resize();
-      buildNodes();
-      buildPotentialLinks();
-      buildSpokes();
-      webLinks = [];
+      buildStars();
+      buildArms();
+      synapses = [];
       pulses = [];
-      globalTime = 0;
-      // Spawn inicial: webLinks ya en distintas fases de vida
-      var initialCount = Math.min(20, Math.floor(allPotentialLinks.length * 0.35));
-      for(var i = 0; i < initialCount; i++){
-        spawnWebLink();
-        // Adelantar la edad para que no aparezcan todos a la vez
-        webLinks[webLinks.length - 1].age = Math.random() * 3;
-      }
-      // Pre-spawn de pulsos
-      for(var pp = 0; pp < 3; pp++) spawnPulse();
+      vortices = [];
+      globalT = 0;
       lastT = 0;
       if(animId) cancelAnimationFrame(animId);
       animId = requestAnimationFrame(frame);
@@ -1148,12 +1205,12 @@ function _crearDialOverlay(){
     window.addEventListener('resize', function(){
       if(_particlesCanvas.offsetParent !== null){
         resize();
-        buildNodes();
-        buildPotentialLinks();
-        buildSpokes();
+        buildStars();
+        buildArms();
       }
     });
   })();
+
 
 
   // ── Aro pulsante "breathing" (P-1b): círculo delineado SVG centrado en el dial.
