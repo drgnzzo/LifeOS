@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.185
+/* RAW Entry — Overlay v.5.187
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -1117,7 +1117,7 @@ function _crearDialOverlay(){
 
     function drawWarp(dt){
       var diag = Math.hypot(W/2, H/2);
-      var eventHorizon = DIAL_R * 0.40;
+      var eventHorizon = DIAL_R * 0.55;  // v5.186: zona de absorción más amplia
 
       // ── CICLO CÓSMICO: big crunch ↔ big bang ──
       // Periodo total ~24s: 12s contrayéndose, 12s expandiéndose.
@@ -1162,12 +1162,23 @@ function _crearDialOverlay(){
         }
         w.r += radialVel * dt;
 
-        // Límites: si cruza el horizonte, reaparece en el borde;
-        // si se va más allá del borde, reaparece cerca del centro.
+        // v5.186: ABSORCIÓN — el agujero negro "se come" las partículas
+        // que cruzan el horizonte de eventos. Renacen lejos (en el borde).
         if(w.r <= eventHorizon){
-          w.r = eventHorizon + 2;
+          // Tragada: renace en un radio exterior aleatorio
+          var diagNow = Math.hypot(W/2, H/2);
+          w.r = diagNow * (0.55 + Math.random() * 0.55);
+          w.theta = Math.random() * Math.PI * 2;
+          w.rHome = w.r;
+          w.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+          // Pequeña marca para fade-in al renacer
+          w._reborn = 0;
         } else if(w.r > diag + 80){
           w.r = diag + 80;
+        }
+        // Avanzar el fade-in de renacimiento
+        if(w._reborn !== undefined && w._reborn < 1){
+          w._reborn = Math.min(1, w._reborn + dt * 1.5);
         }
 
         // ── RENDER ──
@@ -1179,12 +1190,22 @@ function _crearDialOverlay(){
         // Brillo: más en el centro (calentamiento) y modulado por el ciclo
         var cycleGlow = 0.7 + 0.3 * Math.abs(cosmicForce);
         var alpha = (0.20 + proximity * 0.55) * twinkle * cycleGlow;
-        var radius = w.size * (0.7 + proximity * 0.9);
+        // v5.186: fade-in al renacer (tras ser tragada por el agujero negro)
+        if(w._reborn !== undefined && w._reborn < 1){
+          alpha *= w._reborn;
+        }
+        // v5.186: cerca del horizonte la partícula se "estira" y acelera su
+        // brillo — efecto de ser absorbida (último destello antes de caer)
+        var nearHorizon = Math.max(0, 1 - (w.r - eventHorizon) / (DIAL_R * 1.2));
+        if(nearHorizon > 0){
+          alpha *= (1 + nearHorizon * 0.8);   // último destello
+        }
+        var radius = w.size * (0.7 + proximity * 0.9) * (1 + nearHorizon * 0.6);
         // Blueshift cerca del centro
         var col = proximity > 0.72 ? '#E0F2FE' : w.color;
         pctx.fillStyle = col + Math.floor(Math.max(0, Math.min(1, alpha)) * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = col;
-        pctx.shadowBlur = 2 + proximity * 12;
+        pctx.shadowBlur = 2 + proximity * 12 + nearHorizon * 10;
         pctx.beginPath();
         pctx.arc(px, py, radius, 0, Math.PI * 2);
         pctx.fill();
@@ -2021,7 +2042,7 @@ function _crearDialOverlay(){
       drawDust(dt);
 
       // 3) Anillos orbitales sutiles
-      drawOrbitRings(dt);
+      // v5.187: drawOrbitRings desactivado (aros mecánicos poco orgánicos)
 
       // 3b) v5.181: Efecto warp / agujero negro (centro)
       drawWarp(dt);
@@ -2157,7 +2178,7 @@ function _crearDialOverlay(){
       buildConstellations();
       buildSpirals();
       buildDust();          // v5.169
-      buildOrbitRings();    // v5.169
+      // v5.187: buildOrbitRings desactivado
       buildWarp();          // v5.181
       synapses = [];
       pulses = [];
@@ -2193,7 +2214,7 @@ function _crearDialOverlay(){
         buildConstellations();
         buildSpirals();
         buildDust();          // v5.169
-        buildOrbitRings();    // v5.169
+        // v5.187: buildOrbitRings desactivado
       buildWarp();          // v5.181
       }
     });
