@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.180
+/* RAW Entry — Overlay v.5.181
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -783,6 +783,7 @@ function _crearDialOverlay(){
     var orbitRings = [];      // v5.169: anillos orbitales sutiles
     var interMesh = [];       // v5.171: red interestelar (no pasa por el centro)
     var mandalas = [];        // v5.171: geometría tipo crop circles
+    var warpParticles = [];   // v5.181: disco de acreción / agujero negro central
     var constellations = [];  // grupos de estrellas conectadas
     var synapses = [];        // conexiones fugaces neuronales
     var pulses = [];
@@ -1072,6 +1073,98 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     //  DIBUJOS
     // ══════════════════════════════════════════════════════════════════
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.181: EFECTO WARP / AGUJERO NEGRO (prueba)
+    //  Disco de acreción toroidal en el centro absoluto. Partículas que
+    //  espiralan hacia adentro acelerando (como materia cayendo al
+    //  horizonte de eventos). Queda detrás del dial.
+    // ══════════════════════════════════════════════════════════════════
+    var warpParticles = [];
+
+    function buildWarp(){
+      warpParticles = [];
+      var nWarp = 90;
+      for(var i = 0; i < nWarp; i++){
+        warpParticles.push(spawnWarpParticle());
+      }
+    }
+
+    function spawnWarpParticle(){
+      // Nace en un radio exterior y espirala hacia el centro
+      var rOuter = DIAL_R * (1.4 + Math.random() * 1.3);
+      return {
+        r: rOuter,
+        theta: Math.random() * Math.PI * 2,
+        rStart: rOuter,
+        // El "warp" hace que el toroide tenga inclinación: comprimimos en Y
+        // para simular la perspectiva de un disco visto en ángulo
+        color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+        size: 0.5 + Math.random() * 1.3,
+        phase: Math.random() * Math.PI * 2,
+      };
+    }
+
+    function drawWarp(dt){
+      // Radio del horizonte de eventos: justo dentro del dial
+      var eventHorizon = DIAL_R * 0.45;
+      for(var i = 0; i < warpParticles.length; i++){
+        var w = warpParticles[i];
+        // Velocidad angular: acelera cuanto más cerca del centro (kepleriana extrema)
+        var angVel = 0.35 / Math.sqrt(Math.max(20, w.r)) * 3.0;
+        w.theta += angVel * dt;
+        // Caída radial: acelera hacia el centro
+        var fallSpeed = 14 + (1 - w.r / w.rStart) * 60;
+        w.r -= fallSpeed * dt;
+        w.phase += dt * 2;
+        // Si cruzó el horizonte de eventos → renace afuera
+        if(w.r <= eventHorizon){
+          warpParticles[i] = spawnWarpParticle();
+          continue;
+        }
+        // Posición con compresión toroidal en Y (disco inclinado ~60°)
+        var tilt = 0.42;  // factor de compresión vertical
+        var px = CX + Math.cos(w.theta) * w.r;
+        var py = CY + Math.sin(w.theta) * w.r * tilt;
+        // Alpha: más brillante cuanto más cerca del centro (calentamiento)
+        var proximity = 1 - (w.r - eventHorizon) / (w.rStart - eventHorizon);
+        proximity = Math.max(0, Math.min(1, proximity));
+        var twinkle = 0.6 + 0.4 * Math.sin(w.phase);
+        var alpha = (0.25 + proximity * 0.6) * twinkle;
+        // Tamaño: las partículas se estiran al caer (efecto spaghettification leve)
+        var radius = w.size * (0.7 + proximity * 1.0);
+        // Color shift: hacia el blanco-azul al acercarse (blueshift)
+        var col = proximity > 0.7 ? '#E0F2FE' : w.color;
+        pctx.fillStyle = col + Math.floor(alpha * 220).toString(16).padStart(2, '0');
+        pctx.shadowColor = col;
+        pctx.shadowBlur = 3 + proximity * 12;
+        pctx.beginPath();
+        pctx.arc(px, py, radius, 0, Math.PI * 2);
+        pctx.fill();
+      }
+      pctx.shadowBlur = 0;
+
+      // Anillo de luz del horizonte de eventos (photon ring)
+      var ringPulse = 0.6 + 0.4 * Math.sin(globalT * 1.5);
+      var photonGrad = pctx.createRadialGradient(
+        CX, CY, eventHorizon * 0.6,
+        CX, CY, eventHorizon * 1.6
+      );
+      photonGrad.addColorStop(0, 'rgba(224,242,254,0)');
+      photonGrad.addColorStop(0.6, 'rgba(167,139,250,' + (0.10 * ringPulse) + ')');
+      photonGrad.addColorStop(0.85, 'rgba(103,232,249,' + (0.18 * ringPulse) + ')');
+      photonGrad.addColorStop(1, 'rgba(224,242,254,0)');
+      pctx.fillStyle = photonGrad;
+      pctx.save();
+      // Aplicar la misma compresión toroidal al photon ring
+      pctx.translate(CX, CY);
+      pctx.scale(1, 0.42);
+      pctx.translate(-CX, -CY);
+      pctx.beginPath();
+      pctx.arc(CX, CY, eventHorizon * 1.6, 0, Math.PI * 2);
+      pctx.fill();
+      pctx.restore();
+    }
 
     function drawSpirals(dt){
       spirals.forEach(function(sp, idx){
@@ -1903,6 +1996,9 @@ function _crearDialOverlay(){
       // 3) Anillos orbitales sutiles
       drawOrbitRings(dt);
 
+      // 3b) v5.181: Efecto warp / agujero negro (centro)
+      drawWarp(dt);
+
       // 4) Espirales áureas (fondo)
       drawSpirals(dt);
 
@@ -2035,6 +2131,7 @@ function _crearDialOverlay(){
       buildSpirals();
       buildDust();          // v5.169
       buildOrbitRings();    // v5.169
+      buildWarp();          // v5.181
       synapses = [];
       pulses = [];
       vortices = [];
@@ -2070,6 +2167,7 @@ function _crearDialOverlay(){
         buildSpirals();
         buildDust();          // v5.169
         buildOrbitRings();    // v5.169
+      buildWarp();          // v5.181
       }
     });
   })();
