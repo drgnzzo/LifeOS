@@ -1,4 +1,12 @@
-/* RAW Entry — Overlay v.5.197
+/* RAW Entry — Overlay v.5.198
+   FIX v5.198 (CAUSA RAÍZ confirmada por dump runtime): al soltar un
+   panel, _hudColPositions salía con todo null → fourCols=false →
+   layout colapsaba a 2 columnas y amontonaba los paneles. Causa:
+   r (geometría del dial) venía de getBoundingClientRect, inestable
+   tras un drop. AHORA en modo normal r se calcula matemáticamente
+   (dial centrado, tamaño _calcDialSize) SIEMPRE. v5.193-197 atacaron
+   sintomas; esta es la causa real.
+   ── Heredado v5.197
    FIX v5.197: lock de reentrada GLOBAL (window._reposLock) + el DnD ya
    no hookea _reposicionarHUD. El hook congelaba una referencia vieja
    sin lock (confirmado en runtime: LOCK AUSENTE). Ahora el lock es
@@ -3396,35 +3404,34 @@ function _crearDialOverlay(){
     //  2) Apertura inicial: el dial tiene transform:scale(0.85) y opacity:0,
     //     antes de la fase 3 del timeline. boundingClientRect devuelve el
     //     rect transformado (más chico), descalibrando las columnas.
-    // Para detectar caso 2 miramos si _dialCanvas tiene transform inline o si
-    // hay paneles con _animatingEntry (apertura en curso). En ambos casos
-    // calculamos el rect final del dial centrado en el viewport.
+    //
+    // ─── FIX v5.198: CAUSA RAÍZ del "layout roto al soltar un panel" ───
+    // Diagnóstico runtime: tras un drop, _hudColPositions salía con TODO
+    // null → fourCols era false → layout colapsaba a 2 columnas y los
+    // paneles se amontonaban. fourCols=false ocurre cuando r.left (espacio
+    // a la izquierda del dial) sale demasiado chico. r venía de
+    // getBoundingClientRect del dial, y tras un drop el dial puede estar
+    // a media transición / con transform residual → rect equivocado.
+    // Los casos 1 y 2 ya calculaban el rect matemáticamente; el caso
+    // "drop / reposición normal" NO, y ahí estaba el hueco.
+    // SOLUCIÓN: en modo normal el dial SIEMPRE está centrado en el
+    // viewport con tamaño _calcDialSize(). Calculamos r matemáticamente
+    // SIEMPRE (salvo modo expandido). Nunca más dependemos de
+    // getBoundingClientRect, que es la fuente de inestabilidad.
     var _hayApertura = !window._hudExpanded && window._hudPanels.some(function(hp){ return hp.el && hp.el._animatingEntry; });
-    if(window._hudReturningFromExpand && !window._hudExpanded){
-      var _fSize = _calcDialSize();
-      var _fLeft = Math.round((vW - _fSize) / 2);
-      var _fTop  = Math.round((vH - _fSize) / 2);
+    if(!window._hudExpanded){
+      // Modo normal (incluye apertura, regreso de expandido y reposición
+      // tras drop): el dial está/estará centrado con su tamaño calculado.
+      var _fSizeN = _calcDialSize();
+      var _fLeftN = Math.round((vW - _fSizeN) / 2);
+      var _fTopN  = Math.round((vH - _fSizeN) / 2);
       r = {
-        left:   _fLeft,
-        top:    _fTop,
-        right:  _fLeft + _fSize,
-        bottom: _fTop  + _fSize,
-        width:  _fSize,
-        height: _fSize,
-      };
-    } else if(_hayApertura){
-      // Durante la apertura inicial el dial tiene scale(0.85) y boundingClientRect
-      // devuelve un rect chico. Usar el rect final del dial al tamaño normal.
-      var _fSize2 = _calcDialSize();
-      var _fLeft2 = Math.round((vW - _fSize2) / 2);
-      var _fTop2  = Math.round((vH - _fSize2) / 2);
-      r = {
-        left:   _fLeft2,
-        top:    _fTop2,
-        right:  _fLeft2 + _fSize2,
-        bottom: _fTop2  + _fSize2,
-        width:  _fSize2,
-        height: _fSize2,
+        left:   _fLeftN,
+        top:    _fTopN,
+        right:  _fLeftN + _fSizeN,
+        bottom: _fTopN  + _fSizeN,
+        width:  _fSizeN,
+        height: _fSizeN,
       };
     }
 
