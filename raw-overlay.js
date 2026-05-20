@@ -1,15 +1,23 @@
-/* RAW Entry — Overlay v.5.195
-   FIX (de fondo) "layout se desconfigura al soltar un panel".
+/* RAW Entry — Overlay v.5.196
+   FIX DEFINITIVO "layout se desconfigura al soltar un panel".
 
-   ── Cambio v5.195 ──
-   _reposicionarHUD ahora limpia el transform residual de TODOS los
-   paneles al inicio de la rama normal, ANTES de medir alturas. Un
-   transform activo (animacion previa o drag recien terminado)
-   contaminaba la medicion de scrollHeight → topMaxH se disparaba →
-   colTopY enorme → las columnas laterales se apilaban hasta el fondo
-   (sintoma: "movi una card y todas se bajaron"). La rama de regreso
-   de expandido ya limpiaba transforms; la rama normal no — ese era
-   el hueco real. v5.193/5.194 atacaron un sintoma, no la causa.
+   ── Causa raíz (confirmada con diagnóstico en runtime) ──
+   El dump de window._hudPanels al reproducir el bug mostró que
+   _side/_order quedaban CORRECTOS, pero cada columna arrancaba a
+   distinta altura (left-1 top:471px, left-2 top:930px...). Imposible
+   si colTopY fuese constante. La explicación: _reposicionarHUD se
+   ejecutaba de forma REENTRANTE — una segunda llamada entraba antes
+   de que la primera terminara de posicionar las 4 columnas. Las dos
+   pasadas se pisaban y dejaban columnas a alturas inconsistentes.
+
+   ── Fix v5.196 ──
+   _reposicionarHUD ahora tiene un lock de reentrada. Si una llamada
+   entra mientras otra está en curso, se ignora y se agenda UNA sola
+   re-ejecución limpia al final. La lógica real se movió a
+   _reposicionarHUD_impl; el wrapper gestiona el lock.
+
+   v5.193-195 atacaron síntomas (transforms, dimensiones); la causa
+   real era la reentrada.
 
    ── Heredado v5.193 ──
    REDISEÑO card expandida de FIJOS (mockup).
@@ -3331,7 +3339,33 @@ function _crearDialOverlay(){
   window._calcDialSize = _calcDialSize;
 
   // ── Reposicionar HUD ──
+  // ─── FIX v5.196: lock de reentrada (causa raíz del "layout roto al
+  //     soltar un panel") ───
+  // _reposicionarHUD posiciona las 4 columnas en secuencia, cada una
+  // midiendo scrollHeight (lo que fuerza reflow). Si una SEGUNDA llamada
+  // entra mientras la primera aún no termina (cosa que pasa al soltar un
+  // panel: onUp llama _reposicionarHUD, el hook del DnD agenda trabajo,
+  // y otros callers se solapan), las dos pasadas se pisan: la columna A
+  // se coloca con un estado y la C con otro → columnas a distinta altura.
+  // El lock hace que las llamadas reentrantes se ignoren, y agenda UNA
+  // sola re-ejecución limpia al final si hubo intentos durante el lock.
+  var _reposEnCurso = false;
+  var _reposPendiente = false;
   function _reposicionarHUD(){
+    if(_reposEnCurso){ _reposPendiente = true; return; }
+    _reposEnCurso = true;
+    try {
+      _reposicionarHUD_impl();
+    } finally {
+      _reposEnCurso = false;
+      if(_reposPendiente){
+        _reposPendiente = false;
+        // Re-ejecutar una vez en frío para asentar el layout final.
+        requestAnimationFrame(function(){ _reposicionarHUD(); });
+      }
+    }
+  }
+  function _reposicionarHUD_impl(){
     if(!_dialCanvas||!window._hudPanels) return;
     // Aplicar tamaño dinámico del dial ANTES de medir su rect, para que
     // getBoundingClientRect refleje ya el tamaño correcto para el viewport
