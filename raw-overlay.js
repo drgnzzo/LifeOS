@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.177
+/* RAW Entry — Overlay v.5.179
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -730,12 +730,13 @@ function _crearDialOverlay(){
     'border-radius:50%',
     'pointer-events:none',
     'z-index:0',
-    'backdrop-filter:blur(12px) saturate(110%)',
-    '-webkit-backdrop-filter:blur(12px) saturate(110%)',
-    // Mask radial: full opaque en el centro, fade hacia el borde
-    // para que la transición a "sin blur" sea gradual y no se note el corte
-    '-webkit-mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 78%)',
-    'mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 78%)',
+    // v5.178: blur más intenso + fondo oscuro semi-opaco para tapar más
+    'backdrop-filter:blur(24px) saturate(120%) brightness(0.85)',
+    '-webkit-backdrop-filter:blur(24px) saturate(120%) brightness(0.85)',
+    'background:radial-gradient(circle at 50% 50%, rgba(8,6,18,0.55) 0%, rgba(8,6,18,0.40) 45%, rgba(8,6,18,0.0) 78%)',
+    // Mask radial: opaque en el centro, fade hacia el borde
+    '-webkit-mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 82%)',
+    'mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 82%)',
   ].join(';');
   _dialOverlay.appendChild(_dialBlurDisc);
 
@@ -883,7 +884,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      var nStars = Math.max(140, Math.min(220, Math.floor((W * H) / 8000)));  // v5.169: más estrellas
+      var nStars = Math.max(175, Math.min(275, Math.floor((W * H) / 6400)));  // v5.179: +25% estrellas
       for(var i = 0; i < nStars; i++){
         var u = Math.random();
         var r = 30 + (MAX_R - 30) * Math.pow(u, 0.7);
@@ -1908,9 +1909,9 @@ function _crearDialOverlay(){
       // 5) Rayos del centro (giran)
       drawRays(dt);
 
-      // 6) Lorenz
-      updateLorenz(dt);
-      drawLorenz();
+      // 6) v5.179: Lorenz e interMesh eliminados (aparecían/desaparecían sin propósito)
+      // updateLorenz(dt);
+      // drawLorenz();
 
       // 7) Vórtices
       drawVortices(dt);
@@ -1918,8 +1919,8 @@ function _crearDialOverlay(){
       // 8) Sinapsis
       drawSynapses(dt);
 
-      // 8b) v5.171: Red interestelar (cadenas que no pasan por el centro)
-      drawInterMesh(dt);
+      // 8b) v5.179: red interestelar también eliminada
+      // drawInterMesh(dt);
 
       // 8c) v5.171: Mandalas eliminados en v5.172 (distraían)
       // drawMandalas(dt);
@@ -2012,9 +2013,9 @@ function _crearDialOverlay(){
       pctx.restore();
 
       // Spawns periódicos
-      if(synapses.length < 7 && Math.random() < 0.12) spawnSynapse();
+      // v5.179: sinapsis desactivadas (líneas entre estrellas que parecían no tener origen)
       if(pulses.length < 10 && Math.random() < 0.09) spawnPulse();
-      if(vortices.length < 3 && Math.random() < 0.012) spawnVortex();
+      // v5.179: vórtices desactivados (ondas concéntricas que aparecían en puntos sin contexto)
       // v5.177: Lorenz desactivado (trazos caóticos sin propósito visible)
       if(meteors.length < 3 && Math.random() < 0.015) spawnMeteor();
       // v5.171: Red interestelar y mandalas
