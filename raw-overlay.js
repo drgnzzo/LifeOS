@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.187
+/* RAW Entry — Overlay v.5.188
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -5771,6 +5771,11 @@ function _dialDrawSector(ctx,startA,endA,rOut,rIn,fill,accent,isActive){
   ctx.lineTo(dc.CX+rIn*Math.cos(endA),dc.CY+rIn*Math.sin(endA));
   ctx.arc(dc.CX,dc.CY,rIn,endA,startA,true);
   ctx.closePath();
+
+  // v5.188: pasada de relleno base opaco para que se vea menos lo de atrás.
+  // Sube la opacidad efectiva del gajo ~30% sin alterar el look del gradiente.
+  ctx.fillStyle = 'rgba(14,14,20,0.55)';
+  ctx.fill();
 
   var grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, (rOut-rIn)*1.1);
   var ar=139,ag=92,ab=246;
