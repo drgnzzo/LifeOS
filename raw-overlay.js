@@ -1,4 +1,24 @@
-/* RAW Entry — Overlay v.5.198
+/* RAW Entry — Overlay v.5.201
+   MEJORA del fondo del overlay (atmósfera tipo mockup).
+
+   ── Cambios v5.201 ──
+   · NEBULOSA VISIBLE: capa nueva pre-renderizada a canvas offscreen
+     (buildNebulaLayer/drawNebulaLayer). Manchas moradas/azules/cian
+     en esquinas y bordes, con textura de polvo. Antes la nebulosa
+     solo modulaba el brillo de estrellas (nebulaIntensityAt) pero no
+     se veía. Optimización: estática + drawImage por frame = costo
+     casi nulo. nebulaIntensityAt NO se tocó.
+   · ANILLOS DEL DIAL: 8 aros concéntricos (solid/dashed/ticks) con
+     glow, girando a distintas velocidades — estructura tipo Dyson.
+   · HALOS LEJANOS: 7 objetos cósmicos (núcleo + aro) por el fondo.
+   · ESTRELLAS: densidad +40% (368-580). Constelaciones 8→13.
+   · WARP suavizado 5x (0.6→0.12): el ciclo big-crunch ahora es un
+     drift casi imperceptible — ya no "se siente raro".
+   Rayos, sinapsis, flujos y curvas: SIN cambios.
+
+   ── Heredado v5.200 ──
+   REDISEÑO card expandida de VARIABLES (mockup).
+   ── Heredado v5.198
    FIX v5.198 (CAUSA RAÍZ confirmada por dump runtime): al soltar un
    panel, _hudColPositions salía con todo null → fourCols=false →
    layout colapsaba a 2 columnas y amontonaba los paneles. Causa:
@@ -912,6 +932,224 @@ function _crearDialOverlay(){
     }
 
     // ══════════════════════════════════════════════════════════════════
+    //  v5.201 — NEBULOSA VISIBLE (capa offscreen pre-renderizada)
+    //  Optimización: la nebulosa es estática (solo deriva lentísimo), así
+    //  que se pinta UNA vez a un canvas offscreen y por frame solo se hace
+    //  un drawImage — costo casi nulo. Da el color/textura del mockup sin
+    //  recalcular gradientes cada frame.
+    //  nebulaIntensityAt (arriba) NO se toca: sigue modulando estrellas.
+    // ══════════════════════════════════════════════════════════════════
+    var _nebCanvas = null;       // canvas offscreen con la nebulosa pintada
+    var _nebDriftX = 0, _nebDriftY = 0;
+
+    function buildNebulaLayer(){
+      _nebCanvas = document.createElement('canvas');
+      _nebCanvas.width  = W;
+      _nebCanvas.height = H;
+      var nc = _nebCanvas.getContext('2d');
+
+      // Colores de nebulosa — morados/azules/cian como el mockup objetivo.
+      var NEB_COLORS = [
+        'rgba(124, 58, 237, ALPHA)',   // violeta profundo
+        'rgba(59, 130, 246, ALPHA)',   // azul
+        'rgba(34, 211, 238, ALPHA)',   // cian
+        'rgba(139, 92, 246, ALPHA)',   // violeta medio
+      ];
+
+      // Manchas de nebulosa. Concentradas en esquinas/bordes (como el
+      // mockup), evitando el centro para no competir con el dial.
+      // [cx_rel, cy_rel, radio_rel, colorIdx, intensidad]
+      var blobs = [
+        [0.08, 0.82, 0.42, 0, 0.85],   // abajo-izquierda — fuerte
+        [0.92, 0.70, 0.46, 2, 0.90],   // abajo-derecha — fuerte (cian)
+        [0.04, 0.30, 0.34, 3, 0.55],   // arriba-izquierda — media
+        [0.97, 0.22, 0.30, 1, 0.50],   // arriba-derecha — media
+        [0.50, 0.95, 0.40, 0, 0.45],   // borde inferior centro — suave
+        [0.72, 0.90, 0.30, 3, 0.40],   // relleno abajo
+        [0.20, 0.60, 0.26, 1, 0.35],   // mancha suelta izquierda
+      ];
+
+      // Cada mancha = varias capas de gradiente radial superpuestas con
+      // leve offset, para que el borde sea irregular y no un círculo.
+      blobs.forEach(function(b){
+        var bx = b[0] * W, by = b[1] * H;
+        var br = b[2] * Math.min(W, H);
+        var baseColor = NEB_COLORS[b[3]];
+        var intensity = b[4];
+        var capas = 4;
+        for(var c = 0; c < capas; c++){
+          var ox = bx + (Math.sin(c * 2.1) * br * 0.22);
+          var oy = by + (Math.cos(c * 1.7) * br * 0.22);
+          var rad = br * (0.55 + c * 0.18);
+          // Alpha por capa: el additive hace que el solape se vea denso.
+          var a = (intensity * 0.10) * (1 - c / capas);
+          var g = nc.createRadialGradient(ox, oy, 0, ox, oy, rad);
+          g.addColorStop(0,   baseColor.replace('ALPHA', a.toFixed(3)));
+          g.addColorStop(0.5, baseColor.replace('ALPHA', (a * 0.45).toFixed(3)));
+          g.addColorStop(1,   baseColor.replace('ALPHA', '0'));
+          nc.globalCompositeOperation = 'lighter';
+          nc.fillStyle = g;
+          nc.fillRect(0, 0, W, H);
+        }
+      });
+
+      // Una pasada de "polvo" fino dentro de las nebulosas para textura.
+      nc.globalCompositeOperation = 'lighter';
+      for(var d = 0; d < 220; d++){
+        var blob = blobs[Math.floor(Math.random() * blobs.length)];
+        var ang = Math.random() * Math.PI * 2;
+        var dist = Math.random() * blob[2] * Math.min(W, H) * 0.7;
+        var dx = blob[0] * W + Math.cos(ang) * dist;
+        var dy = blob[1] * H + Math.sin(ang) * dist;
+        var col = NEB_COLORS[blob[3]].replace('ALPHA', (0.04 + Math.random() * 0.06).toFixed(3));
+        nc.fillStyle = col;
+        nc.beginPath();
+        nc.arc(dx, dy, 0.5 + Math.random() * 1.4, 0, Math.PI * 2);
+        nc.fill();
+      }
+      nc.globalCompositeOperation = 'source-over';
+    }
+
+    // Dibuja la nebulosa pre-renderizada con un drift lentísimo (parallax).
+    function drawNebulaLayer(dt){
+      if(!_nebCanvas) return;
+      _nebDriftX = Math.sin(globalT * 0.03) * 14;
+      _nebDriftY = Math.cos(globalT * 0.022) * 10;
+      pctx.save();
+      pctx.globalCompositeOperation = 'lighter';
+      pctx.globalAlpha = 0.9;
+      pctx.drawImage(_nebCanvas, _nebDriftX, _nebDriftY);
+      pctx.restore();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.201 — HALOS LEJANOS (objetos cósmicos con aro)
+    //  Puntos brillantes con un aro tenue alrededor, repartidos por el
+    //  fondo — las "esferas" lejanas del mockup. Ligeros: vectoriales.
+    // ══════════════════════════════════════════════════════════════════
+    var farHalos = [];
+    function buildFarHalos(){
+      farHalos = [];
+      var n = 7;
+      for(var i = 0; i < n; i++){
+        farHalos.push({
+          x: 0.10 + Math.random() * 0.80,   // relativo a W
+          y: 0.10 + Math.random() * 0.80,   // relativo a H
+          ringR: 14 + Math.random() * 22,
+          color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+          phase: Math.random() * Math.PI * 2,
+          pulseSpeed: 0.4 + Math.random() * 0.5,
+        });
+      }
+    }
+    function drawFarHalos(dt){
+      pctx.save();
+      pctx.globalCompositeOperation = 'lighter';
+      for(var i = 0; i < farHalos.length; i++){
+        var h = farHalos[i];
+        var hx = h.x * W, hy = h.y * H;
+        // No dibujar si cae sobre el dial central (queda feo encima).
+        if(Math.hypot(hx - CX, hy - CY) < DIAL_R * 1.5) continue;
+        h.phase += dt * h.pulseSpeed;
+        var pulse = 0.5 + 0.5 * Math.sin(h.phase);
+        // Núcleo brillante
+        var coreA = 0.35 + pulse * 0.4;
+        var cg = pctx.createRadialGradient(hx, hy, 0, hx, hy, 4);
+        cg.addColorStop(0, h.color);
+        cg.addColorStop(1, 'transparent');
+        pctx.globalAlpha = coreA;
+        pctx.fillStyle = cg;
+        pctx.beginPath(); pctx.arc(hx, hy, 4, 0, Math.PI*2); pctx.fill();
+        // Aro alrededor
+        pctx.globalAlpha = 0.10 + pulse * 0.16;
+        pctx.strokeStyle = h.color;
+        pctx.lineWidth = 1;
+        pctx.beginPath();
+        pctx.arc(hx, hy, h.ringR * (0.92 + pulse * 0.12), 0, Math.PI*2);
+        pctx.stroke();
+      }
+      pctx.restore();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.201 — ANILLOS CONCÉNTRICOS DEL DIAL (estructura tipo Dyson)
+    //  Varios aros alrededor del dial: unos continuos finos, otros
+    //  segmentados/punteados, con glow, girando a distintas velocidades.
+    //  Vectorial y ligero — ~8 aros, trazos simples.
+    // ══════════════════════════════════════════════════════════════════
+    var dialRings = [];
+    function buildDialRings(){
+      dialRings = [];
+      // [factor_radio, tipo, grosor, velocidad_giro, nSegmentos]
+      // tipo: 'solid' continuo · 'dashed' segmentado · 'ticks' marcas cortas
+      var defs = [
+        [1.18, 'solid',  1.0,  0.05,  0],
+        [1.30, 'dashed', 1.2, -0.07, 36],
+        [1.44, 'ticks',  1.5,  0.04, 60],
+        [1.58, 'solid',  0.8,  0.09,  0],
+        [1.74, 'dashed', 1.0, -0.05, 24],
+        [1.92, 'ticks',  1.3,  0.03, 90],
+        [2.12, 'solid',  0.7, -0.04,  0],
+        [2.36, 'dashed', 0.9,  0.025, 48],
+      ];
+      defs.forEach(function(d, i){
+        dialRings.push({
+          rFactor: d[0], type: d[1], width: d[2],
+          rotSpeed: d[3], nSeg: d[4],
+          rot: Math.random() * Math.PI * 2,
+          color: i % 2 === 0 ? '#A78BFA' : '#22D3EE',
+          phase: i * 0.7,
+        });
+      });
+    }
+    function drawDialRings(dt){
+      pctx.save();
+      pctx.globalCompositeOperation = 'lighter';
+      for(var i = 0; i < dialRings.length; i++){
+        var ring = dialRings[i];
+        ring.rot += ring.rotSpeed * dt;
+        ring.phase += dt * 0.6;
+        var R = DIAL_R * ring.rFactor;
+        // Glow suave que respira
+        var breathe = 0.5 + 0.5 * Math.sin(ring.phase);
+        var baseA = 0.10 + breathe * 0.10;
+        pctx.strokeStyle = ring.color;
+        pctx.lineWidth = ring.width;
+        pctx.shadowColor = ring.color;
+        pctx.shadowBlur = 6;
+
+        if(ring.type === 'solid'){
+          pctx.globalAlpha = baseA;
+          pctx.beginPath();
+          pctx.arc(CX, CY, R, 0, Math.PI * 2);
+          pctx.stroke();
+        } else if(ring.type === 'dashed'){
+          pctx.globalAlpha = baseA * 1.3;
+          var segLen = (Math.PI * 2) / ring.nSeg;
+          for(var s = 0; s < ring.nSeg; s += 2){
+            var a0 = ring.rot + s * segLen;
+            pctx.beginPath();
+            pctx.arc(CX, CY, R, a0, a0 + segLen * 0.7);
+            pctx.stroke();
+          }
+        } else if(ring.type === 'ticks'){
+          pctx.globalAlpha = baseA * 1.1;
+          pctx.shadowBlur = 3;
+          for(var t = 0; t < ring.nSeg; t++){
+            var ang = ring.rot + (t / ring.nSeg) * Math.PI * 2;
+            var inner = R - 3, outer = R + 3;
+            pctx.beginPath();
+            pctx.moveTo(CX + Math.cos(ang) * inner, CY + Math.sin(ang) * inner);
+            pctx.lineTo(CX + Math.cos(ang) * outer, CY + Math.sin(ang) * outer);
+            pctx.stroke();
+          }
+        }
+      }
+      pctx.shadowBlur = 0;
+      pctx.restore();
+    }
+
+
     //  RAYOS DEL CENTRO ABSOLUTO (parten de CX,CY y rotan)
     // ══════════════════════════════════════════════════════════════════
     function buildRays(){
@@ -936,7 +1174,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      var nStars = Math.max(263, Math.min(413, Math.floor((W * H) / 4267)));  // v5.180: +50% estrellas
+      var nStars = Math.max(368, Math.min(580, Math.floor((W * H) / 3050)));  // v5.201: +40% estrellas (campo más denso, como el mockup)
       for(var i = 0; i < nStars; i++){
         var u = Math.random();
         var r = 30 + (MAX_R - 30) * Math.pow(u, 0.7);
@@ -961,7 +1199,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildConstellations(){
       constellations = [];
-      var nConst = 8;  // v5.169: más constelaciones
+      var nConst = 13;  // v5.201: más constelaciones (como el mockup)
       for(var c = 0; c < nConst; c++){
         // Centro del grupo en órbita
         var cR = 200 + Math.random() * (MAX_R - 250);
@@ -1206,10 +1444,10 @@ function _crearDialOverlay(){
         var radialVel;
         if(force > 0){
           // Contracción: cae hacia el centro, acelera cerca (gravedad)
-          radialVel = -(gravityPull + 12) * force * 0.6;  // v5.185: más lento
+          radialVel = -(gravityPull + 12) * force * 0.12; // v5.201: warp muy suave
         } else {
           // Expansión: sale hacia afuera, acelera lejos
-          radialVel = (expansionPush + 12) * (-force) * 0.6;  // v5.185: más lento
+          radialVel = (expansionPush + 12) * (-force) * 0.12; // v5.201: warp muy suave
         }
         w.r += radialVel * dt;
 
@@ -2086,8 +2324,11 @@ function _crearDialOverlay(){
       globalT += dt;
       galaxyRotation += 0.01 * dt;
 
-      // 1) Actualizar nebulosa
+      // 1) Actualizar nebulosa (modulador de estrellas — sin cambios)
       updateNebula(dt);
+
+      // 1b) v5.201: NEBULOSA VISIBLE — capa offscreen al fondo de todo.
+      drawNebulaLayer(dt);
 
       // 2) Polvo cósmico (capa más al fondo)
       drawDust(dt);
@@ -2096,10 +2337,14 @@ function _crearDialOverlay(){
       // v5.187: drawOrbitRings desactivado (aros mecánicos poco orgánicos)
 
       // 3b) v5.181: Efecto warp / agujero negro (centro)
+      // v5.201: warp muy suavizado — ver drawWarp (ciclo casi imperceptible).
       drawWarp(dt);
 
       // 4) Espirales áureas (fondo)
       drawSpirals(dt);
+
+      // 4b) v5.201: ANILLOS CONCÉNTRICOS del dial (estructura tipo Dyson)
+      drawDialRings(dt);
 
       // 5) Rayos del centro (giran)
       drawRays(dt);
@@ -2125,6 +2370,9 @@ function _crearDialOverlay(){
 
       // 10) Estrellas
       drawStars(dt);
+
+      // 10b) v5.201: HALOS LEJANOS (objetos cósmicos con aro)
+      drawFarHalos(dt);
 
       // 11) Meteoros (encima de las estrellas, dramáticos)
       drawMeteors(dt);
@@ -2224,6 +2472,9 @@ function _crearDialOverlay(){
     function start(){
       resize();
       initNebula();
+      buildNebulaLayer();   // v5.201: capa de nebulosa visible offscreen
+      buildFarHalos();      // v5.201: halos lejanos
+      buildDialRings();     // v5.201: anillos concéntricos del dial
       buildRays();
       buildStars();
       buildConstellations();
@@ -2260,6 +2511,9 @@ function _crearDialOverlay(){
       if(_particlesCanvas.offsetParent !== null){
         resize();
         initNebula();
+        buildNebulaLayer();   // v5.201: re-render nebulosa al nuevo tamaño
+        buildFarHalos();      // v5.201
+        buildDialRings();     // v5.201
         buildRays();
         buildStars();
         buildConstellations();
@@ -4913,27 +5167,30 @@ function _crearDialOverlay(){
     },
     // ── VARIABLES ──
     'hud-variables': {
+      // v5.200: vista expandida rediseñada. renderVariablesExpandido pinta
+      // tabla + stats + chips + contenedor de grafica en un contenedor.
       html: function(){
-        return ''+
-          '<div style="display:flex;gap:14px;flex:1;min-height:0;align-items:stretch">'+
-            '<div id="hud-var-tabla" style="flex:1.1;min-width:0;overflow:auto;display:flex;align-items:center"></div>'+
-            '<div id="hud-var-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0;justify-content:center">'+
-              '<div id="graf-loading-hud-var-tabla" style="text-align:center;padding:24px;color:rgba(220,224,235,0.40)">Cargando gráfica…</div>'+
-              '<canvas id="graf-canvas-hud-var-tabla" style="display:none;flex:1;min-height:200px;max-height:100%"></canvas>'+
-              '<div id="graf-leyenda-hud-var-tabla" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0"></div>'+
-            '</div>'+
-          '</div>';
+        return '<div id="hud-var-tabla" style="width:100%;min-width:0"></div>';
       },
       hydrate: function(){
-        if(typeof renderGastos === 'function' && typeof datosMes !== 'undefined' && datosMes && datosMes.meses){
-          renderGastos('hud-var-tabla');
-          if(typeof initGraficas === 'function') initGraficas(datosMes, '-hud-var-tabla');
+        function _pintar(d){
+          window.datosMes = d;
+          if(typeof renderVariablesExpandido === 'function'){
+            renderVariablesExpandido(d, 'hud-var-tabla');
+            function _graf(){ if(typeof renderVariablesGrafica==='function') renderVariablesGrafica(); }
+            if(window.Chart){ setTimeout(_graf, 60); }
+            else {
+              var s=document.createElement('script');
+              s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+              s.onload=function(){ setTimeout(_graf, 80); };
+              document.head.appendChild(s);
+            }
+          }
+        }
+        if(typeof datosMes !== 'undefined' && datosMes && datosMes.meses){
+          _pintar(datosMes);
         } else if(typeof api !== 'undefined' && api.getDatosMes){
-          api.getDatosMes().then(function(d){
-            window.datosMes = d;
-            renderGastos('hud-var-tabla');
-            if(typeof initGraficas === 'function') initGraficas(d, '-hud-var-tabla');
-          }).catch(function(){});
+          api.getDatosMes().then(_pintar).catch(function(){});
         } else {
           var el = document.getElementById('hud-var-tabla');
           if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
