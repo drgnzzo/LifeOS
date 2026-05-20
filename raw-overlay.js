@@ -1,4 +1,22 @@
-/* RAW Entry — Overlay v.5.201
+/* RAW Entry — Overlay v.5.202
+   FIX "el fondo se ve gris/opaco, como con una capa encima".
+
+   ── Causa ──
+   El _dialOverlay (div fixed que cubre toda la pantalla) tenía
+   backdrop-filter:blur(28px) brightness(0.68) + un background
+   radial translúcido. El blur "lavaba" los negros del fondo de
+   estrellas → gris. Además _particlesCanvas estaba en opacity:0.75,
+   dejando ver ese gris a través del fondo.
+
+   ── Fix v5.202 ──
+   · _dialOverlay: fondo NEGRO sólido (radial #0a0618→#020308), sin
+     backdrop-filter. El overlay ya tiene su fondo de partículas
+     opaco, no necesita desenfocar lo de atrás.
+   · _particlesCanvas: opacity 0.75 → 1 (fondo de estrellas pleno).
+   Ahora el fondo se ve negro profundo y las nebulosas/estrellas
+   resaltan como en el mockup.
+
+   ── Heredado v5.201 ──
    MEJORA del fondo del overlay (atmósfera tipo mockup).
 
    ── Cambios v5.201 ──
@@ -755,9 +773,12 @@ function _crearDialOverlay(){
     'position:fixed','inset:0','z-index:9000',
     'display:none','align-items:center','justify-content:center',
     'opacity:0','pointer-events:none',
-    'background:radial-gradient(ellipse at center,rgba(80,40,140,0.15) 0%,rgba(4,4,14,0.65) 100%)',
-    'backdrop-filter:blur(28px) saturate(160%) brightness(0.68)',
-    '-webkit-backdrop-filter:blur(28px) saturate(160%) brightness(0.68)',
+    // v5.202: fondo NEGRO sólido. Antes era un radial translúcido
+    // (rgba ...0.65) + backdrop-filter:blur(28px) brightness(0.68) que
+    // "lavaba" los negros del fondo de estrellas → se veía gris/opaco.
+    // El overlay ya tiene su propio fondo de partículas opaco encima,
+    // así que no necesita desenfocar el dashboard de atrás.
+    'background:radial-gradient(ellipse at center,#0a0618 0%,#020308 100%)',
   ].join(';');
 
   // ── Glow ambiental — v5.150: más intenso para que el dial se sienta como núcleo neuronal ──
@@ -823,7 +844,9 @@ function _crearDialOverlay(){
   // ══════════════════════════════════════════════════════════════════
   var _particlesCanvas = document.createElement('canvas');
   _particlesCanvas.id = 'dial-particles';
-  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.75';
+  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:1';
+  // v5.202: opacity 0.75 → 1. Con 0.75 el fondo de estrellas/nebulosas
+  // dejaba ver el gris de detrás → se sumaba al efecto "lavado".
   _dialOverlay.appendChild(_particlesCanvas);
 
   (function initEverything(){
