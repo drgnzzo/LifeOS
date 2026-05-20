@@ -1,4 +1,19 @@
-/* RAW Entry — Overlay v.5.202
+/* RAW Entry — Overlay v.5.203
+   ORDEN en el fondo del overlay (menos caótico).
+
+   ── Cambios v5.203 ──
+   · HALOS lejanos: quietos y sutiles — brillo FIJO por halo, sin
+     pulso. Ya no parpadean caóticos. 6 en vez de 7.
+   · ANILLOS del dial: 8→5 aros. TODOS giran en la MISMA dirección
+     (horario) a velocidad lenta y pareja → se leen como un solo
+     sistema ordenado, no 8 cosas sueltas. Arrancan alineados.
+   · WARP → DISCO DE ACRECIÓN real: las partículas espiralan SIEMPRE
+     hacia el centro (se eliminó el ciclo big-crunch/big-bang que
+     solo hacía gravitar). Aceleran y brillan al acercarse, cruzan
+     el horizonte de eventos y son "tragadas" → renacen lejos. Un
+     agujero negro de verdad: flujo constante hacia adentro.
+
+   ── Heredado v5.202 ──
    FIX "el fondo se ve gris/opaco, como con una capa encima".
 
    ── Causa ──
@@ -1053,19 +1068,22 @@ function _crearDialOverlay(){
     var farHalos = [];
     function buildFarHalos(){
       farHalos = [];
-      var n = 7;
+      var n = 6;  // v5.203: uno menos, más espaciados
       for(var i = 0; i < n; i++){
         farHalos.push({
           x: 0.10 + Math.random() * 0.80,   // relativo a W
           y: 0.10 + Math.random() * 0.80,   // relativo a H
-          ringR: 14 + Math.random() * 22,
+          ringR: 16 + Math.random() * 16,
           color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
-          phase: Math.random() * Math.PI * 2,
-          pulseSpeed: 0.4 + Math.random() * 0.5,
+          // v5.203: brillo FIJO por halo (sin pulso). Cada uno tiene su
+          // intensidad estable — discretos, no parpadeantes.
+          bright: 0.35 + Math.random() * 0.30,
         });
       }
     }
     function drawFarHalos(dt){
+      // v5.203: halos QUIETOS y sutiles — sin pulso. Objetos lejanos
+      // discretos, no luces parpadeando caóticas.
       pctx.save();
       pctx.globalCompositeOperation = 'lighter';
       for(var i = 0; i < farHalos.length; i++){
@@ -1073,22 +1091,19 @@ function _crearDialOverlay(){
         var hx = h.x * W, hy = h.y * H;
         // No dibujar si cae sobre el dial central (queda feo encima).
         if(Math.hypot(hx - CX, hy - CY) < DIAL_R * 1.5) continue;
-        h.phase += dt * h.pulseSpeed;
-        var pulse = 0.5 + 0.5 * Math.sin(h.phase);
-        // Núcleo brillante
-        var coreA = 0.35 + pulse * 0.4;
-        var cg = pctx.createRadialGradient(hx, hy, 0, hx, hy, 4);
+        // Núcleo brillante — alpha fijo
+        var cg = pctx.createRadialGradient(hx, hy, 0, hx, hy, 3.5);
         cg.addColorStop(0, h.color);
         cg.addColorStop(1, 'transparent');
-        pctx.globalAlpha = coreA;
+        pctx.globalAlpha = h.bright;
         pctx.fillStyle = cg;
-        pctx.beginPath(); pctx.arc(hx, hy, 4, 0, Math.PI*2); pctx.fill();
-        // Aro alrededor
-        pctx.globalAlpha = 0.10 + pulse * 0.16;
+        pctx.beginPath(); pctx.arc(hx, hy, 3.5, 0, Math.PI*2); pctx.fill();
+        // Aro alrededor — tenue y fijo
+        pctx.globalAlpha = 0.14;
         pctx.strokeStyle = h.color;
         pctx.lineWidth = 1;
         pctx.beginPath();
-        pctx.arc(hx, hy, h.ringR * (0.92 + pulse * 0.12), 0, Math.PI*2);
+        pctx.arc(hx, hy, h.ringR, 0, Math.PI*2);
         pctx.stroke();
       }
       pctx.restore();
@@ -1103,23 +1118,25 @@ function _crearDialOverlay(){
     var dialRings = [];
     function buildDialRings(){
       dialRings = [];
-      // [factor_radio, tipo, grosor, velocidad_giro, nSegmentos]
-      // tipo: 'solid' continuo · 'dashed' segmentado · 'ticks' marcas cortas
+      // v5.203: 5 aros (antes 8). TODOS giran en la MISMA dirección
+      // (horario) y a velocidad LENTA y pareja → se leen como un solo
+      // sistema ordenado, no 8 cosas sueltas girando caóticas.
+      // [factor_radio, tipo, grosor, nSegmentos]
       var defs = [
-        [1.18, 'solid',  1.0,  0.05,  0],
-        [1.30, 'dashed', 1.2, -0.07, 36],
-        [1.44, 'ticks',  1.5,  0.04, 60],
-        [1.58, 'solid',  0.8,  0.09,  0],
-        [1.74, 'dashed', 1.0, -0.05, 24],
-        [1.92, 'ticks',  1.3,  0.03, 90],
-        [2.12, 'solid',  0.7, -0.04,  0],
-        [2.36, 'dashed', 0.9,  0.025, 48],
+        [1.20, 'solid',  1.0,  0],
+        [1.36, 'dashed', 1.2, 36],
+        [1.54, 'ticks',  1.3, 72],
+        [1.74, 'solid',  0.8,  0],
+        [1.96, 'dashed', 0.9, 30],
       ];
+      var ROT_BASE = 0.018;  // velocidad base lenta, igual para todos
       defs.forEach(function(d, i){
         dialRings.push({
-          rFactor: d[0], type: d[1], width: d[2],
-          rotSpeed: d[3], nSeg: d[4],
-          rot: Math.random() * Math.PI * 2,
+          rFactor: d[0], type: d[1], width: d[2], nSeg: d[3],
+          // Todos en la misma dirección. Los exteriores apenas más
+          // lentos (parallax sutil), pero el MISMO sentido.
+          rotSpeed: ROT_BASE * (1 - i * 0.10),
+          rot: 0,  // arrancan alineados, no aleatorio
           color: i % 2 === 0 ? '#A78BFA' : '#22D3EE',
           phase: i * 0.7,
         });
@@ -1393,16 +1410,14 @@ function _crearDialOverlay(){
     //  horizonte de eventos). Queda detrás del dial.
     // ══════════════════════════════════════════════════════════════════
     var warpParticles = [];
-    // v5.184: ciclo cósmico — contracción (big crunch) ↔ expansión (big bang)
-    var cosmicPhase = 0;            // 0..1 dentro del ciclo
-    var cosmicMode = 'crunch';      // 'crunch' (cae al centro) o 'bang' (sale)
-    var cosmicCycleTime = 0;
+    // v5.203: el ciclo cósmico (cosmicPhase/cosmicMode/cosmicCycleTime)
+    // se eliminó — el warp ahora es disco de acreción de flujo constante.
 
     function buildWarp(){
       warpParticles = [];
-      // El warp ahora abarca TODA la interfaz — partículas distribuidas
-      // por todo el viewport, no solo cerca del dial.
-      var nWarp = 600;  // v5.185: warp masivo
+      // v5.203: disco de acreción — menos partículas (no hace falta llenar
+      // toda la pantalla; el flujo hacia el centro es lo que importa).
+      var nWarp = 340;
       var diag = Math.hypot(W/2, H/2);
       for(var i = 0; i < nWarp; i++){
         warpParticles.push(spawnWarpParticle(diag));
@@ -1411,119 +1426,77 @@ function _crearDialOverlay(){
 
     function spawnWarpParticle(diag){
       if(diag === undefined) diag = Math.hypot(W/2, H/2);
-      // Radio distribuido por TODA la pantalla (desde cerca del centro
-      // hasta más allá de las esquinas). Distribución uniforme en área.
-      var minR = 30;
+      // v5.203: nace en cualquier radio, distribución uniforme por área.
+      var minR = DIAL_R * 0.6;
       var maxR = diag + 60;
-      // sqrt para densidad uniforme por área
       var r = minR + (maxR - minR) * Math.sqrt(Math.random());
       return {
         r: r,
         theta: Math.random() * Math.PI * 2,
-        rHome: r,                       // radio "de reposo" — punto de equilibrio
         color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
-        size: 0.4 + Math.random() * 1.4,
+        size: 0.4 + Math.random() * 1.3,
         phase: Math.random() * Math.PI * 2,
+        // Velocidad de caída individual — leve variación para que no
+        // caigan todas exactamente igual (se ve más orgánico).
+        fallRate: 0.85 + Math.random() * 0.3,
+        _reborn: 1,
       };
     }
 
+    // v5.203 — DISCO DE ACRECIÓN: las partículas espiralan SIEMPRE hacia
+    // el centro (sin ciclo de expansión). Aceleran y brillan al acercarse,
+    // cruzan el horizonte de eventos y son "tragadas" → renacen lejos.
+    // Un agujero negro de verdad: flujo constante hacia adentro.
     function drawWarp(dt){
       var diag = Math.hypot(W/2, H/2);
-      var eventHorizon = DIAL_R * 0.55;  // v5.186: zona de absorción más amplia
-
-      // ── CICLO CÓSMICO: big crunch ↔ big bang ──
-      // Periodo total ~24s: 12s contrayéndose, 12s expandiéndose.
-      cosmicCycleTime += dt;
-      var CYCLE = 40;  // v5.185: ciclo más lento
-      var halfCycle = CYCLE / 2;
-      var tInCycle = cosmicCycleTime % CYCLE;
-      // cosmicForce: -1 = contracción máxima (hacia el centro)
-      //              +1 = expansión máxima (hacia afuera)
-      // Transición suave con seno para que no haya cambios bruscos.
-      var cosmicForce = Math.sin((tInCycle / CYCLE) * Math.PI * 2);
-      // cosmicForce > 0 → primera mitad: contracción
-      //               < 0 → segunda mitad: expansión
-      // (usamos -cosmicForce para que arranque contrayéndose)
-      var force = -cosmicForce;
+      var eventHorizon = DIAL_R * 0.62;  // borde del agujero negro
 
       for(var i = 0; i < warpParticles.length; i++){
         var w = warpParticles[i];
 
-        // ── ROTACIÓN KEPLERIANA: más rápido cerca del centro ──
-        // ω = K / r^1.5 (tercera ley de Kepler: T² ∝ r³ → ω ∝ r^-1.5)
-        // Reducimos el factor cerca del centro para que sea "más lento en el warp"
+        // ── ROTACIÓN: kepleriana — más rápido cuanto más cerca ──
+        // Todas giran en la MISMA dirección (horario) → orden.
         var safeR = Math.max(eventHorizon, w.r);
-        var angVel = (90 / Math.pow(safeR, 1.05)) * 0.3;  // v5.185: aún más lento
+        var angVel = (70 / Math.pow(safeR, 0.95)) * 0.5;
         w.theta += angVel * dt;
         w.phase += dt * 1.5;
 
-        // ── MOVIMIENTO RADIAL: ciclo contracción/expansión ──
-        // La fuerza cósmica empuja hacia el centro (force>0) o hacia afuera (force<0).
-        // Cuanto más lejos del centro, más "sienten" la expansión;
-        // cuanto más cerca, más "sienten" la contracción (gravedad).
-        var gravityPull = 30 * (1 - Math.min(1, w.r / diag)); // fuerte cerca del centro
-        var expansionPush = 45 * (w.r / diag);                 // fuerte lejos del centro
-        // Velocidad radial según la fase del ciclo
-        var radialVel;
-        if(force > 0){
-          // Contracción: cae hacia el centro, acelera cerca (gravedad)
-          radialVel = -(gravityPull + 12) * force * 0.12; // v5.201: warp muy suave
-        } else {
-          // Expansión: sale hacia afuera, acelera lejos
-          radialVel = (expansionPush + 12) * (-force) * 0.12; // v5.201: warp muy suave
-        }
-        w.r += radialVel * dt;
+        // ── CAÍDA HACIA EL CENTRO: constante, acelera cerca ──
+        // La velocidad de caída crece a medida que se acerca (gravedad).
+        var prox = 1 - Math.min(1, w.r / diag);          // 0 lejos, 1 centro
+        var fallSpeed = (14 + prox * prox * 90) * w.fallRate;
+        w.r -= fallSpeed * dt;
 
-        // v5.186: ABSORCIÓN — el agujero negro "se come" las partículas
-        // que cruzan el horizonte de eventos. Renacen lejos (en el borde).
+        // ── ABSORCIÓN: cruza el horizonte → tragada, renace lejos ──
         if(w.r <= eventHorizon){
-          // Tragada: renace en un radio exterior aleatorio
-          var diagNow = Math.hypot(W/2, H/2);
-          w.r = diagNow * (0.55 + Math.random() * 0.55);
+          w.r = diag * (0.70 + Math.random() * 0.45);
           w.theta = Math.random() * Math.PI * 2;
-          w.rHome = w.r;
           w.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
-          // Pequeña marca para fade-in al renacer
-          w._reborn = 0;
-        } else if(w.r > diag + 80){
-          w.r = diag + 80;
+          w._reborn = 0;  // fade-in al renacer
         }
-        // Avanzar el fade-in de renacimiento
-        if(w._reborn !== undefined && w._reborn < 1){
-          w._reborn = Math.min(1, w._reborn + dt * 1.5);
+        if(w._reborn < 1){
+          w._reborn = Math.min(1, w._reborn + dt * 1.2);
         }
 
         // ── RENDER ──
         var px = CX + Math.cos(w.theta) * w.r;
         var py = CY + Math.sin(w.theta) * w.r;
-        // proximity: 1 en el centro, 0 en el borde
-        var proximity = 1 - Math.min(1, w.r / diag);
-        var twinkle = 0.6 + 0.4 * Math.sin(w.phase);
-        // Brillo: más en el centro (calentamiento) y modulado por el ciclo
-        var cycleGlow = 0.7 + 0.3 * Math.abs(cosmicForce);
-        var alpha = (0.20 + proximity * 0.55) * twinkle * cycleGlow;
-        // v5.186: fade-in al renacer (tras ser tragada por el agujero negro)
-        if(w._reborn !== undefined && w._reborn < 1){
-          alpha *= w._reborn;
-        }
-        // v5.186: cerca del horizonte la partícula se "estira" y acelera su
-        // brillo — efecto de ser absorbida (último destello antes de caer)
-        var nearHorizon = Math.max(0, 1 - (w.r - eventHorizon) / (DIAL_R * 1.2));
-        if(nearHorizon > 0){
-          alpha *= (1 + nearHorizon * 0.8);   // último destello
-        }
-        var radius = w.size * (0.7 + proximity * 0.9) * (1 + nearHorizon * 0.6);
-        // Blueshift cerca del centro
-        var col = proximity > 0.72 ? '#E0F2FE' : w.color;
+        var twinkle = 0.7 + 0.3 * Math.sin(w.phase);
+        // Cerca del horizonte: último destello brillante antes de caer.
+        var nearHorizon = Math.max(0, 1 - (w.r - eventHorizon) / (DIAL_R * 1.0));
+        var alpha = (0.16 + prox * 0.5) * twinkle * w._reborn;
+        if(nearHorizon > 0) alpha *= (1 + nearHorizon * 1.1);
+        var radius = w.size * (0.7 + prox * 0.8) * (1 + nearHorizon * 0.7);
+        // Blueshift cerca del centro (calentamiento del disco).
+        var col = prox > 0.7 ? '#E0F2FE' : w.color;
         pctx.fillStyle = col + Math.floor(Math.max(0, Math.min(1, alpha)) * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = col;
-        pctx.shadowBlur = 2 + proximity * 12 + nearHorizon * 10;
+        pctx.shadowBlur = 2 + prox * 10 + nearHorizon * 12;
         pctx.beginPath();
         pctx.arc(px, py, radius, 0, Math.PI * 2);
         pctx.fill();
       }
       pctx.shadowBlur = 0;
-      // v5.185: photon ring eliminado (el halo del centro molestaba)
     }
 
     function drawSpirals(dt){
