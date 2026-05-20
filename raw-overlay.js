@@ -1,22 +1,24 @@
-/* RAW Entry — Overlay v.5.190
-   FIX textos cortados en paneles HUD del dial.
+/* RAW Entry — Overlay v.5.191
+   FIX titulos de header que seguian cortados (PATRIM…, NECESI…, etc.)
 
-   ── Bug ──
-   Titulos de header ("PATRIMONIO","NECESIDADES","FINANCIERO"...) y otros
-   textos se mostraban truncados a la inicial + "..." (P..., N..., B...).
-   Causa: contenedores estrechos + font-size/letter-spacing demasiado
-   grandes para el espacio disponible. El ellipsis solo ESCONDIA el
-   problema, no hacia caber el texto.
+   ── Bug v5.190 ──
+   Los headers CON sparkline aun truncaban el titulo: el sparkline tenia
+   width:48px;flex-shrink:0 (rigido) y el titulo flex:1 no tenia a donde
+   crecer → ellipsis lo cortaba. FIJOS (sin sparkline) si se veia bien.
 
-   ── Fix v5.190 ──
-   Reducir tamaño y letter-spacing lo justo para que el texto QUEPA:
-     · .hud-h-t       11px/.10em  → 9.5px/.035em  (titulo header)
-     · .hud-hero-v    30px        → 25px          (monto grande)
-     · .hud-trio-cell padding 7px → 5px lateral; .lbl .04em→0;
-                      .v 16px     → 13px          (cajitas Activity)
-     · .hud-cta .lbl  .10em       → .03em         (label del pie)
-   El ellipsis se conserva en todos como red de seguridad, pero con los
-   datos reales del dial ya no debe activarse.
+   ── Fix v5.191 ──
+   Invertir prioridad de ancho en el header:
+     · .hud-h-t      → flex:0 1 auto; flex-shrink:0; SIN ellipsis.
+                       El titulo nunca se corta y nunca salta a 2 lineas.
+     · .hud-h-spark  → flex:0 1 48px; min-width:0. El sparkline CEDE el
+                       espacio: se encoge cuando el titulo lo necesita.
+     · .hud-h        → flex-wrap:nowrap (header siempre en 1 fila).
+     · .hud-hero-lbl → +nowrap (no rompe a 2 lineas; "EXCEDENTE DEL MES").
+     · .hud-trio-cell .lbl → 7.5px→7px ("RACHA ACTUAL" cabe completo).
+
+   ── Heredado v5.190 ──
+   Reduccion de tamaño/letter-spacing en hud-h-t, hud-hero-v,
+   hud-trio-cell, hud-cta para que los textos quepan.
 
    ── FIX clicks rotos en +Nueva — causa raíz definitiva (heredado v5.189) ──
 
@@ -2502,14 +2504,21 @@ function _crearDialOverlay(){
       '.hud-pnl .num{font-family:JetBrains Mono,ui-monospace,monospace;font-variant-numeric:tabular-nums}',
       '.hud-pnl .dim{opacity:.45}',
       // header
-      '.hud-h{display:flex;align-items:center;gap:10px;padding:14px 16px 12px}',
+      '.hud-h{display:flex;align-items:center;flex-wrap:nowrap;gap:10px;padding:14px 16px 12px}',
+      // v5.191: el sparkline cede espacio al titulo. Tiene flex:0 1 48px, asi
+      // que se encoge cuando el titulo lo necesita. El titulo siempre gana
+      // porque tiene flex-shrink:0 y no lleva ellipsis.
+      '.hud-h-spark{flex:0 1 48px;min-width:0}',
       '.hud-h-ico{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
       '.hud-h-ico i{font-size:12px}',
       // v5.190: fuente 11->9.5px + letter-spacing .10->.035em para que titulos
       // largos ("PATRIMONIO","NECESIDADES","FINANCIERO") quepan completos junto
       // al sparkline. Ellipsis se conserva como red de seguridad pero ya no
       // deberia activarse con los titulos reales del dial.
-      '.hud-h-t{font-size:9.5px;font-weight:800;letter-spacing:.035em;text-transform:uppercase;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      // v5.191: el TITULO manda sobre el sparkline. flex-shrink:0 + sin ellipsis
+      // → nunca se corta y nunca salta a 2 lineas. El sparkline (.hud-h-spark)
+      // es quien cede espacio. white-space:nowrap garantiza renglon unico.
+      '.hud-h-t{font-size:9.5px;font-weight:800;letter-spacing:.035em;text-transform:uppercase;flex:0 1 auto;flex-shrink:0;white-space:nowrap}',
       '.hud-h-k{font-size:14px;font-weight:800;color:rgba(220,220,240,0.35);letter-spacing:.10em;cursor:default;line-height:0}',
       '.hud-h-expand{background:transparent;border:0;cursor:pointer;padding:5px;border-radius:5px;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s;opacity:.55}',
       '.hud-h-expand:hover{opacity:1;background:rgba(255,255,255,0.06);transform:scale(1.1)}',
@@ -2551,7 +2560,8 @@ function _crearDialOverlay(){
       // hero
       '.hud-hero{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}',
       '.hud-hero-l{flex:1;min-width:0}',
-      '.hud-hero-lbl{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(200,208,230,0.40);margin-bottom:6px}',
+      // v5.191: nowrap → el sublabel ("EXCEDENTE DEL MES") nunca rompe a 2 lineas.
+      '.hud-hero-lbl{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(200,208,230,0.40);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       // v5.190: fuente 30->25px. Con 30px un monto como "+ $ 13,705" se cortaba
       // a "+ $ 13,70..." en el ancho del panel. 25px deja caber 9-10 caracteres.
       '.hud-hero-v{font-size:25px;font-weight:800;letter-spacing:-.02em;line-height:1;font-family:JetBrains Mono,ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
@@ -2607,9 +2617,9 @@ function _crearDialOverlay(){
       '.hud-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:12px 14px}',
       '.hud-trio-cell{padding:9px 5px;border-radius:9px;border:1px solid;text-align:left;position:relative;overflow:hidden;background:rgba(255,255,255,0.02);min-width:0}',
       '.hud-trio-cell .top{position:absolute;top:0;left:0;right:0;height:2px}',
-      // v5.190: lbl con letter-spacing 0 para que "HABITOS HOY"/"RACHA ACTUAL"
-      // quepan en la celda estrecha sin cortarse.
-      '.hud-trio-cell .lbl{font-size:7.5px;font-weight:800;letter-spacing:0;text-transform:uppercase;margin-bottom:5px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      // v5.191: lbl 7.5->7px para que "RACHA ACTUAL" / "HABITOS HOY" quepan
+      // completos en la celda estrecha sin truncarse. Una sola linea (nowrap).
+      '.hud-trio-cell .lbl{font-size:7px;font-weight:800;letter-spacing:0;text-transform:uppercase;margin-bottom:5px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       // v5.190: valor 16->13px para que "13/30" quepa completo en la celda.
       '.hud-trio-cell .v{font-size:13px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       // racha fires
@@ -2746,7 +2756,7 @@ function _crearDialOverlay(){
       '</div>'+
       '<span class="hud-h-t" style="color:'+color+';text-shadow:0 0 12px '+_rgba(color,0.50)+'">'+label+'</span>'+
       '<svg class="hud-h-spark" viewBox="0 0 49 16" preserveAspectRatio="none" '+
-        'style="width:48px;height:14px;flex-shrink:0;opacity:.65" aria-hidden="true">'+
+        'style="flex:0 1 48px;min-width:0;width:48px;height:14px;opacity:.65" aria-hidden="true">'+
         '<polyline points="'+sparkPts+'" fill="none" stroke="'+color+'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" '+
           'style="filter:drop-shadow(0 0 3px '+_rgba(color,0.55)+')"/>'+
         '<circle cx="'+lastPt[0]+'" cy="'+lastPt[1]+'" r="1.6" fill="'+color+'" style="filter:drop-shadow(0 0 3px '+color+')"/>'+
