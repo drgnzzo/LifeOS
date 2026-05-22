@@ -1,4 +1,16 @@
-/* RAW Entry — Overlay v.5.205
+/* RAW Entry — Overlay v.5.207
+   FIX solapamiento de cards laterales al expandir un panel. El ancho
+   del panel central (centerW) no reservaba un GAP de separacion con
+   las columnas → en pantallas medianas el panel central se encimaba
+   con Patrimonio/Necesidades/Financiero. Ahora hay una garantia dura:
+   el panel central nunca invade el hueco de las columnas laterales.
+   ── Heredado v5.206
+   FIX card expandida de Variables no mostraba nada. Causa: el hydrate
+   (a) usaba la global datosMes aunque estuviera vacia (meses:[]), y
+   (b) api.getDatosMes() devuelve {ok,datosMes:{...}} envuelto pero se
+   pasaba sin desenvolver. Ahora chequea meses.length y desenvuelve
+   d.datosMes. Mismo blindaje defensivo aplicado a Fijos (d.gastos).
+   ── Heredado v5.205
    FIX panel expandido inconsistente entre monitores + scrollbar nuevo.
 
    ── Cambios v5.205 ──
@@ -3810,9 +3822,24 @@ function _crearDialOverlay(){
       // Reservar 1 columna lateral por lado + 2 GAPs por lado (margen
       // exterior + separación con la card central) para el ancho del
       // panel expandido en el centro.
-      var reservaLat = (COL_W_exp + GAP*2) * 2;
+      // v5.207 — FIX solapamiento: la reserva lateral debe incluir el
+      // ancho de la columna + su GAP exterior + un GAP de separación
+      // con el panel central. Antes faltaba ese último GAP, así que en
+      // pantallas medianas el panel central se pegaba/encimaba con las
+      // columnas. Ahora: por lado = COL_W + GAP(exterior) + GAP(separación).
+      var reservaLat = (COL_W_exp + GAP * 2) * 2;
       var centerW = Math.min(1100, vW - reservaLat);
+      // Garantía dura: el panel central NO puede invadir las columnas.
+      // Su borde izquierdo debe quedar a la derecha de (leftX + COL_W + GAP)
+      // y su borde derecho a la izquierda de (rightX - GAP).
+      var _colRightEdge = GAP + COL_W_exp + GAP;        // fin de la columna izq + separación
+      var _colLeftEdge  = vW - GAP - COL_W_exp - GAP;   // inicio de la columna der − separación
+      var _maxCenterW   = _colLeftEdge - _colRightEdge;
+      if(centerW > _maxCenterW) centerW = _maxCenterW;
       var centerX = Math.round((vW - centerW) / 2);
+      // Si aún así el centrado lo haría invadir, forzar dentro del hueco.
+      if(centerX < _colRightEdge) centerX = _colRightEdge;
+      if(centerX + centerW > _colLeftEdge) centerW = _colLeftEdge - centerX;
 
       // Provisional: asignar zona completa centrada (sin medir contenido aún).
       // _hudAjustarTamañoExpandido (llamado por _hudExpand post-hydrate) hará
@@ -5204,9 +5231,12 @@ function _crearDialOverlay(){
       },
       hydrate: function(){
         function _pintar(d){
-          window._fijosAnualidadData = d;
+          // v5.206: api.getGastos() puede devolver {ok, gastos:{grupos}}
+          // — desenvolver. Si ya viene {grupos} directo, usar tal cual.
+          var gd = (d && d.gastos) ? d.gastos : d;
+          window._fijosAnualidadData = gd;
           if(typeof renderFijosExpandido === 'function'){
-            renderFijosExpandido(d, 'hud-fijos-tabla');
+            renderFijosExpandido(gd, 'hud-fijos-tabla');
             // Las graficas necesitan Chart.js; cargarlo si falta.
             function _graf(){ if(typeof renderFijosGraficas==='function') renderFijosGraficas(); }
             if(window.Chart){ setTimeout(_graf, 60); }
@@ -5221,7 +5251,12 @@ function _crearDialOverlay(){
         if(window._fijosAnualidadData){
           _pintar(window._fijosAnualidadData);
         } else if(typeof api !== 'undefined' && api.getGastos){
-          api.getGastos().then(_pintar).catch(function(){});
+          var elf = document.getElementById('hud-fijos-tabla');
+          if(elf) elf.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">Cargando…</div>';
+          api.getGastos().then(_pintar).catch(function(){
+            var elf2 = document.getElementById('hud-fijos-tabla');
+            if(elf2) elf2.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">No se pudieron cargar los datos</div>';
+          });
         } else {
           var el = document.getElementById('hud-fijos-tabla');
           if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
@@ -5237,9 +5272,17 @@ function _crearDialOverlay(){
       },
       hydrate: function(){
         function _pintar(d){
-          window.datosMes = d;
+          // v5.206: api.getDatosMes() devuelve {ok, datosMes:{meses,grupos}}
+          // — desenvolver. Si ya viene {meses,grupos} directo, usar tal cual.
+          var dm = (d && d.datosMes) ? d.datosMes : d;
+          if(!dm || !dm.meses || !dm.meses.length){
+            var el0 = document.getElementById('hud-var-tabla');
+            if(el0) el0.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">Sin datos de movimientos variables</div>';
+            return;
+          }
+          window.datosMes = dm;
           if(typeof renderVariablesExpandido === 'function'){
-            renderVariablesExpandido(d, 'hud-var-tabla');
+            renderVariablesExpandido(dm, 'hud-var-tabla');
             function _graf(){ if(typeof renderVariablesGrafica==='function') renderVariablesGrafica(); }
             if(window.Chart){ setTimeout(_graf, 60); }
             else {
@@ -5250,10 +5293,17 @@ function _crearDialOverlay(){
             }
           }
         }
-        if(typeof datosMes !== 'undefined' && datosMes && datosMes.meses){
+        // v5.206: usar la global datosMes SOLO si ya tiene meses cargados
+        // (al inicio es {meses:[],grupos:{}} — vacía). Si no, pedir al API.
+        if(typeof datosMes !== 'undefined' && datosMes && datosMes.meses && datosMes.meses.length){
           _pintar(datosMes);
         } else if(typeof api !== 'undefined' && api.getDatosMes){
-          api.getDatosMes().then(_pintar).catch(function(){});
+          var el1 = document.getElementById('hud-var-tabla');
+          if(el1) el1.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">Cargando…</div>';
+          api.getDatosMes().then(_pintar).catch(function(){
+            var el2 = document.getElementById('hud-var-tabla');
+            if(el2) el2.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">No se pudieron cargar los datos</div>';
+          });
         } else {
           var el = document.getElementById('hud-var-tabla');
           if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
