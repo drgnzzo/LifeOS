@@ -1,4 +1,10 @@
-/* RAW Entry — Overlay v.5.208
+/* RAW Entry — Overlay v.5.212
+   FIX "Invalid Date" en la card expandida de Bitacora (Pensamientos,
+   Salud, Entrenamiento). Causa: new Date(it.fecha).toLocaleDateString()
+   directo — si it.fecha no era parseable, salia literalmente "Invalid
+   Date". Ahora _fechaSegura valida con isNaN y cae a parseo manual de
+   yyyy-MM-dd; si todo falla, cadena vacia.
+   ── Heredado v5.208
    FIX Variables expandido vacio. Causa: datosMes se llena en una
    variable local de raw-core via onDatosMes, pero el hydrate del
    overlay leia window.datosMes — no era la misma. Ademas el fallback
@@ -5338,10 +5344,29 @@ function _crearDialOverlay(){
         var d = window._pensamientosData;
         var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">';
         function tarjeta(titulo, color, icon, items, vacio){
+          // v5.212: formateo de fecha seguro. Antes se hacía
+          // new Date(it.fecha).toLocaleDateString(...) directo — si
+          // it.fecha no era parseable, salía literalmente "Invalid Date".
+          // Ahora se valida con isNaN y, si falla, se intenta el formato
+          // 'yyyy-MM-dd' manualmente; si tampoco, cadena vacía.
+          function _fechaSegura(f){
+            if(!f) return '';
+            var dt = (f instanceof Date) ? f : new Date(f);
+            if(!isNaN(dt.getTime())){
+              return dt.toLocaleDateString('es-MX',{day:'2-digit',month:'short'});
+            }
+            // Fallback: parsear 'yyyy-MM-dd' a mano.
+            var m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if(m){
+              var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+              return m[3] + ' ' + (meses[parseInt(m[2],10)-1] || '');
+            }
+            return '';
+          }
           var rows = '';
           if(items && items.length){
             rows = items.slice(0,8).map(function(it){
-              var fecha = it.fecha ? new Date(it.fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}) : '';
+              var fecha = _fechaSegura(it.fecha);
               var txt = it.contenido || it.descripcion || it.actividad || it.persona || '';
               return '<div style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:8px"><span style="font-size:11px;color:rgba(220,224,235,0.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+txt+'</span><span style="font-size:9px;color:rgba(220,224,235,0.40);flex-shrink:0">'+fecha+'</span></div>';
             }).join('');
