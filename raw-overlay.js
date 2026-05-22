@@ -1,4 +1,19 @@
-/* RAW Entry — Overlay v.5.204
+/* RAW Entry — Overlay v.5.205
+   FIX panel expandido inconsistente entre monitores + scrollbar nuevo.
+
+   ── Cambios v5.205 ──
+   · _hudAjustarTamañoExpandido reescrito. Antes medía la altura
+     natural del contenido y crecía el panel a esa medida → en
+     monitores altos cabía (sin scroll), en bajos no (con scroll):
+     inconsistente, y a veces tapaba de más o se cortaba. Ahora el
+     panel SIEMPRE usa la zona disponible (zonaY..zonaH), valor ya
+     calculado por pantalla. El contenido scrollea internamente si
+     hace falta. Predecible en todo monitor.
+   · SCROLLBAR rediseñado: barra delgada (7px), redondeada, violeta
+     con gradiente — reemplaza el gris cuadrado del navegador.
+     Aplica al panel expandido y a las tablas internas (fjx/vrx).
+
+   ── Heredado v5.204 ──
    WARP — agujero negro que respira (lento y orgánico).
 
    ── Cambios v5.204 ──
@@ -2852,6 +2867,16 @@ function _crearDialOverlay(){
       // v5.142 (heredado v5.137): overflow-y:auto + min-height:0 + overflow-x:hidden
       // para que el scrollbar solo aparezca si el contenido excede.
       '.hud-expanded-content{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 18px}',
+      // v5.205 — SCROLLBAR rediseñado: barra delgada, redondeada, violeta
+      // con glow (no el gris cuadrado del navegador). Aplica al panel
+      // expandido y a las tablas con scroll dentro de él.
+      '.hud-expanded-content::-webkit-scrollbar,.hud-expanded-content .tbl-wrap::-webkit-scrollbar,.fjx-tbl-wrap::-webkit-scrollbar,.vrx-tbl-wrap::-webkit-scrollbar{width:7px;height:7px}',
+      '.hud-expanded-content::-webkit-scrollbar-track,.hud-expanded-content .tbl-wrap::-webkit-scrollbar-track,.fjx-tbl-wrap::-webkit-scrollbar-track,.vrx-tbl-wrap::-webkit-scrollbar-track{background:rgba(255,255,255,0.03);border-radius:99px}',
+      '.hud-expanded-content::-webkit-scrollbar-thumb,.hud-expanded-content .tbl-wrap::-webkit-scrollbar-thumb,.fjx-tbl-wrap::-webkit-scrollbar-thumb,.vrx-tbl-wrap::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#A78BFA,#8B5CF6);border-radius:99px;border:1px solid rgba(167,139,250,0.25)}',
+      '.hud-expanded-content::-webkit-scrollbar-thumb:hover,.hud-expanded-content .tbl-wrap::-webkit-scrollbar-thumb:hover,.fjx-tbl-wrap::-webkit-scrollbar-thumb:hover,.vrx-tbl-wrap::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#C4B5FD,#A78BFA)}',
+      '.hud-expanded-content::-webkit-scrollbar-corner,.hud-expanded-content .tbl-wrap::-webkit-scrollbar-corner,.fjx-tbl-wrap::-webkit-scrollbar-corner,.vrx-tbl-wrap::-webkit-scrollbar-corner{background:transparent}',
+      // Firefox
+      '.hud-expanded-content,.hud-expanded-content .tbl-wrap,.fjx-tbl-wrap,.vrx-tbl-wrap{scrollbar-width:thin;scrollbar-color:#8B5CF6 rgba(255,255,255,0.03)}',
       '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px;justify-content:flex-start}',
       '.hud-expanded .hud-collapsed-content{display:none}',
       // Tablas dentro del panel expandido: scroll horizontal mantenido
@@ -5392,6 +5417,14 @@ function _crearDialOverlay(){
   window._EXPAND_CONFIG = _EXPAND_CONFIG;
 
   // Ajusta el tamaño del panel expandido según el contenido real.
+  // v5.205 — REESCRITO. El problema: la versión vieja medía la altura
+  // natural del contenido y crecía el panel a esa medida (Math.min con
+  // maxH). Resultado: en monitores altos el contenido cabía → sin scroll;
+  // en bajos no cabía → con scroll. Inconsistente entre pantallas.
+  // FIX: el panel SIEMPRE ocupa la zona disponible (zonaY..zonaH) — un
+  // valor ya calculado correctamente para cada pantalla. El contenido
+  // hace scroll interno cuando lo necesita. Predecible en todo monitor:
+  // nunca tapa de más, nunca se corta.
   function _hudAjustarTamañoExpandido(intentos){
     intentos = intentos || 0;
     var panel = window._hudExpanded;
@@ -5405,68 +5438,26 @@ function _crearDialOverlay(){
     var expContent = inner.querySelector(':scope > .hud-expanded-content');
     if(!expContent) return;
 
-    // v5.147: medir altura natural del contenido sin restricciones
-    panel.style.height = 'auto';
-    panel.style.minHeight = '0';
-    expContent.style.overflow = 'visible';
-    expContent.style.justifyContent = 'flex-start';
-    expContent.style.height = 'auto';
-    expContent.style.flex = 'none';
-
-    // Forzar reflow
-    var contentNaturalH = panel.scrollHeight;
-
-    // Restaurar flex
-    expContent.style.flex = '';
-    expContent.style.height = '';
-
-    // Si la medición fue muy chica, contenido aún no listo — reintentar
-    if(contentNaturalH < 100 && intentos < 8){
-      panel.style.height = zonaH + 'px';
-      panel.style.minHeight = '280px';
-      setTimeout(function(){ _hudAjustarTamañoExpandido(intentos+1); }, 100);
-      return;
-    }
-
-    // v5.171: el panel CRECE para mostrar todo su contenido pero reserva
-    // espacio inferior para que NO tape el mini-dial / botón regresar.
-    // El mini-dial vive en la zona inferior del viewport (~120-140px de margen).
-    var maxH = window.innerHeight - 180; // antes 80 — más margen para mini-dial
-    contentNaturalH = Math.max(280, contentNaturalH);
-    var finalH = Math.min(contentNaturalH, maxH);
-
-    // v5.171: el bottom del panel NO debe sobrepasar (innerHeight - 140)
-    // para dejar al mini-dial visible. Ajustamos finalY garantizando esto.
-    var minTopMargin = 80;
+    // Altura fija = la zona disponible, acotada para no tapar el
+    // mini-dial inferior. Misma fórmula en cualquier monitor.
     var maxBottomY = window.innerHeight - 140;
-    var finalY;
-    if(contentNaturalH <= zonaH){
-      finalY = zonaY + Math.max(0, Math.round((zonaH - finalH)/2));
-    } else {
-      finalY = Math.max(minTopMargin, zonaY - Math.round((finalH - zonaH)/2));
-    }
-    // Hard cap: si el bottom del panel sobrepasa maxBottomY, subirlo
+    var finalY = zonaY;
+    var finalH = zonaH;
     if(finalY + finalH > maxBottomY){
-      finalY = Math.max(minTopMargin, maxBottomY - finalH);
-      // Si aún no cabe, reducir el alto
-      if(finalY + finalH > maxBottomY){
-        finalH = maxBottomY - finalY;
-      }
+      finalH = maxBottomY - finalY;
     }
+    finalH = Math.max(280, finalH);
 
-    panel.style.height = finalH + 'px';
+    panel.style.height    = finalH + 'px';
     panel.style.minHeight = finalH + 'px';
-    panel.style.top = finalY + 'px';
+    panel.style.top       = finalY + 'px';
 
-    // v5.147: solo poner scroll si el contenido NATURAL es mayor que el viewport
-    // (no que zonaH). Lo normal es que contenido<=maxH y NO haya scroll.
-    if(contentNaturalH <= maxH){
-      expContent.style.overflow = 'visible';
-      expContent.style.justifyContent = 'flex-start';
-    } else {
-      expContent.style.overflow = 'auto';
-      expContent.style.justifyContent = 'flex-start';
-    }
+    // El contenido SIEMPRE puede scrollear si hace falta. Si el contenido
+    // es corto, el scroll simplemente no aparece (overflow:auto) — pero el
+    // panel mantiene su altura fija, así que el comportamiento es el mismo
+    // visualmente en toda pantalla.
+    expContent.style.overflowY = 'auto';
+    expContent.style.justifyContent = 'flex-start';
   }
   window._hudAjustarTamañoExpandido = _hudAjustarTamañoExpandido;
 
