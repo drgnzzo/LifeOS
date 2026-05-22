@@ -1,4 +1,13 @@
-/* RAW Entry — Core v.5.084
+/* RAW Entry — Core v.5.211 (header legacy v5.084)
+   FIX DEFINITIVO fecha amontonada sobre el círculo de check en
+   Libros/Movies/Pendientes. Causa real (hallada por outerHTML del
+   DOM): el handler de click obtenía infoFlex con
+   row.querySelector(':scope > div') → devuelve el PRIMER div hijo,
+   que es el círculo _act-item. El fechaSpan se insertaba DENTRO del
+   círculo. Ahora infoFlex se selecciona como el div hijo que NO es
+   _act-item. Las 4 rutas de v5.210 ya estaban bien; esta 5ª (el
+   appendChild al div equivocado) era la que faltaba.
+   ── Header original
    DIVISIÓN DEL ARCHIVO — raw-core.js dividido en dos para reducir tamaño:
 
    - raw-core.js  (este archivo, ~150 KB): API híbrida, iconos del dial,
@@ -2302,19 +2311,27 @@ document.addEventListener('DOMContentLoaded', function(){
           var sp  = row&&row.querySelector('span');
           if(sp) sp.style.color = nowDone?'#4A5266':'#C8D0E0';
 
-          // v5.148: actualizar la fecha visual DENTRO de la card del concepto.
-          // El template original tenía un <span> con fechaStr dentro del flex
-          // de info (línea 1929). Cuando se marca/desmarca, actualizar ese
-          // span o crearlo si no existe.
+          // v5.211: actualizar la fecha visual DESPUÉS del nombre del
+          // concepto. BUG corregido: antes infoFlex se obtenía con
+          // row.querySelector(':scope > div'), que devuelve el PRIMER div
+          // hijo de la fila — y ese primer div es el círculo _act-item.
+          // El fechaSpan se metía DENTRO del círculo (amontonado sobre el
+          // check). Ahora se selecciona explícitamente el div de info: el
+          // div hijo que NO es el _act-item.
           if(row){
-            var infoFlex = row.querySelector(':scope > div'); // contenedor de info
+            var infoFlex = null;
+            var hijosDiv = row.querySelectorAll(':scope > div');
+            for(var hi=0; hi<hijosDiv.length; hi++){
+              if(!hijosDiv[hi].classList.contains('_act-item')){
+                infoFlex = hijosDiv[hi]; break;
+              }
+            }
             if(infoFlex){
-              // Buscar el segundo span (fecha) — el primero es el nombre
+              // El primer span es el nombre; el segundo (si existe) la fecha.
               var spans = infoFlex.querySelectorAll(':scope > span');
               var fechaSpan = spans[1];
               if(nowDone){
                 if(!fechaSpan){
-                  // No existe, crearlo
                   fechaSpan = document.createElement('span');
                   fechaSpan.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.06em;color:rgba(167,139,250,0.65);font-family:JetBrains Mono,monospace';
                   infoFlex.appendChild(fechaSpan);
