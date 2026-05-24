@@ -1,4 +1,8 @@
-/* RAW Entry — Overlay v.5.214
+/* RAW Entry — Overlay v.5.216
+   Añadido botón "Sheet" al topBar del overlay (renglón de stats, junto
+   a Créditos). Abre el Google Sheet directamente en pestaña nueva,
+   fuera de la web, vía irASheet() de raw-core.js (con URL de fallback).
+   ── Heredado v5.214
    OPTIMIZACIÓN de rendimiento del fondo (sin perder nada visible).
    · drawStars: shadowBlur (la operación más cara del canvas) ahora
      solo en hubs/estrellas grandes. Las ~580 pequeñas se dibujan
@@ -3119,6 +3123,13 @@ function _crearDialOverlay(){
       '.hud-stats-ribbon{display:flex;align-items:center;justify-content:space-around;gap:6px;padding:8px 12px;height:100%;box-sizing:border-box;min-height:0}',
       '.hud-stats-cell-sm{display:flex;align-items:center;gap:6px;min-width:0;flex:1;justify-content:center}',
       '.hud-stats-cell-sm i{font-size:12px;flex-shrink:0}',
+      // v5.216 — botón "Abrir Sheet" del topBar.
+      '.hud-sheet-btn{display:flex;align-items:center;gap:6px;flex-shrink:0;cursor:pointer;'+
+        'background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.28);'+
+        'border-radius:8px;padding:5px 10px;transition:all 160ms;font-family:inherit}',
+      '.hud-sheet-btn:hover{background:rgba(74,222,128,0.16);border-color:rgba(74,222,128,0.5);'+
+        'box-shadow:0 0 10px rgba(74,222,128,0.25)}',
+      '.hud-sheet-btn i{font-size:12px;flex-shrink:0}',
       '.hud-stats-v-sm{font-size:13px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap;flex-shrink:0}',
       '.hud-stats-v-sm .max{opacity:.45;font-weight:700;font-size:8px;margin-left:1px}',
       '.hud-stats-l-sm{font-size:7.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.50);white-space:nowrap;flex-shrink:0}',
@@ -3353,6 +3364,15 @@ function _crearDialOverlay(){
           '<span id="_hud-creditos" class="hud-stats-v-sm" style="color:#22D3EE">—</span>'+
           '<span class="hud-stats-l-sm">Créditos</span>'+
         '</div>'+
+        '<div class="hud-stats-sep"></div>'+
+        // v5.216 — botón directo al Google Sheet. Abre la hoja en pestaña
+        // nueva, fuera de la web. Usa irASheet() de raw-core.js (que ya
+        // tiene la URL real con fallback).
+        '<button class="hud-sheet-btn" title="Abrir el Google Sheet directamente" '+
+          'onclick="if(typeof irASheet===&quot;function&quot;){irASheet();}else{window.open(&quot;https://docs.google.com/spreadsheets/d/15T14Hb7tvmv24ZAaC3su1NRtDwVS6-dWbJGxQYUGP1o/edit&quot;,&quot;_blank&quot;);}">'+
+          '<i class="fas fa-table-cells" style="color:#4ADE80;filter:drop-shadow(0 0 4px #4ADE80)"></i>'+
+          '<span class="hud-stats-l-sm" style="color:#4ADE80">Sheet</span>'+
+        '</button>'+
       '</div>'+
     '</div>';
 
