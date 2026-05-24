@@ -896,7 +896,7 @@ function renderFijosExpandido(data, containerId){
     '.fjx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:Manrope,-apple-system,sans-serif}'+
     '.fjx-main{flex:1.35;min-width:0;display:flex;flex-direction:column}'+
     '.fjx-side{flex:0.95;min-width:0;display:flex;flex-direction:column;gap:14px}'+
-    '.fjx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:10px}'+
+    '.fjx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding-bottom:8px}'+
     '.fjx-tbl{width:100%;border-collapse:collapse;font-size:12px}'+
     '.fjx-tbl th{padding:10px 12px;background:rgba(255,255,255,.03);font-size:9px;font-weight:800;'+
       'letter-spacing:.07em;text-transform:uppercase;color:rgba(220,224,235,.6);'+
