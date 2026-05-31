@@ -18,6 +18,10 @@
   --sat:env(safe-area-inset-top);
   --sab:env(safe-area-inset-bottom);
 
+  /* v6.031: altura de la barra superior fija. El overlay y las capas
+     de sección empiezan debajo de esta altura. */
+  --hero-h:58px;
+
   /* Aliases legacy — apuntan a tokens del dial */
   --bg:        var(--hud-bg-base);
   --bg2:       var(--hud-bg-deep);
@@ -64,60 +68,181 @@ html,body{
 /* ═══════════════════════════════════════════
    APP LAYOUT
 ═══════════════════════════════════════════ */
-.app{position:fixed;top:0;left:0;z-index:2;width:100%;height:100%;display:flex;flex-direction:column;background:transparent;overflow:hidden}
+.app{position:fixed;top:0;left:0;z-index:2;width:100%;height:100%;display:flex;flex-direction:column;background:transparent;overflow:hidden;
+  /* v6.062: la barra (.hero) es position:fixed y no ocupa espacio de
+     flujo; .app reserva su altura con padding-top para que .board-wrap
+     empiece debajo de la barra. */
+  padding-top:var(--hero-h,58px);box-sizing:border-box}
 
-/* ═══════════════════════════════════════════
-   HERO — barra superior con breathing del dial
-═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   BARRA SUPERIOR v6.010 — fija, lenguaje HUD
+   El hero es la barra de navegación permanente de la app. Esquinas
+   rectas, acento por sección, glow sutil del sistema (raw-tokens.css).
+═══════════════════════════════════════════════════════════════════ */
 .hero{
-  background:rgba(2,4,12,0.97);
-  backdrop-filter:blur(6px) saturate(110%);
-  -webkit-backdrop-filter:blur(6px) saturate(110%);
-  padding:9px 20px;position:relative;overflow:hidden;flex-shrink:0;
-  border-bottom:1px solid rgba(255,255,255,0.09);
-  box-shadow:0 1px 0 rgba(255,255,255,0.04), 0 4px 20px rgba(0,0,0,0.5);
-  display:flex;align-items:center;justify-content:space-between;gap:16px;
-  animation:hudHeroGlow var(--hud-breath-dur) var(--hud-breath-easing) infinite;
+  background:#05060f;
+  padding:0 14px;
+  /* ════════════════════════════════════════════════════════════════
+     v6.062 — LA BARRA ES position:fixed A NIVEL RAÍZ.
+     Antes era position:relative DENTRO de .app. Pero .app tiene
+     z-index:2, que crea un CONTEXTO DE APILAMIENTO: el z-index:10000
+     de la barra quedaba atrapado en el nivel 2 de .app — por DEBAJO
+     del overlay (z-index:9000), que la tapaba por completo. Por eso
+     en modo overlay/Home la barra era invisible (solo el cursor
+     delataba que seguía ahí). Sacándola a position:fixed anclada al
+     viewport, su z-index:10000 es global y sí queda sobre el overlay.
+     .app compensa con padding-top para que el contenido no se solape.
+  ════════════════════════════════════════════════════════════════ */
+  position:fixed;
+  top:0;left:0;right:0;
+  height:var(--hero-h,58px);
+  flex-shrink:0;
+  border-bottom:1px solid rgba(140,100,220,0.20);
+  box-shadow:0 4px 22px rgba(0,0,0,0.55);
+  display:flex;align-items:center;gap:14px;
+  z-index:10000;
 }
-.hero-left {display:flex;align-items:center;gap:10px;flex:1}
-.hero-center{display:flex;flex-direction:column;align-items:center;flex:1}
-.hero-right {display:flex;align-items:center;gap:10px;flex:1;justify-content:flex-end}
-.hero-clock{font-size:12px;color:var(--hud-text-dim);font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.01em}
-.hero-brand{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
-.hero-icon{
-  width:36px;height:36px;border-radius:0;
-  background:var(--hud-panel-bg);border:1px solid rgba(255,255,255,0.12);
-  display:flex;align-items:center;justify-content:center;
-  font-size:15px;color:rgba(255,255,255,0.8);position:relative;flex-shrink:0;
-  box-shadow:0 0 10px rgba(0,0,0,0.4);
+/* Línea de acento inferior pulsante — lenguaje del dial */
+.hero::after{
+  content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:linear-gradient(90deg,transparent 0%,var(--acc-violet) 20%,var(--acc-violet) 80%,transparent 100%);
+  opacity:.55;animation:hudTopPulse var(--hud-breath-dur) var(--hud-breath-easing) infinite;
+  pointer-events:none;
 }
-.hero-title{font-size:13px;font-weight:700;letter-spacing:.06em;line-height:1.2;color:#fff;text-transform:uppercase}
-.hero-sub{
-  font-size:8px;
-  color:rgba(255,255,255,0.18);
-  font-weight:500;
-  letter-spacing:.06em;
-  white-space:nowrap;
-}
-.hero-ver{font-size:8px;color:rgba(255,255,255,0.2);font-weight:600;letter-spacing:.08em;margin-left:6px}
-.hero-actions{display:flex;align-items:center;gap:10px;margin-left:auto}
 
+/* ── IZQUIERDA — marca ── */
+.hero-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hero-brand{display:flex;align-items:center;gap:9px}
+.hero-icon{
+  width:32px;height:32px;border-radius:0;
+  background:rgba(139,92,246,0.10);border:1px solid rgba(167,139,250,0.40);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:var(--acc-violet);flex-shrink:0;
+  box-shadow:0 0 14px rgba(139,92,246,0.18);
+}
+.hero-brand-txt{display:flex;flex-direction:column;gap:1px;line-height:1}
+.hero-title{
+  font-size:13px;font-weight:800;letter-spacing:.10em;color:#f0f4f8;
+  text-transform:uppercase;
+}
+.hero-title span{color:var(--acc-violet)}
+.hero-sub{
+  font-size:8px;color:rgba(200,210,220,0.30);
+  font-weight:600;letter-spacing:.10em;white-space:nowrap;
+}
+
+/* ── CENTRO — tabs de navegación HUD ── */
+.hero-tabs{
+  display:flex;align-items:stretch;gap:3px;flex:1;
+  justify-content:center;min-width:0;
+  overflow-x:auto;scrollbar-width:none;height:100%;
+}
+.hero-tabs::-webkit-scrollbar{display:none}
+.hud-tab{
+  --acc:#94A3B8;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-width:74px;padding:6px 12px;
+  background:transparent;
+  border:1px solid transparent;
+  border-bottom:2px solid transparent;
+  color:rgba(220,224,235,0.50);
+  cursor:pointer;font-family:inherit;
+  font-size:8.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  transition:background .16s,color .16s,border-color .16s;
+  white-space:nowrap;flex-shrink:0;
+}
+.hud-tab i{font-size:13px;color:rgba(220,224,235,0.55);transition:color .16s,filter .16s}
+/* Acento por sección — alimenta var(--acc) usada en :hover y .active */
+#btn-home     {--acc:#94A3B8}
+#btn-logros   {--acc:#FACC15}
+#btn-maslow   {--acc:#C4B5FD}
+#btn-activity {--acc:#FB923C}
+#btn-sos      {--acc:#EF4444}
+#btn-nutricion{--acc:#4ADE80}
+#btn-sheets   {--acc:#A5B4FC}
+.hud-tab:hover{background:rgba(255,255,255,0.035);color:rgba(220,224,235,0.85)}
+.hud-tab:hover i{color:var(--acc)}
+.hud-tab.active,
+.hud-tab.on{
+  background:color-mix(in srgb, var(--acc) 12%, transparent);
+  border-color:color-mix(in srgb, var(--acc) 38%, transparent);
+  border-bottom-color:var(--acc);
+  color:var(--acc);
+  box-shadow:0 -2px 16px color-mix(in srgb, var(--acc) 24%, transparent),
+             inset 0 -2px 0 var(--acc);
+  text-shadow:0 0 8px color-mix(in srgb, var(--acc) 40%, transparent);
+}
+.hud-tab.active i,
+.hud-tab.on i{color:var(--acc);filter:drop-shadow(0 0 5px var(--acc))}
+/* SOS — siempre con su tinte rojo, incluso inactivo */
+.hud-tab.is-sos{
+  background:rgba(239,68,68,0.08);
+  border-color:rgba(239,68,68,0.30);
+  color:rgba(239,68,68,0.85);
+}
+.hud-tab.is-sos i{color:#EF4444}
+.hud-tab.is-sos:hover{background:rgba(239,68,68,0.16);color:#fff}
+
+/* ── DERECHA — estado + acciones + SIM ── */
+.hero-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .hero-chip{
-  display:flex;align-items:center;gap:5px;
-  padding:4px 10px;border-radius:0;
-  font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-  background:var(--hud-panel-bg);border:1px solid rgba(255,255,255,0.10);color:var(--hud-text-dim);
-  transition:border-color .2s;
+  display:flex;align-items:center;gap:6px;
+  padding:5px 10px;border-radius:0;
+  font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+  background:var(--hud-panel-bg);border:1px solid rgba(255,255,255,0.10);
+  color:var(--hud-text-dim);transition:border-color .2s,color .2s;
+}
+.hero-chip .chip-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--hud-text-dim);flex-shrink:0;
 }
 .hero-chip.ok  {background:rgba(74,222,128,0.07);border-color:rgba(74,222,128,0.28);color:rgba(74,222,128,0.9)}
 .hero-chip.load{background:var(--hud-panel-bg);border-color:rgba(255,255,255,0.07);color:var(--hud-text-dim)}
 .hero-chip.err {background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.25);color:var(--hud-err)}
 .hero-chip.ok .chip-dot{
-  background:var(--hud-ok);
-  box-shadow:0 0 8px rgba(74,222,128,0.7);
+  background:var(--hud-ok);box-shadow:0 0 8px rgba(74,222,128,0.7);
   animation:hudDotPulse 2s ease-in-out infinite;
 }
-.hero-chip.err .chip-dot{ background:var(--hud-err); }
+.hero-chip.err .chip-dot{background:var(--hud-err)}
+
+/* Botones de acción cuadrados (RAW directo, refresh) */
+.hero-act{
+  width:32px;height:32px;border-radius:0;flex-shrink:0;
+  background:var(--hud-panel-bg);border:1px solid rgba(255,255,255,0.09);
+  color:rgba(255,255,255,0.45);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;transition:color .15s,background .15s,border-color .15s;
+}
+.hero-act:hover{color:#fff;background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.22)}
+/* v6.040: estado "actualizando" — el ícono gira y el botón se ilumina
+   con el acento violeta del sistema mientras refreshTodo trabaja. */
+.hero-act.spinning i{animation:spin .7s linear infinite}
+.hero-act.spinning{
+  color:var(--acc-violet);
+  border-color:rgba(167,139,250,0.55);
+  background:rgba(139,92,246,0.14);
+  box-shadow:0 0 14px var(--acc-violet-glow);
+  cursor:wait;
+}
+#btn-sheets-direct:hover{color:var(--acc-green);border-color:rgba(74,222,128,0.35)}
+
+/* Bloque SIM / USER */
+.hero-sim{
+  display:flex;align-items:center;gap:7px;flex-shrink:0;
+  padding:5px 9px 5px 6px;border-radius:0;
+  background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.30);
+}
+.hero-sim-avatar{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  background:rgba(139,92,246,0.15);border:1px solid rgba(167,139,250,0.5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;color:var(--acc-violet);
+}
+.hero-sim-txt{display:flex;flex-direction:column;gap:1px;line-height:1}
+.hero-sim-name{font-size:9px;font-weight:800;letter-spacing:.06em;color:#f0f4f8}
+.hero-sim-lv{font-size:8px;font-weight:700;letter-spacing:.04em;color:rgba(250,204,21,0.85)}
+
+.prog-wrap{height:2px;background:rgba(255,255,255,0.05);overflow:hidden}
 
 .btn-refresh{
   width:32px;height:32px;border-radius:0;
@@ -449,13 +574,29 @@ html,body{
 .mprev.neg{color:var(--hud-err)}
 
 .form-actions{display:flex;align-items:center;justify-content:space-between;padding:12px var(--pad);border-top:1px solid rgba(255,255,255,.05);gap:8px}
-.btn-save{flex:1;padding:13px;border-radius:var(--rad-pill);background:#fff;color:#000;border:none;font-family:inherit;font-size:15px;font-weight:600;letter-spacing:-.02em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s}
-.btn-save:hover{background:rgba(255,255,255,.88);transform:translateY(-1px)}
+/* v6.060 — botón Guardar con el lenguaje HUD: esquinas rectas, acento
+   violeta del sistema (antes era blanco con esquinas pill). */
+.btn-save{
+  flex:1;padding:13px;border-radius:0;
+  background:rgba(139,92,246,0.18);
+  color:#C4B5FD;
+  border:1.2px solid rgba(167,139,250,0.6);
+  font-family:inherit;font-size:13px;font-weight:800;
+  letter-spacing:.04em;text-transform:uppercase;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .2s;
+}
+.btn-save:hover{
+  background:rgba(139,92,246,0.30);
+  border-color:rgba(167,139,250,0.85);
+  box-shadow:0 0 18px rgba(139,92,246,0.3);
+  transform:translateY(-1px);
+}
 .btn-save:active{transform:scale(0.98)}
-.btn-save:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-save:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
 .btn-save.saved{
   background:rgba(74,222,128,0.15);
-  border:1px solid rgba(74,222,128,0.4);
+  border:1.2px solid rgba(74,222,128,0.5);
   color:var(--hud-ok);
   animation:savedFlash .4s ease forwards;
 }
@@ -464,7 +605,7 @@ html,body{
   50% { box-shadow: 0 0 24px rgba(74,222,128,0.4); }
   100%{ box-shadow: 0 0 12px rgba(74,222,128,0.1); }
 }
-.btn-sm{width:42px;height:42px;border-radius:var(--rad-pill);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:none;font-family:inherit;transition:all .17s;flex-shrink:0}
+.btn-sm{width:42px;height:42px;border-radius:0;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;border:none;font-family:inherit;transition:all .17s;flex-shrink:0}
 .btn-sm.sec{background:rgba(255,255,255,.06);color:var(--hud-text-dim);border:1px solid rgba(255,255,255,.08)}
 .btn-sm.sec:hover{color:#fff;background:rgba(255,255,255,.12)}
 .btn-sm.suc,.btn-sm.lnk{background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.1)}
@@ -674,14 +815,9 @@ html,body{
 @media(min-width:900px){
   body{height:100vh;overflow:hidden}
   .app{max-width:100%;flex-direction:column;min-height:100vh}
-  .hero{
-    width:100%;padding:0 24px;
-    display:flex;align-items:center;justify-content:space-between;
-    gap:20px;flex-wrap:nowrap;height:52px;
-  }
-  .hero-left{flex:0 0 auto;gap:10px}
-  .hero-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-  .hero-right{flex:0 0 auto;gap:6px;flex-wrap:nowrap}
+  /* v6.010: el hero ya define su propio layout/altura (58px) en el
+     bloque base. Aquí solo se ajusta el padding lateral en desktop. */
+  .hero{ padding:0 20px; }
 
   .sections{
     display:grid !important;
@@ -722,6 +858,27 @@ html,body{
   .board-face{position:absolute;top:0;left:0;width:100%;min-height:100%}
   .board-face.anverso{position:relative;width:100%;overflow:visible;display:block;transition:opacity .18s ease,transform .18s ease}
   .board-face.anverso .sections{overflow-y:auto !important}
+
+  /* ── v7.034 — CLAVAR LA PÁGINA: nada hace crecer el alto ──
+     El bug: .board-face tenía min-height:100% → si su contenido es más
+     alto que la pantalla, la board-face CRECE, estira al .board-wrap, y
+     este (overflow-y:auto) genera un scroll vertical de PÁGINA. Ese
+     scroll rompe el scroll de profundidad (Z): en vez de cambiar de
+     nivel, la página se desplaza hacia abajo.
+     Fix en escritorio (html:not(.mob)):
+       · .board-wrap NO scrollea — es un marco fijo del viewport.
+       · .board-face mide EXACTO la pantalla (height fijo, no min-height)
+         y recorta lo que sobre. El scroll interno permitido vive más
+         adentro (columnas de Activity, cards expandidas), no aquí. */
+  html:not(.mob) .board-wrap{
+    overflow:hidden !important;
+  }
+  html:not(.mob) .board-face:not(.anverso){
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    overflow:hidden !important;
+  }
   .board-face.anverso.slide-right{
     opacity:0 !important;
     pointer-events:none !important;
@@ -736,8 +893,12 @@ html,body{
   .hero-hamburger{display:none}
   .hero-right{flex-wrap:nowrap;white-space:nowrap}
 
-  /* BTN-FLIP — botones de navegación del hero */
-  .btn-flip{
+  /* BTN-FLIP — estilo legacy. v6.010: los tabs de la barra ahora son
+     .hud-tab (estilizados en el bloque base). Conservan también la clase
+     .btn-flip SOLO para que el JS de navegación los siga encontrando con
+     querySelectorAll('.btn-flip'). Por eso estas reglas se excluyen
+     explícitamente de .hud-tab — el estilo lo da .hud-tab. */
+  .btn-flip:not(.hud-tab){
     display:flex;align-items:center;gap:5px;
     padding:5px 11px;
     border-radius:0;
@@ -749,16 +910,16 @@ html,body{
     transition:all .15s;white-space:nowrap;
     flex-shrink:0;
   }
-  .btn-flip i{ transition:filter .15s; }
-  .btn-flip:hover i{ filter:brightness(1.3); }
-  .btn-flip:hover{color:rgba(255,255,255,0.8);border-bottom-color:rgba(255,255,255,0.25)}
-  .btn-flip.active{
+  .btn-flip:not(.hud-tab) i{ transition:filter .15s; }
+  .btn-flip:not(.hud-tab):hover i{ filter:brightness(1.3); }
+  .btn-flip:not(.hud-tab):hover{color:rgba(255,255,255,0.8);border-bottom-color:rgba(255,255,255,0.25)}
+  .btn-flip:not(.hud-tab).active{
     color:#fff !important;
     border-bottom:2px solid rgba(255,255,255,0.7) !important;
     background:rgba(255,255,255,0.05) !important;
     text-shadow:0 0 10px rgba(255,255,255,0.4);
   }
-  .btn-flip.active i{ filter:drop-shadow(0 0 4px currentColor); }
+  .btn-flip:not(.hud-tab).active i{ filter:drop-shadow(0 0 4px currentColor); }
 
   /* NAV-BTN SOS */
   .nav-btn.sos{
@@ -817,7 +978,10 @@ html.mob{
   --w-muted:  var(--hud-text-dim);
   --w-tap:    rgba(255,255,255,0.06);
   --w-rad:    0px;
-  --w-tab-h:  64px;
+  /* v6.050: mob-tabbar retirada. --w-tab-h pasa a 0 para que los
+     calc() que la descontaban dejen de reservar espacio fantasma.
+     Se conserva la variable para no romper esos calc(). */
+  --w-tab-h:  0px;
 }
 
 html.mob *,html.mob *::before,html.mob *::after{box-sizing:border-box}
@@ -825,29 +989,100 @@ html.mob{background:var(--hud-bg-base) !important}
 html.mob body{overflow-x:hidden !important;overflow-y:hidden !important}
 html.mob .app{max-width:100vw !important;overflow:hidden !important}
 
-html.mob .hero{
-  padding:8px 14px 6px !important;
-  min-height:unset !important;
-  background:rgba(2,4,12,0.98) !important;
-  border-bottom:1px solid rgba(255,255,255,0.07) !important;
-  flex-wrap:nowrap !important;gap:8px !important;
-  justify-content:space-between !important;
+/* ═══════════════════════════════════════════════════════════════════
+   BARRA SUPERIOR MÓVIL v6.010 — estilo Apple Watch / jukebox
+   Dos renglones: (1) marca + estado + acciones + SIM,
+   (2) fila jukebox de tabs por la que se desliza horizontalmente.
+   HOME es siempre el segmento ancla.
+═══════════════════════════════════════════════════════════════════ */
+html.mob{
+  /* v6.031: la barra móvil tiene 2 renglones (~88px). El overlay y las
+     secciones empiezan debajo de esta altura. */
+  --hero-h:88px;
 }
-html.mob .hero-center,html.mob .hero-right,html.mob .hero-clock,html.mob .hero-tabs,html.mob .prog-wrap{display:none !important}
-html.mob .hero-left{flex:1;min-width:0;gap:6px}
-html.mob .hero-icon{width:26px !important;height:26px !important;font-size:11px !important;flex-shrink:0}
-html.mob .hero-title{font-size:11px !important;letter-spacing:.06em}
-html.mob .hero-ver{display:none !important}
-html.mob .hero-chip{font-size:9px !important;padding:2px 6px !important;gap:3px !important}
-html.mob .btn-refresh{width:26px !important;height:26px !important;font-size:10px !important}
+html.mob .hero{
+  flex-direction:column !important;
+  align-items:stretch !important;
+  height:auto !important;min-height:unset !important;
+  padding:0 !important;gap:0 !important;
+  background:#05060f !important;
+  border-bottom:1px solid rgba(140,100,220,0.20) !important;
+  z-index:10000 !important;
+}
 
-html.mob .hero-right-mob{display:flex !important;align-items:center;gap:4px;flex-shrink:0}
-html.mob #saldo-val-mob{font-size:14px !important;font-weight:800 !important;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1;white-space:nowrap}
+/* Renglón 1 — marca · chip · acciones · SIM */
+html.mob .hero-left{
+  display:flex !important;align-items:center;
+  padding:7px 130px 5px 12px !important;   /* margen derecho para hero-right absoluto */
+  gap:8px !important;
+  min-width:0;
+}
+html.mob .hero-icon{width:26px !important;height:26px !important;font-size:11px !important;flex-shrink:0}
+html.mob .hero-title{font-size:11px !important;letter-spacing:.08em !important}
+html.mob .hero-sub{display:none !important}
+html.mob .hamburger,html.mob .hero-hamburger{display:none !important}
+
+/* La derecha (chip+acciones+SIM) se ancla en el renglón 1 vía orden flex */
+html.mob .hero-right{
+  display:flex !important;align-items:center;
+  gap:6px !important;flex-shrink:0;
+  margin-left:auto;
+  padding:7px 12px 5px !important;
+  order:-1;                       /* sube al renglón 1 junto a hero-left */
+  position:absolute;right:0;top:0;
+}
+html.mob .hero-chip{font-size:8px !important;padding:3px 7px !important;gap:4px !important}
+html.mob .hero-chip span:not(.chip-dot){display:none}   /* solo el dot en móvil */
+html.mob .hero-act{width:28px !important;height:28px !important;font-size:11px !important}
+html.mob .hero-sim{padding:3px 7px 3px 4px !important}
+html.mob .hero-sim-avatar{width:18px !important;height:18px !important;font-size:8px !important}
+html.mob .hero-sim-name{font-size:8px !important}
+html.mob .hero-sim-lv{font-size:7.5px !important}
+
+/* Renglón 2 — fila jukebox de tabs */
+html.mob .hero-tabs{
+  display:flex !important;
+  align-items:stretch;
+  gap:5px !important;
+  padding:5px 10px 8px !important;
+  overflow-x:auto !important;
+  scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;
+  background:#020810 !important;
+  border-top:1px solid rgba(255,255,255,0.05) !important;
+  position:relative;
+}
+html.mob .hero-tabs::-webkit-scrollbar{display:none}
+html.mob .hud-tab{
+  flex:0 0 auto;
+  min-width:60px;
+  padding:8px 10px !important;
+  scroll-snap-align:center;
+  border:1px solid rgba(255,255,255,0.06) !important;
+  border-bottom-width:1px !important;
+  font-size:7.5px !important;letter-spacing:.06em !important;
+  gap:4px !important;
+  opacity:.7;
+  transition:opacity .18s,transform .18s,background .16s,border-color .16s;
+}
+html.mob .hud-tab i{font-size:15px !important}
+html.mob .hud-tab span{font-size:7.5px !important}
+/* Segmento activo — más grande y resaltado, estilo selector de rocola */
+html.mob .hud-tab.active{
+  opacity:1;
+  transform:scale(1.06);
+  min-width:74px;
+  border-width:1.4px !important;
+  border-bottom-width:1.4px !important;
+}
+html.mob .hud-tab:active{transform:scale(0.94)}
+html.mob .hud-tab.is-sos{opacity:.85}
 
 html.mob .board-wrap{
   padding-bottom:var(--w-tab-h) !important;
   overflow:hidden !important;
-  height:calc(100dvh - 46px - var(--w-tab-h)) !important;
+  /* v6.010: el hero móvil ahora tiene 2 renglones (~88px) */
+  height:calc(100dvh - 88px - var(--w-tab-h)) !important;
   position:relative !important;
 }
 html.mob .board-face{
@@ -973,8 +1208,42 @@ html.mob #sec-entrada{
   width:100% !important;max-width:100% !important;
   border-radius:0 !important;max-height:92vh !important;margin:0 !important;
 }
+/* v6.060: en móvil el formulario RAW ocupa todo el ancho, anclado abajo. */
+html.mob #entrada-paso2{
+  width:100% !important;max-width:100% !important;
+}
 
 html.mob #dial-overlay{align-items:center !important;padding:0 !important}
+
+/* ═══════════════════════════════════════════════════════════════════
+   OVERLAY EN MÓVIL v6.032 — solo el dial.
+   Los paneles HUD flotantes (hud-user, hud-sim-band, hud-patrimonio,
+   etc.) son una interfaz de ESCRITORIO. En móvil estorban: se crean
+   igual pero _reposicionarHUD no los coloca (es >=900), así que quedan
+   amontonados. En el teléfono NO van: sus datos viven en las cards del
+   carrusel. Aquí se ocultan todos. El overlay móvil = fondo plano +
+   dial centrado. El fondo de partículas también se oculta (la
+   animación se desactiva en raw-overlay.js v6.032).
+═══════════════════════════════════════════════════════════════════ */
+html.mob #dial-overlay > [id^="hud-"]{
+  display:none !important;
+}
+html.mob #dial-particles{ display:none !important; }
+html.mob #dial-ambient{ opacity:.35 !important; animation:none !important; }
+/* El dial canvas sí se ve — es el centro de la app. Es el <canvas>
+   hijo directo del overlay que NO tiene id (el de partículas sí lo
+   tiene: #dial-particles, y queda oculto arriba). */
+html.mob #dial-overlay > canvas:not([id]){
+  display:block !important;
+  /* En móvil _reposicionarHUD no corre (es >=900): sin esto el dial
+     se queda en 40vw, diminuto. Tamaño protagónico para el teléfono. */
+  width:min(86vw,420px) !important;
+  height:min(86vw,420px) !important;
+  position:relative !important;
+  top:0 !important;left:0 !important;
+  margin:0 auto !important;
+}
+
 html.mob #dial-nav-panel{display:none !important}
 html.mob .cf{padding:12px 16px !important}
 html.mob .cf-label{font-size:10px !important}
@@ -1061,6 +1330,11 @@ html.mob .hero-right{display:none !important}
 
 /* ═══════════════════════════════════════════
    PANEL SHEETS / BITÁCORA / ACTIVITY / NUTRICIÓN
+   v6.065: las secciones NO tienen scroll vertical propio. Igual que el
+   overlay (Home), ocupan exactamente el viewport (height:100%; overflow
+   :hidden). Si el contenido interno necesita scroll, lo hace su
+   .panel-body — no la board-face entera. Solo panel-sheets (RAW) deja
+   scroll porque es el iframe embebido de Google Sheets.
 ═══════════════════════════════════════════ */
 .board-face.panel-sheets{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;height:100%;overflow:hidden}
 .board-face.panel-sheets.active{transform:none;opacity:1;pointer-events:all}
@@ -1068,22 +1342,46 @@ html.mob .hero-right{display:none !important}
 #sheets-iframe-cont{flex:1;overflow:hidden;min-height:0}
 #sheets-iframe-cont iframe{width:100%;height:100%;border:none;display:block}
 
-.board-face.panel-bitacora{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.board-face.panel-bitacora{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;height:100%;overflow:hidden}
 .board-face.panel-bitacora.active{transform:none;opacity:1;pointer-events:all}
 .board-face.panel-bitacora .reverso-header{flex-shrink:0}
-.board-face.panel-bitacora .panel-body{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;padding:16px 20px;overflow-y:visible}
-.board-face.panel-bitacora::-webkit-scrollbar{width:5px}
-.board-face.panel-bitacora::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+.board-face.panel-bitacora .panel-body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;padding:16px 20px;overflow:hidden}
 
-.board-face.panel-activity{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.board-face.panel-activity{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;height:100%;overflow:hidden}
 .board-face.panel-activity.active{transform:none;opacity:1;pointer-events:all}
-.board-face.panel-activity::-webkit-scrollbar{width:5px}
-.board-face.panel-activity::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+.board-face.panel-activity .reverso-header{flex-shrink:0}
+.board-face.panel-activity .panel-body{flex:1;min-height:0;overflow:hidden}
 
-.board-face.panel-nutricion{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.board-face.panel-nutricion{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;height:100%;overflow:hidden}
 .board-face.panel-nutricion.active{transform:none;opacity:1;pointer-events:all}
-.board-face.panel-nutricion::-webkit-scrollbar{width:5px}
-.board-face.panel-nutricion::-webkit-scrollbar-thumb{background:rgba(74,222,128,.2);border-radius:3px}
+.board-face.panel-nutricion .reverso-header{flex-shrink:0}
+.board-face.panel-nutricion .panel-body{flex:1;min-height:0;overflow:hidden}
+
+/* ═══════════════════════════════════════════════════════════════════
+   v6.068 — SCROLL VERTICAL: SOLO EN MÓVIL
+   En ESCRITORIO las secciones no tienen scroll (ocupan el viewport,
+   igual que el overlay). En MÓVIL el scroll vertical SÍ se permite —
+   es la forma natural de desplazarse en un teléfono; sin él el
+   contenido quedaría apretado y recortado. Estas reglas html.mob
+   restauran el scroll del .panel-body solo en móvil.
+═══════════════════════════════════════════════════════════════════ */
+html.mob .board-face.panel-bitacora .panel-body,
+html.mob .board-face.panel-activity .panel-body,
+html.mob .board-face.panel-nutricion .panel-body{
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  -webkit-overflow-scrolling:touch;
+}
+html.mob .board-face.panel-bitacora .panel-body::-webkit-scrollbar,
+html.mob .board-face.panel-activity .panel-body::-webkit-scrollbar,
+html.mob .board-face.panel-nutricion .panel-body::-webkit-scrollbar{
+  width:4px;
+}
+html.mob .board-face.panel-bitacora .panel-body::-webkit-scrollbar-thumb,
+html.mob .board-face.panel-activity .panel-body::-webkit-scrollbar-thumb,
+html.mob .board-face.panel-nutricion .panel-body::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.12);border-radius:2px;
+}
 
 /* ═══════════════════════════════════════════
    SELECTS REVISIÓN
@@ -1120,16 +1418,17 @@ html.mob .hero-right{display:none !important}
 /* ═══════════════════════════════════════════
    CF STYLES (formulario)
 ═══════════════════════════════════════════ */
+/* v6.060 — campos del formulario RAW con lenguaje HUD */
 .cf{
   display:flex;align-items:center;
-  padding:10px 16px;
+  padding:11px 16px;
   border-bottom:1px solid rgba(255,255,255,.05);
   cursor:pointer;position:relative;
   transition:background .15s;gap:0;min-height:48px;
 }
-.cf:hover{background:rgba(255,255,255,.02)}
-.cf:active{transform:scale(0.995);background:rgba(255,255,255,.03) !important}
-.cf-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hud-text-dim);width:96px;flex-shrink:0}
+.cf:hover{background:rgba(139,92,246,.05)}
+.cf:active{transform:scale(0.995);background:rgba(139,92,246,.07) !important}
+.cf-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(200,210,220,0.55);width:96px;flex-shrink:0}
 .cf-val-wrap{flex:1;min-width:0}
 .cf-val{font-size:14px;font-weight:500;color:var(--hud-text);letter-spacing:-.02em}
 .cf-val.empty{color:var(--dim);font-weight:400}
@@ -1139,7 +1438,21 @@ html.mob .hero-right{display:none !important}
 .monto-input{background:transparent;border:none;color:var(--hud-text);font-family:inherit;font-size:22px;font-weight:700;letter-spacing:-.03em;outline:none;padding-left:90px;width:100%}
 .sw{max-height:0;overflow:hidden;transition:max-height .25s ease;width:100%}
 .cf.active .sw{max-height:320px}
-.cf.active{background:rgba(255,255,255,.03)}
+/* Campo activo: se ilumina con el acento del sistema + barra lateral */
+.cf.active{background:rgba(139,92,246,.08)}
+.cf.active::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--acc-violet);box-shadow:0 0 8px var(--acc-violet-glow);
+}
+/* Campo Monto — el dato central: barra de acento permanente */
+#cf-monto{
+  background:rgba(139,92,246,.04);
+}
+#cf-monto::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--acc-violet);opacity:.6;
+}
+#cf-monto.active::before{opacity:1;box-shadow:0 0 8px var(--acc-violet-glow)}
 .sec-add-btn{
   width:24px;height:24px;border-radius:50%;
   background:rgba(255,255,255,.08);
@@ -1509,9 +1822,11 @@ html.mob .hero-right{display:none !important}
 /* ═══════════════════════════════════════════
    TRANSICIÓN PANELES
 ═══════════════════════════════════════════ */
-.board-face{transition:opacity .2s ease,transform .2s ease !important}
+/* v6.060: cross-fade afinado — curva suave y un pelín más larga para
+   que el cambio Home ↔ sección se sienta pulido, no seco. */
+.board-face{transition:opacity .28s cubic-bezier(.16,1,.3,1),transform .28s cubic-bezier(.16,1,.3,1) !important}
 .board-face:not(.active):not(.anverso){
-  opacity:0 !important;pointer-events:none !important;transform:translateY(8px) !important;
+  opacity:0 !important;pointer-events:none !important;transform:translateY(10px) !important;
 }
 .board-face.active,
 .board-face.anverso:not(.slide-right):not(.slide-left){
@@ -1640,7 +1955,14 @@ html.mob .hero-right{display:none !important}
    ENTRADA DROPDOWN — selector tipo
 ═══════════════════════════════════════════ */
 .entrada-dropdown{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;display:none;align-items:center;justify-content:center;background:transparent;backdrop-filter:none;padding:0}
-.entrada-dropdown.show{display:flex;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+/* v6.060: blur del fondo reforzado + oscurecido. El formulario RAW es
+   el motor de la app — debe flotar nítido sobre el dial difuminado. */
+.entrada-dropdown.show{
+  display:flex;
+  background:rgba(2,2,10,0.78);
+  backdrop-filter:blur(16px) saturate(115%);
+  -webkit-backdrop-filter:blur(16px) saturate(115%);
+}
 .entrada-dropdown-inner{background:none;border:none;border-radius:0;width:auto;height:auto;max-width:none;max-height:none;overflow:visible;box-shadow:none;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}
 .entrada-selector-hdr{display:none}
 .entrada-selector-grid{position:relative;width:400px;height:400px;margin:0 auto;flex-shrink:0;overflow:visible;background:none;border:none}
@@ -1661,20 +1983,34 @@ html.mob .hero-right{display:none !important}
 .entrada-tipo-ico{font-size:18px;color:var(--tipo-color, rgba(255,255,255,.6));line-height:1}
 .entrada-tipo-lbl{font-size:10px;font-weight:700;color:#fff;letter-spacing:-.01em;white-space:nowrap;text-align:center}
 .entrada-tipo-sub{display:none}
-/* v5.213 — FIX "+Nueva se ve descolorido/transparente". El contenedor
-   .entrada-dropdown-inner tiene background:none, así que el formulario
-   se veía directamente sobre el fondo cósmico del overlay, sin un panel
-   opaco detrás — los campos translúcidos no tenían contra qué contrastar.
-   Se le da a #entrada-paso2 un fondo de panel sólido oscuro, borde y
-   radio: ahora es una tarjeta legible. */
+/* ═══════════════════════════════════════════════════════════════════
+   FORMULARIO RAW v6.060 — lenguaje HUD del sistema
+   Esquinas rectas (token --hud-rad), línea de acento violeta pulsante,
+   esquinas decorativas (corner brackets), borde y glow del sistema.
+═══════════════════════════════════════════════════════════════════ */
 #entrada-paso2{
   position:relative;
   background:linear-gradient(180deg,#140d28 0%,#0c0818 100%);
-  border:1px solid rgba(140,100,220,0.22);
-  border-radius:16px;
-  box-shadow:0 18px 60px rgba(0,0,0,0.6),0 0 0 1px rgba(120,160,255,0.05);
+  border:1px solid rgba(140,100,220,0.40);
+  border-radius:0;                       /* esquinas rectas — lenguaje del dial */
+  box-shadow:0 24px 70px rgba(0,0,0,0.7),
+             0 0 40px rgba(139,92,246,0.12),
+             inset 0 0 0 1px rgba(120,160,255,0.04);
   overflow:hidden;
   width:420px;max-width:92vw;
+}
+/* Línea de acento superior pulsante */
+#entrada-paso2::before{
+  content:'';position:absolute;left:0;right:0;top:0;height:2px;z-index:3;
+  background:linear-gradient(90deg,transparent 0%,var(--acc-violet) 22%,var(--acc-violet) 78%,transparent 100%);
+  animation:hudTopPulse var(--hud-breath-dur) var(--hud-breath-easing) infinite;
+}
+/* Esquina decorativa inferior-derecha */
+#entrada-paso2::after{
+  content:'';position:absolute;right:0;bottom:0;width:10px;height:10px;z-index:3;
+  border-right:1.5px solid rgba(167,139,250,0.7);
+  border-bottom:1.5px solid rgba(167,139,250,0.7);
+  pointer-events:none;
 }
 .entrada-dropdown-inner .form-actions{padding:12px 16px;border-top:1px solid rgba(255,255,255,.06);gap:8px}
 
@@ -2283,3 +2619,617 @@ html.mob .hero-right{display:none !important}
 .bit-card-sal-estado.completado{ color:var(--acc-green); background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.25); }
 .bit-card-sal-estado.cancelado { color:var(--hud-err);  background:rgba(239,68,68,0.08);  border:1px solid rgba(239,68,68,0.25); }
 .bit-card-sal-estado.pendiente { color:var(--hud-warn); background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   CARRUSEL DEL HOME MÓVIL v6.030 — estilo Apple Watch / jukebox
+   Solo activo en <900px. En desktop el carrusel no se construye.
+   Opción A: el dial-overlay (fixed, z-index:9000) no se toca; el
+   carrusel es una capa aparte. Slide 0 = hueco transparente que deja
+   ver el dial; slides 1+ = las .section reales del Home.
+═══════════════════════════════════════════════════════════════════ */
+html.mob #os-carousel{
+  /* v6.032: el carrusel es position:fixed para NO quedar atrapado en
+     el contexto de apilado de board-wrap/board-anverso (que lo dejaría
+     por debajo del overlay fixed). Cubre el área bajo la barra. */
+  position:fixed;
+  top:var(--hero-h,88px);left:0;right:0;bottom:0;
+  display:flex;flex-direction:column;
+  z-index:8500;                      /* bajo el overlay (9000): se ve el dial */
+  pointer-events:none;
+}
+/* En slides de cards el carrusel sube por encima del overlay para ser
+   visible e interactivo. En el slide del dial se queda debajo. */
+html.mob #os-carousel:not(.on-dial){
+  z-index:9300;
+}
+
+/* Track scrolleable horizontal con snap */
+html.mob .os-carousel-track{
+  flex:1;
+  display:flex;
+  overflow-x:auto;overflow-y:hidden;
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  pointer-events:auto;
+}
+html.mob .os-carousel-track::-webkit-scrollbar{display:none}
+
+/* Cada slide ocupa el ancho completo del viewport */
+html.mob .os-slide{
+  flex:0 0 100%;
+  width:100%;height:100%;
+  scroll-snap-align:center;
+  scroll-snap-stop:always;
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+html.mob .os-slide::-webkit-scrollbar{display:none}
+
+/* Slide 0 — el "slide del dial": transparente, sin contenido.
+   Deja pasar los toques al dial-overlay que está detrás. */
+html.mob .os-slide-dial{
+  background:transparent;
+  pointer-events:none;
+}
+
+/* Slides 1+ — cards reales. La .section dentro ocupa el slide. */
+html.mob .os-slide-card{
+  padding:14px 12px 20px;
+  pointer-events:auto;
+}
+html.mob .os-slide-card .section{
+  width:100%;
+  margin:0;
+  /* La sección se ve completa, expandida, una por slide */
+}
+
+/* Fila de puntos indicadores (scrubber tipo rocola) */
+html.mob .os-carousel-dots{
+  flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  gap:7px;
+  padding:9px 0 calc(9px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(to top,rgba(2,8,16,0.92),transparent);
+  pointer-events:auto;
+}
+html.mob .os-dot{
+  width:7px;height:7px;border-radius:50%;
+  border:none;padding:0;cursor:pointer;
+  background:rgba(167,139,250,0.22);
+  transition:background .2s,transform .2s,width .2s;
+}
+html.mob .os-dot.active{
+  width:20px;border-radius:4px;
+  background:var(--acc-violet);
+  box-shadow:0 0 8px var(--acc-violet-glow);
+}
+
+/* Con el carrusel activo, el stack vertical viejo de #mob-sections
+   ya no se usa como tal — las .section fueron movidas a los slides.
+   El contenedor #mob-sections queda vacío; se oculta por si acaso. */
+html.mob #os-carousel ~ #mob-sections,
+html.mob #mob-sections:empty{
+  display:none !important;
+}
+
+/* Con el board-anverso oculto (en una sección), el carrusel queda
+   inerte aunque su track declare pointer-events:auto. */
+html.mob .board-face.anverso.slide-right #os-carousel,
+html.mob .board-face.anverso.slide-right .os-carousel-track,
+html.mob .board-face.anverso.slide-right .os-carousel-dots{
+  pointer-events:none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECCIÓN NOTAS v6.069 — sticky notes, cuadrícula 5×5
+   La board-face ocupa el viewport (sin scroll en escritorio, igual que
+   las demás secciones); en móvil sí scrollea. Header arriba + grid.
+═══════════════════════════════════════════════════════════════════ */
+.board-face.panel-notas{
+  transform:none;opacity:0;pointer-events:none;
+  padding:0;display:flex;flex-direction:column;
+  height:100%;overflow:hidden;
+  background:#06060f;
+}
+.board-face.panel-notas.active{transform:none;opacity:1;pointer-events:all}
+
+/* Header */
+.notas-header{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 22px;
+  background:rgba(10,8,20,0.96);
+  border-bottom:1px solid rgba(232,216,106,0.20);
+}
+.notas-titulo{
+  display:flex;align-items:center;gap:10px;
+  font-size:13px;font-weight:800;letter-spacing:1.5px;
+  color:#FEF3A0;
+}
+.notas-titulo i{font-size:15px}
+.notas-btn-nueva{
+  display:flex;align-items:center;gap:7px;
+  padding:9px 16px;border-radius:0;
+  background:rgba(254,243,160,0.12);
+  border:1.2px solid rgba(232,216,106,0.55);
+  color:#FEF3A0;
+  font-family:inherit;font-size:11px;font-weight:800;
+  letter-spacing:.04em;text-transform:uppercase;
+  cursor:pointer;transition:all .18s;
+}
+.notas-btn-nueva i{font-size:10px}
+.notas-btn-nueva:hover{
+  background:rgba(254,243,160,0.22);
+  border-color:rgba(232,216,106,0.85);
+  box-shadow:0 0 16px rgba(254,243,160,0.25);
+}
+.notas-btn-nueva:active{transform:scale(0.97)}
+
+/* Cuadrícula 5×5 */
+/* ── v7.020 — GRAFO DE NODOS (reemplaza la cuadrícula 5×5) ──
+   El lienzo donde flotan los nodos. Scrolleable: el grafo puede
+   crecer más que la pantalla. */
+.grafo-wrap{
+  flex:1;min-height:0;
+  position:relative;
+  overflow:auto;
+  background:
+    radial-gradient(circle, rgba(140,100,220,0.05) 1px, transparent 1px);
+  background-size:28px 28px;
+}
+/* Las dos capas viven una encima de otra dentro del wrap */
+.grafo-lineas{
+  position:absolute;
+  top:0;left:0;
+  pointer-events:none;   /* las líneas no roban clics */
+  z-index:1;
+}
+.grafo-nodos{
+  position:absolute;
+  top:0;left:0;
+  z-index:2;
+}
+/* Una línea de conexión entre dos nodos */
+.grafo-linea{
+  stroke:rgba(167,139,250,0.55);
+  stroke-width:2;
+}
+.grafo-linea-tmp{
+  stroke:rgba(34,211,238,0.9);
+  stroke-width:2;
+  stroke-dasharray:6 5;
+}
+/* Un nodo (la nota en el lienzo) */
+.grafo-nodo{
+  position:absolute;
+  border:1.5px solid;
+  border-radius:3px;
+  padding:10px 12px;
+  box-sizing:border-box;
+  cursor:grab;
+  overflow:hidden;
+  box-shadow:0 4px 14px rgba(0,0,0,0.4);
+  transition:box-shadow .15s;
+  user-select:none;
+}
+.grafo-nodo:hover{
+  box-shadow:0 6px 20px rgba(0,0,0,0.55), 0 0 14px rgba(167,139,250,0.3);
+}
+.grafo-nodo.arrastrando{
+  cursor:grabbing;
+  box-shadow:0 10px 30px rgba(0,0,0,0.6), 0 0 22px rgba(167,139,250,0.5);
+  z-index:50;
+}
+.grafo-nodo.conectando{
+  outline:1.5px solid rgba(34,211,238,0.6);
+  outline-offset:2px;
+}
+/* El punto-conector del que se arrastra para crear un enlace */
+.grafo-conector{
+  position:absolute;
+  right:-7px;
+  top:50%;
+  transform:translateY(-50%);
+  width:14px;height:14px;
+  border-radius:50%;
+  background:rgba(34,211,238,0.9);
+  border:2px solid rgba(8,6,18,0.95);
+  cursor:crosshair;
+  box-shadow:0 0 8px rgba(34,211,238,0.6);
+  transition:transform .12s;
+}
+.grafo-conector:hover{
+  transform:translateY(-50%) scale(1.3);
+}
+
+/* La nota (post-it) */
+.nota{
+  width:100%;height:100%;
+  display:flex;flex-direction:column;gap:5px;
+  padding:11px 12px;
+  border:1px solid;
+  border-radius:0;
+  cursor:pointer;
+  overflow:hidden;
+  box-shadow:0 4px 14px rgba(0,0,0,0.4);
+  transition:transform .14s,box-shadow .14s;
+}
+.nota:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 22px rgba(0,0,0,0.5);
+}
+.nota.arrastrando{
+  opacity:0.45;
+  transform:scale(0.96);
+}
+.nota-titulo{
+  font-size:12px;font-weight:800;
+  line-height:1.2;
+  word-break:break-word;
+  flex-shrink:0;
+}
+.nota-cuerpo{
+  font-size:11px;font-weight:500;
+  line-height:1.35;
+  word-break:break-word;
+  overflow:hidden;
+  flex:1;
+}
+.nota-vacia-txt{opacity:0.4;font-style:italic}
+
+/* Editor de nota (modal) */
+.nota-editor-ov{
+  position:fixed;inset:0;z-index:10500;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(2,2,10,0.78);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  padding:24px;
+}
+.nota-editor{
+  width:380px;max-width:92vw;
+  display:flex;flex-direction:column;gap:12px;
+  padding:18px;
+  border:1.5px solid;
+  border-radius:0;
+  box-shadow:0 24px 70px rgba(0,0,0,0.7);
+}
+.nota-ed-titulo{
+  background:rgba(255,255,255,0.35);
+  border:none;border-bottom:1.5px solid rgba(0,0,0,0.18);
+  padding:8px 10px;
+  font-family:inherit;font-size:14px;font-weight:800;
+  outline:none;
+}
+.nota-ed-cuerpo{
+  background:rgba(255,255,255,0.35);
+  border:none;
+  padding:10px;
+  min-height:150px;resize:vertical;
+  font-family:inherit;font-size:13px;font-weight:500;line-height:1.4;
+  outline:none;
+}
+.nota-ed-titulo::placeholder,
+.nota-ed-cuerpo::placeholder{color:rgba(0,0,0,0.35)}
+.nota-ed-colores{
+  display:flex;gap:8px;flex-wrap:wrap;
+}
+.nota-sw{
+  width:26px;height:26px;border-radius:50%;
+  border:2px solid;cursor:pointer;padding:0;
+  transition:transform .14s;
+}
+.nota-sw:hover{transform:scale(1.15)}
+.nota-sw.sel{
+  box-shadow:0 0 0 2px rgba(0,0,0,0.55);
+}
+.nota-ed-acciones{
+  display:flex;gap:10px;justify-content:space-between;
+  margin-top:2px;
+}
+.nota-ed-borrar{
+  padding:9px 16px;border-radius:0;
+  background:rgba(0,0,0,0.10);
+  border:1.2px solid rgba(0,0,0,0.25);
+  color:rgba(0,0,0,0.6);
+  font-family:inherit;font-size:11px;font-weight:700;
+  letter-spacing:.03em;text-transform:uppercase;cursor:pointer;
+  transition:all .15s;
+}
+.nota-ed-borrar:hover{background:rgba(180,30,30,0.15);border-color:rgba(180,30,30,0.4);color:#7a1a1a}
+.nota-ed-ok{
+  flex:1;
+  padding:9px 16px;border-radius:0;
+  background:rgba(0,0,0,0.72);
+  border:none;
+  color:#fff;
+  font-family:inherit;font-size:11px;font-weight:800;
+  letter-spacing:.04em;text-transform:uppercase;cursor:pointer;
+  transition:all .15s;
+}
+.nota-ed-ok:hover{background:rgba(0,0,0,0.88)}
+.nota-ed-ok:active{transform:scale(0.98)}
+
+/* ── Móvil: la sección Notas SÍ scrollea (igual criterio que las demás) ── */
+html.mob .notas-grid{
+  grid-template-columns:repeat(2,1fr);
+  grid-auto-rows:140px;
+  overflow-y:auto !important;overflow-x:hidden !important;
+  -webkit-overflow-scrolling:touch;
+}
+html.mob .notas-grid::-webkit-scrollbar{width:4px}
+html.mob .notas-grid::-webkit-scrollbar-thumb{background:rgba(254,243,160,0.3);border-radius:2px}
+
+/* ═══════════════════════════════════════════════════════════════════
+   v7 FASE 1 — SISTEMA DE NIVELES
+   La barra vertical de profundidad + el wheel circular estilo iPod.
+   Solo visibles en escritorio; raw-niveles.js los oculta en móvil.
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── Barra vertical de nivel (lado derecho) ── */
+.niv-barra{
+  position:fixed;
+  right:14px;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:230px;
+  z-index:10200;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+}
+.niv-riel{
+  position:relative;
+  width:4px;
+  height:100%;
+  background:rgba(140,100,220,0.16);
+  border-radius:2px;
+  pointer-events:auto;
+  cursor:ns-resize;
+}
+/* Relleno del medidor de intención */
+.niv-fill{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  width:4px;
+  background:linear-gradient(180deg,#22D3EE,#8B5CF6);
+  border-radius:2px;
+  box-shadow:0 0 8px rgba(139,92,246,0.55);
+  height:0%;
+  transition:height .08s linear,top .08s linear;
+}
+/* Paradas (niveles) */
+.niv-stop{
+  position:absolute;
+  left:50%;
+  width:13px;height:13px;
+  margin-left:-6.5px;margin-top:-6.5px;
+  border-radius:50%;
+  background:rgba(8,6,18,0.95);
+  border:1.5px solid rgba(167,139,250,0.45);
+  cursor:pointer;
+  padding:0;
+  transition:all .2s;
+}
+.niv-stop:nth-child(2){ top:0%; }    /* nivel 0 */
+.niv-stop:nth-child(3){ top:50%; }   /* nivel 1 */
+.niv-stop:nth-child(4){ top:100%; }  /* nivel 2 */
+.niv-stop:hover{
+  border-color:#A78BFA;
+  box-shadow:0 0 10px rgba(167,139,250,0.5);
+}
+.niv-stop.on{
+  background:#A78BFA;
+  border-color:#C4B5FD;
+  box-shadow:0 0 12px rgba(167,139,250,0.7);
+}
+/* Marcador de posición actual */
+.niv-marcador{
+  position:absolute;
+  left:50%;
+  width:20px;height:20px;
+  margin-left:-10px;margin-top:-10px;
+  border-radius:50%;
+  border:2px solid #A78BFA;
+  background:rgba(167,139,250,0.12);
+  box-shadow:0 0 14px rgba(167,139,250,0.55);
+  pointer-events:none;
+  transition:top .42s cubic-bezier(.4,1.2,.5,1);
+}
+
+/* ── Wheel circular estilo iPod (abajo-derecha) ── */
+.niv-wheel{
+  position:fixed;
+  right:22px;
+  bottom:22px;
+  width:96px;height:96px;
+  z-index:10200;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.niv-wheel-ring{
+  position:absolute;
+  inset:0;
+  border-radius:50%;
+  border:3px solid rgba(140,100,220,0.22);
+  cursor:grab;
+  /* El anillo se ilumina proporcional a --niv-frac (0..1) */
+  background:
+    conic-gradient(
+      from -90deg,
+      rgba(34,211,238,0.55) calc(var(--niv-frac,0) * 360deg),
+      rgba(140,100,220,0.06) 0
+    );
+  transition:border-color .2s;
+}
+.niv-wheel.activo .niv-wheel-ring{
+  cursor:grabbing;
+  border-color:rgba(167,139,250,0.5);
+}
+.niv-wheel-hub{
+  position:relative;
+  width:46px;height:46px;
+  border-radius:50%;
+  background:rgba(8,6,18,0.97);
+  border:1.5px solid rgba(167,139,250,0.4);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 0 16px rgba(0,0,0,0.6);
+  pointer-events:none;
+}
+.niv-wheel-lvl{
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:20px;
+  font-weight:800;
+  color:#A78BFA;
+  text-shadow:0 0 8px rgba(167,139,250,0.6);
+}
+.niv-wheel-hint{
+  position:absolute;
+  bottom:-16px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.18em;
+  color:rgba(200,208,230,0.4);
+  pointer-events:none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   v7 FASE 2 — INMERSIÓN POR PROFUNDIDAD
+   El <html> lleva la clase niv-0 / niv-1 / niv-2 (la pone raw-niveles).
+   Cuanto más profundo el nivel, más se difumina y desvanece lo que
+   queda "arriba" — el fondo cósmico, el dial, las cards. Todo con
+   filter:blur + opacity (v6 nunca toca filter → cero conflicto).
+   Transición ~750ms: el descenso se siente, sin hacerse lento.
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── El fondo cósmico: blur progresivo según la profundidad ── */
+#dial-particles{
+  transition:filter .75s cubic-bezier(.4,0,.2,1);
+  /* v7.021 — Aislar esta capa. Animar `filter` sobre el canvas grande
+     hacía que el navegador recompusiera el layout en bucle, y eso
+     re-disparaba la medición de las cards (scroll que parpadea en el
+     Nivel 1). `contain:layout paint` confina la animación a esta capa
+     sin tocar su tamaño (no se usa `strict` para no arriesgar que el
+     canvas a pantalla completa se encoja). */
+  contain:layout paint;
+  will-change:filter;
+}
+html.niv-0 #dial-particles{ filter:blur(0px); }
+html.niv-1 #dial-particles{ filter:blur(5px); }
+html.niv-2 #dial-particles{ filter:blur(12px); }
+
+/* ── El dial / overlay: SIN blur. v7.013: el blur es EXCLUSIVAMENTE
+      para el fondo cósmico (#dial-particles). Nada más se difumina —
+      ni el overlay, ni el dial, ni las cards, ni los paneles
+      expandidos. El overlay queda intacto. ── */
+
+/* ── Las cards HUD ──
+      v7.012: las cards laterales NO se difuminan. El usuario las quiere
+      nítidas en todos los niveles. La inmersión la dan el fondo cósmico
+      (blur progresivo) y el dial (se desvanece) — las cards se quedan
+      claras. Sin reglas de filter sobre .hud-pnl. ── */
+
+/* ── v7.031 — JALÓN EN Z de las secciones (Nivel 1 ↔ 2) ──
+   Las reglas de v6 fijan transform:none en cada panel-*, así que el
+   escalado de la Fase 2 quedaba pisado. Aquí se gana con !important y
+   solo durante la transición de nivel: raw-niveles.js pone la clase
+   `niv-warp` al <html> mientras cruza. La sección que se activa EMERGE
+   desde el fondo (escala de lejos → 1); al salir, se ALEJA hacia el
+   fondo. Fuera de la transición, v6 manda y la sección queda normal.
+   La transición es larga para que el jalón se SIENTA.
+   v7.034: propiedades de transición explícitas (no shorthand) y
+   selector reforzado con `html.niv-warp` para ganarle a la regla
+   `.board-face{transition:.28s !important}` de v6. La sección entrante
+   ESPERA (delay .40s) antes de volverse opaca — el warp del fondo
+   tiene esos instantes para verse sin que la pantalla lo tape. */
+html.niv-warp .board-face:not(.anverso){
+  transition-property:opacity, transform !important;
+  transition-duration:.66s, .92s !important;
+  transition-timing-function:cubic-bezier(.22,1,.36,1) !important;
+  transition-delay:.40s, 0s !important;
+}
+/* Sección entrante: emerge desde "muy lejos" hasta su sitio */
+html.niv-warp .board-face:not(.anverso).active{
+  transform:scale(1) translateY(0) !important;
+  opacity:1 !important;
+}
+/* Sección saliente / aún no activa: hundida y desvanecida en el fondo */
+html.niv-warp .board-face:not(.anverso):not(.active){
+  transform:scale(.80) translateY(0) !important;
+  opacity:0 !important;
+}
+
+/* ── v7.031 — La card expandida durante el cruce 1↔2 ──
+   Al bajar a una sección (Nivel 2), la card expandida se aleja hacia
+   el fondo (encoge + se desvanece) — se siente "succionada". Al volver
+   (2→1) emerge de nuevo. Solo durante la transición (clase niv-warp).
+   La card expandida lleva .hud-expanded; cuelga de <body>. */
+html.niv-warp .hud-pnl.hud-expanded{
+  transition:transform 1.0s cubic-bezier(.22,1,.36,1),
+             opacity 1.0s cubic-bezier(.22,1,.36,1) !important;
+}
+/* En Nivel 2, la card expandida ya no se ve: se fue al fondo */
+html.niv-warp.niv-2 .hud-pnl.hud-expanded{
+  transform:scale(.7) !important;
+  opacity:0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   v7.032 — MATAR EL SCROLL VERTICAL FANTASMA DE LAS SECCIONES
+   La regla general .panel-body (overflow-y:auto) deja scroll vertical.
+   v6 lo corrige solo en panel-activity/bitacora/nutricion. Cualquier
+   otra sección — o un .panel-body interno no cubierto — se queda con
+   scroll de adorno: el contenido no se sale, pero la barra aparece.
+   Aquí, EN ESCRITORIO, se fuerza overflow:hidden en el .panel-body de
+   TODAS las board-face. En móvil NO aplica (las reglas html.mob ya
+   restauran el scroll, que ahí sí hace falta).
+═══════════════════════════════════════════════════════════════════ */
+html:not(.mob) .board-face:not(.anverso) .panel-body{
+  overflow:hidden !important;
+}
+
+/* ── v7.032 — MATAR EL SCROLL VERTICAL FANTASMA DE LAS SECCIONES ──
+   En ESCRITORIO las secciones (Activity, Bitácora, Logros, Nutrición…)
+   ocupan exacto el viewport y NO deben tener scroll vertical — así está
+   diseñado v6. Pero la regla base `.panel-body{overflow-y:auto}` se lo
+   colaba igual, y como el contenido se extiende de más, salía ese
+   scroll vertical horrible. Aquí se fuerza overflow:hidden en
+   escritorio. `html:not(.mob)` → en móvil NO aplica (ahí el scroll sí
+   debe existir, y las reglas html.mob lo restauran). */
+html:not(.mob) .board-face .panel-body{
+  overflow-y:hidden !important;
+}
+html:not(.mob) .board-face:not(.anverso){
+  overflow:hidden !important;
+}
+
+/* ── v7.034 — el flashazo del dial en 1↔2 se maneja desde
+   raw-niveles.js (oculta el overlay antes de cerrarDial). No se fuerza
+   por CSS para no pelear con abrirDial/cerrarDial de v6. ── */
+
+/* ── v7.046 — el fondo cósmico ahora SIEMPRE se ve durante el cruce ──
+   El canvas #dial-particles vive DENTRO del overlay. Si apagamos el
+   overlay, se apaga el cosmos. La solución: NO apagar el overlay,
+   apagar solo el dial y sus elementos. El canvas de partículas se
+   queda siempre visible — es el "fondo" de toda la experiencia. */
+
+/* ── v7.053 — En Nivel 2, el overlay (que tiene el canvas cósmico
+   dentro) debe quedar DETRÁS de la sección a pantalla completa.
+   Activity vive en .app (z-index:2); el overlay es 9000 — la tapa.
+   En Nivel 2 ponemos el overlay en z-index:1 (debajo de .app:2), así
+   el fondo cósmico se ve DETRÁS de Activity y los datos se ven al
+   frente. Los hijos del overlay que se vean en Nivel 2 (solo
+   #dial-particles, los demás están con visibility:hidden) quedan
+   alineados visualmente como "fondo". */
+html.niv-2 #dial-overlay{
+  z-index:1 !important;
+}

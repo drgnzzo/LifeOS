@@ -1,4 +1,14 @@
-/* RAW Entry — Dashboard v.5.091
+/* RAW Entry — Dashboard v.6.040
+   ╔══════════════════════════════════════════════════════════════════╗
+   ║ FASE v6.040 — BOTÓN ACTUALIZAR                                   ║
+   ╚══════════════════════════════════════════════════════════════════╝
+   refreshTodo NO saca del overlay: no navega ni cierra el dial. Refresca
+   los datos en segundo plano y re-renderiza TODO, incluidos los paneles
+   HUD del overlay (espejos del dial: _refrescarEspejos, renderSimsNeeds,
+   renderSimsBandSimsStyle, _reposicionarHUD). El usuario se queda donde
+   está. Feedback: el botón gira y se ilumina + el chip de estado.
+
+   ── Heredado v5.091 ──
    Cambios desde v5.090:
    - REVERTIDO renderSimsPanel() del DASHBOARD: la banda Sim ya no vive ahí.
      Ahora es un STUB que reenvía al renderer del overlay del dial
@@ -384,6 +394,15 @@ function addItem(idx){
 //  REFRESH
 // ══════════════════════════════════════════
 function refreshTodo(){
+  // ════════════════════════════════════════════════════════════════
+  // v6.040 — ACTUALIZAR sin salir del overlay.
+  // refreshTodo NO navega: no llama cerrarDial ni cambia de sección.
+  // Refresca los datos en segundo plano y re-renderiza TODO — incluidos
+  // los paneles HUD del overlay (los "espejos" del dial) — así que el
+  // usuario se queda exactamente donde está (Home o cualquier sección)
+  // y ve los datos nuevos. Feedback visual: el botón gira + el chip de
+  // estado. Es idempotente y seguro de llamar desde cualquier vista.
+  // ════════════════════════════════════════════════════════════════
   const btn=document.getElementById('btn-rf');
   if(btn){btn.classList.add('spinning');btn.disabled=true;}
   progStart();setChip('load','Actualizando');
@@ -407,11 +426,19 @@ function refreshTodo(){
     if(typeof cargarScore==='function')cargarScore();
     cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
     renderSimsPanel();
-    if(btn){btn.classList.remove('spinning');btn.disabled=false;}progDone();showToast('Datos actualizados');
+    // v6.040: refrescar los paneles HUD del overlay (espejos del dial)
+    // para que el Home también muestre datos nuevos sin reabrirse.
+    if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
+    if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
+    if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+    if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+    if(btn){btn.classList.remove('spinning');btn.disabled=false;}progDone();
+    setChip('ok','Listo');showToast('Datos actualizados');
   }).catch((err)=>{
     console.error('refreshTodo falló:', err);
     if(btn){btn.classList.remove('spinning');btn.disabled=false;}
     progDone();
+    setChip('err','Error');
     showToast('Error al actualizar',false);
   });
 }

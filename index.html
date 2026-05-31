@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <!-- IMPORTANTE: tokens ANTES de raw-app — la cascada y :root necesitan este orden -->
   <link rel="stylesheet" href="raw-tokens.css?v=5106">
-  <link rel="stylesheet" href="raw-app.css?v=5213">
+  <link rel="stylesheet" href="raw-app.css?v=7053">
 
 </head>
 <body>
@@ -22,35 +22,82 @@
 <div id="pts" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden"></div>
 <div id="prog" class="prog-bar"></div>
 
-<div class="app">
-
-  <!-- HERO -->
+<!-- v6.064: la barra (hero) se MUEVE fuera de .app — hija directa de
+     <body>. .app tiene z-index:2 → crea contexto de apilamiento que
+     atrapaba la barra por debajo del overlay aunque dijera z-index:
+     10000. Como hija de <body> su z-index sí compite con el overlay
+     y la barra queda SIEMPRE visible encima. -->
   <div class="hero" id="hero">
+
+    <!-- IZQUIERDA — marca -->
     <div class="hero-left">
       <button class="hero-hamburger" id="hamburger"><i class="fas fa-bars"></i></button>
       <div class="hero-brand">
-        <div class="hero-title">Life<span style="color:var(--p)">OS</span></div>
-        <div class="hero-sub">v.5.217 · Trello · Sheets</div>
+        <div class="hero-icon"><i class="fas fa-diamond"></i></div>
+        <div class="hero-brand-txt">
+          <div class="hero-title">Life<span>OS</span></div>
+          <div class="hero-sub">v.7.054 · Sheets</div>
+        </div>
       </div>
     </div>
+
+    <!-- CENTRO — tabs de navegación (estilo HUD, acento por sección) -->
+    <nav class="hero-tabs" id="hero-tabs">
+      <button class="hud-tab btn-flip is-home active" id="btn-home" data-acc="#94A3B8" onclick="volverAlAnverso()" title="Home">
+        <i class="fas fa-house"></i><span>Home</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-logros" data-acc="#FACC15" onclick="irALogros()" title="Logros">
+        <i class="fas fa-trophy"></i><span>Logros</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-maslow" data-acc="#C4B5FD" onclick="irABitacora()" title="Bitácora">
+        <i class="fas fa-book-open"></i><span>Bitácora</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-activity" data-acc="#FB923C" onclick="irAActivity()" title="Activity Check">
+        <i class="fas fa-bolt"></i><span>Activity</span>
+      </button>
+      <button class="hud-tab btn-flip is-sos" id="btn-sos" data-acc="#EF4444" onclick="activarSOS()" title="SOS">
+        <i class="fas fa-circle-exclamation"></i><span>SOS</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-nutricion" data-acc="#4ADE80" onclick="irANutricion()" title="Nutrición">
+        <i class="fas fa-leaf"></i><span>Nutrición</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-notas" data-acc="#FEF3A0" onclick="irANotas()" title="Notas">
+        <i class="fas fa-note-sticky"></i><span>Notas</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-sheets" data-acc="#A5B4FC" onclick="irASheets('raw')" title="RAW en la web">
+        <i class="fas fa-table"></i><span>RAW</span>
+      </button>
+    </nav>
+
+    <!-- DERECHA — estado + acciones + SIM -->
     <div class="hero-right">
-      <div id="chip" class="hero-chip load"><span id="chip-txt">Cargando</span></div>
-      <button class="btn-flip" id="btn-home" onclick="volverAlAnverso()" title="Inicio" style="border-color:rgba(255,255,255,0.20);color:rgba(255,255,255,0.7)">
-        <i class="fas fa-house" style="font-size:10px"></i> Home
+      <div id="chip" class="hero-chip load"><span class="chip-dot"></span><span id="chip-txt">Cargando</span></div>
+      <button class="hero-act" id="btn-sheets-direct" onclick="window.open('https://docs.google.com/spreadsheets/d/15T14Hb7tvmv24ZAaC3su1NRtDwVS6-dWbJGxQYUGP1o/edit#gid=0','_blank')" title="Abrir RAW directo en Google Sheets">
+        <i class="fab fa-google-drive"></i>
       </button>
-      <button class="btn-flip btn-nueva-entrada-hero" id="btn-nueva-entrada" onclick="toggleEntradaDropdown()" title="Nueva Entrada" style="background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.4);color:#A5B4FC">
-        <i class="fas fa-plus"></i> Nueva
+      <button class="hero-act" id="btn-rf" onclick="refreshTodo()" title="Actualizar">
+        <i class="fas fa-rotate-right"></i>
       </button>
-      <button class="btn-flip" id="btn-logros"    onclick="irALogros()"   title="Logros"><i class="fas fa-trophy"></i> Logros</button>
-      <button class="btn-flip" id="btn-maslow"    onclick="irABitacora()" title="Bitácora"><i class="fas fa-book-open"></i> Bitácora</button>
-      <button class="btn-flip" id="btn-activity"  onclick="irAActivity()" title="Activity Check">⚡ Activity</button>
-      <button class="nav-btn sos" id="btn-sos"    onclick="activarSOS()"  title="SOS"><i class="fas fa-circle-exclamation"></i> SOS</button>
-      <button class="btn-flip" id="btn-nutricion" onclick="irANutricion()" title="Nutrición" style="background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.3);color:#4ADE80"><i class="fas fa-leaf"></i> Nutrición</button>
-      <button class="btn-flip" id="btn-sheets"    onclick="irASheets('raw')" title="RAW Sheets en web"><i class="fas fa-table"></i> RAW EN WEB</button>
-      <button class="btn-flip" id="btn-sheets-direct" onclick="window.open('https://docs.google.com/spreadsheets/d/15T14Hb7tvmv24ZAaC3su1NRtDwVS6-dWbJGxQYUGP1o/edit#gid=0','_blank')" title="Abrir RAW en Sheets"><i class="fab fa-google-drive"></i> RAW</button>
-      <button class="btn-refresh" id="btn-rf" onclick="refreshTodo()" title="Actualizar"><i class="fas fa-rotate-right"></i></button>
+      <div class="hero-sim" id="hero-sim">
+        <div class="hero-sim-avatar">U</div>
+        <div class="hero-sim-txt">
+          <span class="hero-sim-name">SIM</span>
+          <span class="hero-sim-lv" id="hero-sim-lv">Lv 1</span>
+        </div>
+      </div>
     </div>
   </div>
+
+<div class="app">
+
+  <!-- ════════════════════════════════════════════════════════════
+       BARRA SUPERIOR v6.010 — fija, siempre visible, lenguaje HUD.
+       Estructura: brand · tabs de navegación · acciones · SIM.
+       Los onclick apuntan a las funciones de navegación existentes;
+       esta fase NO cambia la navegación, solo el aspecto y que la
+       barra sea permanente.
+  ═════════════════════════════════════════════════════════════════ -->
+
 
   <!-- BOARD -->
   <div class="board-wrap">
@@ -223,10 +270,10 @@
     </div>
 
     <!-- PANEL LOGROS — montado por raw-logros.js -->
-    <div class="board-face panel-logros" id="board-logros" style="overflow:hidden;display:flex;flex-direction:column;background:#020810"></div>
+    <div class="board-face panel-logros" id="board-logros" style="overflow:hidden;display:flex;flex-direction:column"></div>
 
     <!-- PANEL BITÁCORA — layout estilo Activity Check -->
-    <div class="board-face panel-bitacora" id="board-bitacora" style="overflow:hidden;display:flex;flex-direction:column;background:rgba(4,4,14,0.97)">
+    <div class="board-face panel-bitacora" id="board-bitacora" style="overflow:hidden;display:flex;flex-direction:column">
 
       <!-- HEADER full-width estilo Activity Check -->
       <div id="bit-header">
@@ -415,7 +462,7 @@
     </div>
 
     <!-- PANEL ACTIVITY -->
-    <div class="board-face panel-activity" id="board-activity" style="overflow-y:auto;overflow-x:hidden">
+    <div class="board-face panel-activity" id="board-activity" style="overflow:hidden">
       <div class="reverso-header">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:32px;height:32px;border-radius:0;background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.3);display:flex;align-items:center;justify-content:center;font-size:14px">⚡</div>
@@ -457,7 +504,7 @@
     </div>
 
     <!-- PANEL NUTRICIÓN -->
-    <div class="board-face panel-nutricion" id="board-nutricion" style="overflow-y:auto;overflow-x:hidden">
+    <div class="board-face panel-nutricion" id="board-nutricion" style="overflow:hidden">
       <div class="reverso-header" style="flex-shrink:0">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:32px;height:32px;border-radius:0;background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.25);display:flex;align-items:center;justify-content:center;font-size:16px">🥗</div>
@@ -477,6 +524,9 @@
         <div style="padding:40px;text-align:center;color:var(--m)"><i class="fas fa-circle-notch fa-spin" style="font-size:20px;color:#4ADE80"></i></div>
       </div>
     </div>
+
+    <!-- NOTAS — sticky notes 5×5 (montado por raw-notas.js) -->
+    <div class="board-face panel-notas" id="board-notas" style="overflow:hidden"></div>
 
   </div><!-- /board-wrap -->
 </div><!-- /app -->
@@ -498,28 +548,10 @@
 </div>
 
 <!-- TAB BAR MÓVIL -->
-<div class="mob-tabbar">
-  <button class="mob-tab active" data-tab="entrada" onclick="_syncMobTab('entrada');volverAlAnverso()">
-    <div class="mob-tab-icon"><i class="fas fa-pen-to-square"></i></div>
-    <div class="mob-tab-label">Entrada</div>
-  </button>
-  <button class="mob-tab" data-tab="logros"   onclick="irALogros()">
-    <div class="mob-tab-icon"><i class="fas fa-trophy"></i></div>
-    <div class="mob-tab-label">Logros</div>
-  </button>
-  <button class="mob-tab" data-tab="bitacora" onclick="irABitacora()">
-    <div class="mob-tab-icon"><i class="fas fa-book-open"></i></div>
-    <div class="mob-tab-label">Bitácora</div>
-  </button>
-  <button class="mob-tab" data-tab="activity" onclick="irAActivity()">
-    <div class="mob-tab-icon"><i class="fas fa-bolt"></i></div>
-    <div class="mob-tab-label">Activity</div>
-  </button>
-  <button class="mob-tab" data-tab="nutricion" onclick="irANutricion()">
-    <div class="mob-tab-icon"><i class="fas fa-leaf"></i></div>
-    <div class="mob-tab-label">Nutrición</div>
-  </button>
-</div>
+<!-- v6.050: mob-tabbar (barra de tabs inferior móvil) RETIRADA.
+     Duplicaba la navegación de la barra superior fija (la fila jukebox
+     de v6.010). La navegación móvil vive ahora 100% en la barra
+     superior. -->
 
 <!-- PANEL GESTIONAR LISTA -->
 <div class="panel-overlay" id="panel-overlay" onclick="cPanel()"></div>
@@ -616,12 +648,14 @@
   </div>
 </div>
 
-<script src="raw-drag.js?v=5189"></script>
-<script src="raw-core.js?v=5211"></script>
-<script src="raw-overlay.js?v=5217"></script>
-<script src="raw-overlay-dnd.js?v=5199"></script>
-<script src="raw-dashboard.js?v=5213"></script>
-<script src="raw-logros.js?v=5215"></script>
+<script src="raw-core.js?v=6072"></script>
+<script src="raw-overlay.js?v=7042"></script>
+<script src="raw-overlay-dnd.js?v=6011"></script>
+<script src="raw-dashboard.js?v=6040"></script>
+<script src="raw-logros.js?v=6068"></script>
 <script src="raw-bitacora.js?v=5189"></script>
+<script src="raw-carousel.js?v=6030"></script>
+<script src="raw-notas.js?v=7020"></script>
+<script src="raw-niveles.js?v=7054"></script>
 </body>
 </html>

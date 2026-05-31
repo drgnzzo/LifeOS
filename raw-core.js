@@ -1,12 +1,30 @@
-/* RAW Entry — Core v.5.211 (header legacy v5.084)
+/* RAW Entry — Core v.6.072
+   ╔══════════════════════════════════════════════════════════════════╗
+   ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
+   ╚══════════════════════════════════════════════════════════════════╝
+   · progStart/progDone a prueba de null: el elemento #prog (barra de
+     progreso vieja) se retiró al rediseñar la barra en v6.010. Ya no
+     lanzan TypeError si no existe — esto desbloquea refreshTodo, que
+     fallaba en progStart() antes de buscar datos.
+
+   ── v6.030 — CARRUSEL DEL HOME MÓVIL ──
+   · El router _osMostrar('home'), en móvil, hace snap al slide del
+     dial del carrusel (window._osCarouselHome) y deja visible el
+     board-anverso, que contiene el carrusel: se le quita el
+     display:none de origen. El carrusel vive en raw-carousel.js.
+
+   ── v6.020 — ROUTER DE CAPAS + HOME ──
+   _osMostrar(seccion) es el router único de navegación de v6:
+     · 'home' → el overlay (dial + cards + fondo cósmico).
+     · resto  → la .board-face de la sección, con cross-fade.
+   _irAPanel es envoltorio de _osMostrar; volverAlAnverso =
+   _osMostrar('home'); irABitacora/irAActivity/irANutricion
+   reconectadas al router conservando su carga de datos.
+
+   ── Heredado v5.211 ──
    FIX DEFINITIVO fecha amontonada sobre el círculo de check en
-   Libros/Movies/Pendientes. Causa real (hallada por outerHTML del
-   DOM): el handler de click obtenía infoFlex con
-   row.querySelector(':scope > div') → devuelve el PRIMER div hijo,
-   que es el círculo _act-item. El fechaSpan se insertaba DENTRO del
-   círculo. Ahora infoFlex se selecciona como el div hijo que NO es
-   _act-item. Las 4 rutas de v5.210 ya estaban bien; esta 5ª (el
-   appendChild al div equivocado) era la que faltaba.
+   Libros/Movies/Pendientes. infoFlex se selecciona como el div hijo
+   que NO es _act-item.
    ── Header original
    DIVISIÓN DEL ARCHIVO — raw-core.js dividido en dos para reducir tamaño:
 
@@ -20,12 +38,15 @@
      calculadores derivados, renderSimsBandSimsStyle, _refrescarEspejos.
 
    ORDEN DE CARGA EN index.html (CRÍTICO):
-     1. raw-drag.js
-     2. raw-core.js     ← este archivo
-     3. raw-overlay.js  ← cargado INMEDIATAMENTE después
+     1. raw-core.js     ← este archivo
+     2. raw-overlay.js  ← cargado INMEDIATAMENTE después
+     3. raw-overlay-dnd.js
      4. raw-dashboard.js
      5. raw-logros.js
      6. raw-bitacora.js
+     7. raw-carousel.js
+   (v6.061: raw-drag.js retirado — el DnD de columnas del anverso viejo
+   ya no existe en v6.)
 
    COMUNICACIÓN ENTRE ARCHIVOS:
    - Funciones: declaradas con `function X(){}` a nivel de archivo → se
@@ -126,6 +147,12 @@ const api = {
   guardarNutricion:     (d)=>EN_GAS?gasRun('guardarNutricion',d):apiPost('guardarNutricion',{datos:d}),
   getEntrenamiento:     ()=>EN_GAS?gasRun('getEntrenamiento'):apiGet('getEntrenamiento'),
   guardarEntrenamiento: (d)=>EN_GAS?gasRun('guardarEntrenamiento',d):apiPost('guardarEntrenamiento',{datos:d}),
+  // v6.069 — NOTAS (sticky notes). Hoja NOTAS del Sheet.
+  getNotas:             ()=>EN_GAS?gasRun('getNotas'):apiGet('getNotas'),
+  guardarNota:          (d)=>EN_GAS?gasRun('guardarNota',d):apiPost('guardarNota',{datos:d}),
+  actualizarNota:       (d)=>EN_GAS?gasRun('actualizarNota',d):apiPost('actualizarNota',{datos:d}),
+  borrarNota:           (id)=>EN_GAS?gasRun('borrarNota',id):apiPost('borrarNota',{id:id}),
+  moverNota:            (id,slot)=>EN_GAS?gasRun('moverNota',id,slot):apiPost('moverNota',{id:id,slot:slot}),
 };
 
 // ══════════════════════════════════════════
@@ -365,8 +392,12 @@ function showToast(msg,ok=true){
   clearTimeout(_toast);
   _toast=setTimeout(()=>t.classList.remove('show'),2800);
 }
-function progStart(){const b=document.getElementById('prog');b.className='prog-bar ind';}
-function progDone(){const b=document.getElementById('prog');b.className='prog-bar';b.style.width='100%';setTimeout(()=>{b.style.width='0%';},400);}
+// v6.040: el elemento #prog (barra de progreso vieja del hero) fue
+// retirado al rediseñar la barra superior en v6.010. progStart/progDone
+// se vuelven a prueba de null para no lanzar TypeError — el feedback de
+// "actualizando" ahora lo da el botón girando + el chip de estado.
+function progStart(){const b=document.getElementById('prog');if(b)b.className='prog-bar ind';}
+function progDone(){const b=document.getElementById('prog');if(!b)return;b.className='prog-bar';b.style.width='100%';setTimeout(()=>{b.style.width='0%';},400);}
 
 // ══════════════════════════════════════════
 //  ACORDEONES
@@ -549,70 +580,150 @@ const SHEETS_CONFIG=[{id:'raw',label:'RAW',emoji:'📄',gid:'0',spreadsheetId:'1
 /* ═══════════════════════════════════════════════════════
    NAVEGACIÓN
 ═══════════════════════════════════════════════════════ */
-var _panelActual = 'anverso';
+/* ═══════════════════════════════════════════════════════════════════
+   ROUTER DE CAPAS v6.020 — _osMostrar()
+   ───────────────────────────────────────────────────────────────────
+   La app v6 es una sola escena persistente. El router gobierna QUÉ
+   capa se ve bajo la barra superior fija:
 
-function _irAPanel(boardId, tabKey){
-  var esAnverso = (boardId === 'board-anverso');
-  if(!esAnverso && _panelActual === boardId){
-    if(typeof volverAlAnverso==='function') volverAlAnverso();
-    return;
-  }
-  _panelActual = esAnverso ? 'anverso' : boardId;
+     · 'home'  → el overlay (dial + cards + fondo cósmico). Es la cara
+                 base de la app. Equivale a abrirDial() — sin recons-
+                 trucción ni re-animación (v6.000 ya lo garantiza).
+     · resto   → la .board-face de esa sección (Logros, Bitácora,
+                 Activity, Nutrición, RAW/Sheets). El overlay se oculta
+                 con fade vía cerrarDial(); el fondo cósmico sigue vivo
+                 detrás. Navegar es solo un cross-fade.
 
-  var anverso = document.getElementById('board-anverso');
-  if(anverso){
-    if(esAnverso) anverso.classList.remove('slide-right','slide-left');
-    else          anverso.classList.add('slide-right');
-  }
+   Las capas se PAUSAN, no se destruyen: una .board-face oculta
+   conserva su DOM y su estado. Solo el botón Actualizar refresca datos.
 
-  document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){
-    f.classList.remove('active');
+   Las funciones irALogros / irABitacora / irAActivity / irANutricion /
+   irASheets / volverAlAnverso son envoltorios delgados sobre este
+   router (cada una hace su carga de datos y delega la navegación aquí).
+═══════════════════════════════════════════════════════════════════ */
+var _panelActual = 'anverso';     // compat: 'anverso' == home
+window._osSeccion = 'home';       // sección lógica actual del router
+
+// Mapa sección → { boardId, tabId }
+var _OS_SECCIONES = {
+  home:      { board:null,             tab:'btn-home'      },
+  logros:    { board:'board-logros',   tab:'btn-logros'    },
+  bitacora:  { board:'board-bitacora', tab:'btn-maslow'    },
+  activity:  { board:'board-activity', tab:'btn-activity'  },
+  nutricion: { board:'board-nutricion',tab:'btn-nutricion' },
+  notas:     { board:'board-notas',    tab:'btn-notas'     },
+  sheets:    { board:'board-sheets',   tab:'btn-sheets'    }
+};
+// Mapa sección → data-tab de la tabbar móvil legacy
+var _OS_MOBTAB = {
+  home:'entrada', logros:'logros', bitacora:'bitacora',
+  activity:'activity', nutricion:'nutricion', notas:'entrada', sheets:'entrada'
+};
+
+function _osMarcarTabs(seccion){
+  // Tabs de la barra superior: limpiar 'active'/'on', marcar el activo.
+  document.querySelectorAll('.hud-tab, .btn-flip').forEach(function(b){
+    b.classList.remove('active','on');
   });
-  if(!esAnverso){
-    var dest = document.getElementById(boardId);
-    if(dest) dest.classList.add('active');
-  }
-
-  document.querySelectorAll('.btn-flip').forEach(function(b){ b.classList.remove('active'); });
-  var bh = document.getElementById('btn-home');
-  if(bh) bh.classList.toggle('on', esAnverso);
-  var ids = {'logros':'btn-logros','bitacora':'btn-maslow',
-              'activity':'btn-activity','nutricion':'btn-nutricion','sheets':'btn-sheets'};
-  var heroBtn = document.getElementById(ids[tabKey] || ('btn-'+tabKey));
-  if(heroBtn) heroBtn.classList.add('active');
-
+  var info = _OS_SECCIONES[seccion];
+  var tabEl = info && document.getElementById(info.tab);
+  if(tabEl) tabEl.classList.add(seccion==='home' ? 'active' : 'active');
+  // Tabbar móvil legacy
+  var mt = _OS_MOBTAB[seccion] || 'entrada';
   document.querySelectorAll('.mob-tab').forEach(function(t){
-    t.classList.toggle('active', t.dataset.tab === tabKey);
+    t.classList.toggle('active', t.dataset.tab===mt);
   });
 }
 
-window.volverAlAnverso = window.volverAlAnverso || function(){
-  _panelActual = 'anverso';
-  var anv = document.getElementById('board-anverso');
-  if(anv) anv.classList.remove('slide-right','slide-left');
-  document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){ f.classList.remove('active'); });
-  // Resetear estilos inline del board-activity (que se ponen a position:fixed al renderizar)
-  var bAct = document.getElementById('board-activity');
-  if(bAct){
-    bAct.style.position = '';
-    bAct.style.top = bAct.style.left = bAct.style.right = bAct.style.bottom = '';
-    bAct.style.zIndex = '';
-    bAct.style.height = bAct.style.maxHeight = '';
-    bAct.style.display = '';
+/* Router principal */
+function _osMostrar(seccion){
+  if(!_OS_SECCIONES[seccion]) seccion = 'home';
+  window._osSeccion = seccion;
+  _panelActual = (seccion==='home') ? 'anverso' : _OS_SECCIONES[seccion].board;
+
+  var board = document.getElementById('board-anverso');
+
+  if(seccion === 'home'){
+    // ── HOME = overlay (dial + cards + fondo) ──
+    // Ocultar todas las board-face de sección con fade.
+    document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){
+      f.classList.remove('active');
+    });
+    // Resetear inline-styles que board-activity se pone al renderizar.
+    var bAct = document.getElementById('board-activity');
+    if(bAct){
+      bAct.style.position = '';
+      bAct.style.top = bAct.style.left = bAct.style.right = bAct.style.bottom = '';
+      bAct.style.zIndex = '';
+      bAct.style.height = bAct.style.maxHeight = '';
+      bAct.style.display = '';
+    }
+    // El board-anverso permanece oculto: en v6 las cards reales son los
+    // paneles HUD del overlay. Se mantiene en el DOM (se retira en v6.050).
+    // v6.030: en móvil el board-anverso SÍ se muestra — contiene el
+    // carrusel del Home. El carrusel se encarga de que el slide del dial
+    // sea un hueco transparente sobre el overlay.
+    if(board){
+      if(window._osCarouselActivo && window._osCarouselActivo()){
+        board.classList.remove('slide-right');
+        board.style.display = '';   // v6.032: quitar el display:none de origen
+      } else {
+        board.classList.add('slide-right');
+      }
+    }
+    // Mostrar el overlay (sin reconstrucción — v6.000).
+    if(typeof abrirDial === 'function' && !window._dialVisible){
+      abrirDial();
+    }
+    // v6.030: en móvil, HOME hace snap al slide del dial del carrusel.
+    if(window._osCarouselHome) window._osCarouselHome();
+    var dd = document.getElementById('entrada-dropdown');
+    if(dd){ dd.classList.remove('show'); dd.style.display='none'; }
+  } else {
+    // ── SECCIÓN = una board-face a pantalla casi completa ──
+    // Cerrar el overlay con su fade (el fondo cósmico sigue vivo).
+    if(typeof cerrarDial === 'function' && window._dialVisible){
+      cerrarDial();
+    }
+    if(board){ board.classList.add('slide-right'); }
+    // Mostrar solo la board-face destino.
+    document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){
+      f.classList.remove('active');
+    });
+    var dest = document.getElementById(_OS_SECCIONES[seccion].board);
+    if(dest){ dest.classList.add('active'); dest.scrollTop = 0; }
   }
-  var bh = document.getElementById('btn-home'); if(bh) bh.classList.add('on');
-  document.querySelectorAll('.btn-flip').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('.mob-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab==='entrada'); });
-  var dd = document.getElementById('entrada-dropdown');
-  if(dd){ dd.classList.remove('show'); dd.style.display='none'; }
+
+  _osMarcarTabs(seccion);
+}
+window._osMostrar = _osMostrar;
+
+/* Compat: _irAPanel se mantiene como envoltorio sobre el router para
+   no romper llamadas existentes (p.ej. irASheets). */
+function _irAPanel(boardId, tabKey){
+  var sec = 'home';
+  Object.keys(_OS_SECCIONES).forEach(function(k){
+    if(_OS_SECCIONES[k].board === boardId) sec = k;
+  });
+  // Toggle: si ya estás en esa sección, volver a Home.
+  if(sec !== 'home' && window._osSeccion === sec){ _osMostrar('home'); return; }
+  _osMostrar(sec);
+}
+
+window.volverAlAnverso = function(){
+  _osMostrar('home');
 };
 
-window.irABitacora = window.irABitacora || function(){
-  _irAPanel('board-bitacora','bitacora');
+window.irABitacora = function(){
+  // Toggle: si ya estás en Bitácora, volver a Home.
+  if(window._osSeccion === 'bitacora'){ _osMostrar('home'); return; }
+  _osMostrar('bitacora');
 };
 
-window.irAActivity = window.irAActivity || function(){
-  _irAPanel('board-activity','activity');
+window.irAActivity = function(){
+  // Toggle: si ya estás en Activity, volver a Home.
+  if(window._osSeccion === 'activity'){ _osMostrar('home'); return; }
+  _osMostrar('activity');
   function _doRenderActivity(){
     if(typeof window.renderActivity==='function') window.renderActivity();
   }
@@ -631,8 +742,10 @@ window.irAActivity = window.irAActivity || function(){
     }
   }
 };
-window.irANutricion = window.irANutricion || function(){
-  _irAPanel('board-nutricion','nutricion');
+window.irANutricion = function(){
+  // Toggle: si ya estás en Nutrición, volver a Home.
+  if(window._osSeccion === 'nutricion'){ _osMostrar('home'); return; }
+  _osMostrar('nutricion');
   // Render INMEDIATO del layout completo (vacío) — luego se llena con datos
   _renderNutLayoutCompleto(null);
   if(typeof api!=='undefined'){
@@ -643,6 +756,15 @@ window.irANutricion = window.irANutricion || function(){
       _renderNutLayoutCompleto(null);
     });
   }
+};
+
+// v6.069 — NOTAS. Sección de sticky notes 5×5. El módulo raw-notas.js
+// monta y gestiona todo; aquí solo se enruta y se le pide montar.
+window.irANotas = function(){
+  // Toggle: si ya estás en Notas, volver a Home.
+  if(window._osSeccion === 'notas'){ _osMostrar('home'); return; }
+  _osMostrar('notas');
+  if(typeof window._notasMontar === 'function') window._notasMontar();
 };
 
 // Layout completo de Nutrición: SIEMPRE muestra todos los componentes (KPIs, macros, agua, semana, items)
@@ -816,11 +938,9 @@ window._renderNutLayoutCompleto = window._renderNutLayoutCompleto || function(d)
     '</div>';
 };
 
-window._syncMobTab = window._syncMobTab || function(tabKey){
-  document.querySelectorAll('.mob-tab').forEach(function(t){
-    t.classList.toggle('active', t.dataset.tab===tabKey);
-  });
-};
+/* v6.061: _syncMobTab ELIMINADO. Sincronizaba la barra de tabs inferior
+   móvil (mob-tabbar), retirada en v6.050. La navegación móvil vive en
+   la barra superior fija; el router _osMostrar ya marca los tabs. */
 
 function irASheets(sheetId){
   sheetId=sheetId||'raw';
@@ -1808,6 +1928,13 @@ document.addEventListener('DOMContentLoaded', function(){
 
       // ── Filtros por columna ──
       var _actFilter = window._actFilter || (window._actFilter = {});
+      // v6.072 — por columna: ¿ocultar los completados? Para libro/movie/
+      // norut arranca en TRUE (los completados no se ven; el botón dice
+      // "Mostrar completos"). Las Pendientes se cierran constantemente,
+      // así que por defecto la columna muestra solo lo que falta.
+      var _actOcultarDone = window._actOcultarDone || (window._actOcultarDone = {
+        libro:true, movie:true, norut:true
+      });
 
       function hexToRgb(hex){
         var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
@@ -1823,6 +1950,25 @@ document.addEventListener('DOMContentLoaded', function(){
           {k:'hoy_si', ico:'fa-circle-check',    tip:'Con check hoy'},
           {k:'hoy_no', ico:'fa-circle',           tip:'Sin check hoy'},
         ];
+        // v6.072 — botón de mostrar/ocultar completados. Solo en las
+        // columnas libro/movie/norut (las que tienen "completado").
+        var toggleDone = '';
+        if(tipo==='libro' || tipo==='movie' || tipo==='norut'){
+          var oculto = !!_actOcultarDone[tipo];
+          toggleDone =
+            '<button class="_act-done-toggle" data-tipo="'+tipo+'" '+
+            'title="'+(oculto?'Mostrar los completados':'Ocultar los completados')+'" style="'+
+            'margin-left:auto;display:flex;align-items:center;gap:5px;height:26px;padding:0 9px;'+
+            'border-radius:6px;cursor:pointer;flex-shrink:0;font-size:9px;font-weight:700;'+
+            'letter-spacing:.05em;text-transform:uppercase;transition:all .12s;'+
+            'border:1px solid '+(oculto?'#26304A':c.color)+';'+
+            'background:'+(oculto?'transparent':'rgba('+hexToRgb(c.color)+',0.15)')+';'+
+            'color:'+(oculto?'#6A7388':c.color)+';'+
+            'box-shadow:'+(oculto?'none':'0 0 8px '+c.glow)+'">'+
+            '<i class="fas '+(oculto?'fa-eye':'fa-eye-slash')+'" style="pointer-events:none;font-size:10px"></i>'+
+            '<span style="pointer-events:none">'+(oculto?'Mostrar completos':'Ocultar completos')+'</span>'+
+            '</button>';
+        }
         return '<div class="_act-filter-bar" data-tipo="'+tipo+'" style="'+
           'display:flex;gap:4px;padding:6px 12px;background:rgba(6,4,14,0.95);border-bottom:1px solid rgba(140,100,220,0.14);align-items:center;flex-shrink:0">'+
           '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-right:4px;flex-shrink:0">Orden</span>'+
@@ -1836,6 +1982,7 @@ document.addEventListener('DOMContentLoaded', function(){
               'box-shadow:'+(on?'0 0 8px '+c.glow:'none')+';flex-shrink:0">'+
               '<i class="fas '+b.ico+'" style="pointer-events:none"></i></button>';
           }).join('')+
+          toggleDone+
         '</div>';
       }
 
@@ -1863,6 +2010,15 @@ document.addEventListener('DOMContentLoaded', function(){
         else if(f==='za') s.sort(function(a,b){ return b.nombre.localeCompare(a.nombre); });
         else if(f==='hoy_si') s.sort(function(a,b){ return (isDone(b)?1:0)-(isDone(a)?1:0); });
         else if(f==='hoy_no') s.sort(function(a,b){ return (isDone(a)?1:0)-(isDone(b)?1:0); });
+        // v6.072 — ocultar/mostrar completados por columna.
+        if(_actOcultarDone[tipo]){
+          // Ocultos: se quitan de la lista (siguen en el Sheet, no borrados).
+          s = s.filter(function(it){ return !isDone(it); });
+        } else {
+          // Mostrados: los completados van SIEMPRE al fondo de la columna,
+          // sin perder el orden elegido dentro de cada grupo.
+          s.sort(function(a,b){ return (isDone(a)?1:0)-(isDone(b)?1:0); });
+        }
         return s;
       }
 
@@ -2101,12 +2257,14 @@ document.addEventListener('DOMContentLoaded', function(){
       board.style.position = '';
       board.style.top = board.style.left = board.style.right = board.style.bottom = '';
       board.style.zIndex = '';
-      // Forzar altura disponible: la ventana menos lo que ocupa el hero arriba
-      var topOffset = board.getBoundingClientRect().top + window.scrollY;
-      // Si el board está oculto temporalmente, usamos 0 como fallback seguro
-      if(topOffset < 0 || isNaN(topOffset)) topOffset = 0;
-      board.style.height = 'calc(100vh - '+topOffset+'px)';
-      board.style.maxHeight = 'calc(100vh - '+topOffset+'px)';
+      // v6.065: NO imponer height con calc(100vh - ...). El board-activity
+      // ya recibe su altura correcta del CSS (height:100% heredado de
+      // .board-wrap, que está dimensionado bajo la barra superior). Antes
+      // este cálculo con 100vh incluía el área de la barra → la sección
+      // se extendía de más y aparecía scroll exterior. El contenedor
+      // interno (flex:1;min-height:0) ya gestiona el espacio.
+      board.style.height = '';
+      board.style.maxHeight = '';
 
       board.innerHTML =
         header +
@@ -2155,7 +2313,29 @@ document.addEventListener('DOMContentLoaded', function(){
           return;
         }
 
-        // ── v5.209: Botón limpiar TODA la columna (Personal/Electronics) ──
+        // ── v6.072: Botón mostrar/ocultar completados por columna ──
+        var dt = e.target.closest('._act-done-toggle');
+        if(dt){
+          var tipoDT = dt.dataset.tipo;
+          _actOcultarDone[tipoDT] = !_actOcultarDone[tipoDT];
+          var d2DT = window._actData;
+          if(!d2DT) return;
+          var panelDT = dt.closest('[data-panel-tipo]');
+          if(panelDT){
+            var oldBarDT = panelDT.querySelector('._act-filter-bar');
+            if(oldBarDT){
+              var tmpDT = document.createElement('div');
+              tmpDT.innerHTML = filterBar(tipoDT);
+              oldBarDT.replaceWith(tmpDT.firstChild);
+            }
+            var innerDT = panelDT.querySelector('[data-panel-inner]');
+            if(innerDT){
+              var itemsDT = (tipoDT==='libro'?d2DT.libros:tipoDT==='movie'?d2DT.movies:d2DT.noRutinarias)||[];
+              innerDT.innerHTML = itemList(itemsDT, tipoDT);
+            }
+          }
+          return;
+        }
         var clrAll = e.target.closest('._act-clear-all');
         if(clrAll){
           var tipoCA = clrAll.dataset.tipo;
@@ -2359,6 +2539,20 @@ document.addEventListener('DOMContentLoaded', function(){
             }
           }
           if(typeof api!=='undefined') api.marcarActivityItem(tipo, fila, nowDone);
+          // v6.072: si la columna tiene "ocultar completados" activo y el
+          // item se acaba de completar, re-renderizar la columna para que
+          // desaparezca de la vista (sigue en el Sheet, no se borra).
+          if(_actOcultarDone[tipo] && nowDone){
+            var panelIT = it.closest('[data-panel-tipo]');
+            if(panelIT){
+              var innerIT = panelIT.querySelector('[data-panel-inner]');
+              if(innerIT && d2){
+                var itemsIT = (tipo==='libro'?d2.libros:tipo==='movie'?d2.movies:d2.noRutinarias)||[];
+                innerIT.innerHTML = itemList(itemsIT, tipo);
+              }
+            }
+          }
+          return;
         }
       });
     };

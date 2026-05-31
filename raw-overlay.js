@@ -1,14 +1,59 @@
-/* RAW Entry — Overlay v.5.217
-   OPTIMIZACIÓN del arranque del fondo del overlay.
-   · CONSTRUCCIÓN DIFERIDA: start() ya no corre los 10 build*()
-     síncronos antes del primer frame (eso atascaba el arranque unos
-     segundos). Ahora arranca YA con estrellas + dial, y construye el
-     resto (nebulosa, constelaciones, warp...) escalonado, un paso por
-     frame. El overlay anima fluido desde el frame 1.
-   · NEBULOSA a media resolución (1/4 de píxeles): la capa más cara de
-     construir. Es difusa, escalarla es invisible.
-   · DETECCIÓN de dispositivo modesto (pocos núcleos / poca RAM): baja
-     densidad de estrellas, constelaciones y warp automáticamente.
+/* RAW Entry — Overlay v.7.042
+   ╔══════════════════════════════════════════════════════════════════╗
+   ║ v6.066 — REGRESO A HOME MÁS SUAVE Y CALMADO                      ║
+   ╚══════════════════════════════════════════════════════════════════╝
+   La reapertura del overlay (volver a Home) entraba brusca: las cards
+   aparecían casi en bloque (escalonado de 35ms, duración 420ms) y el
+   dial igual de rápido. Ahora todo entra con calma, sin prisa:
+   · Las cards entran una tras otra, escalonado amplio (110ms entre
+     cada una), fundido largo (760ms) con curva muy suave.
+   · El dial entra el ÚLTIMO y el más lento (fundido 1100ms, arranca
+     360ms después), ya con las cards asentadas — no compite con ellas.
+   · El overlay-contenedor hace su fundido en 620ms.
+   No es la cascada del primer arranque — es solo un fade, pero pausado.
+
+   ── v6.062 — REAPERTURA CON FADE REAL ──
+   La reapertura rápida de abrirDial mostraba el dial y las cards "de
+   golpe": dial/glow/ring/paneles ya estaban en opacity:1 de un cierre
+   previo, así que reasignarles opacity:1 NO disparaba transición. Y
+   _reposicionarHUD corría sin reset de medidas → layout descolocado.
+   Ahora la reapertura replica EXACTAMENTE _hudCollapse (el regreso de
+   una card expandida): reset de medidas (display:none→reflow→display)
+   + doble _reposicionarHUD, y los elementos PARTEN de un estado oculto
+   /reducido y ANIMAN hacia el final — fade suave, con escalonado por
+   panel. Volver a Home desde la barra o al cerrar el formulario se ve
+   igual de pulido que regresar de una card expandida.
+
+   ── v6.050 — LIMPIEZA: retiro de +Nueva ──
+   ── v6.050 — LIMPIEZA: retiro de +Nueva ──
+   · Retiradas las 3 referencias muertas a btn-nueva-entrada (el botón
+     se eliminó en v6.010; el formulario RAW vive en el centro del
+     dial). Eran inertes (guardadas con if) — ahora también limpias.
+   · Retirada la variable huérfana _dialLandingUsed (quedó sin uso al
+     eliminarse el override de cerrarDial en v6.020).
+   Nota: el sistema .board-face / slide-right NO se retira — dejó de
+   ser "vista vieja" y es el mecanismo de capas que usa el router v6.
+
+   ── Heredado v6.032 — MODO MÓVIL: FONDO PLANO ──
+   En móvil el fondo cósmico no corre la animación pesada.
+
+   ── Heredado v6.031 — FIX barra/Home/hueco ──
+   La barra superior sube a z-index:10000 (sobre el overlay); el HUD
+   se desplaza media barra para centrarse en el espacio visible;
+   abrirDial distingue primer arranque (cascada) de reapertura (fade
+   rápido) vía _dialYaInicializado; cerrarEntrada ya no cierra el
+   overlay.
+
+   ── Heredado v6.020 — ROUTER DE CAPAS ──
+   ── Heredado v6.011 — FIX slots vacíos + window._dialVisible ──
+   ── Heredado v6.010 — BARRA SUPERIOR FIJA ──
+   ── Heredado v6.000 — PERSISTENCIA DEL OVERLAY ──
+   El _dialOverlay y el fondo cósmico se construyen y animan UNA sola
+   vez. toggleEntradaDropdown ya no destruye el overlay.
+
+   ── Heredado v5.217 ──
+   OPTIMIZACIÓN del arranque del fondo del overlay (construcción
+   diferida, nebulosa a media resolución, detección de equipo modesto).
    ── Heredado v5.216
    Añadido botón "Sheet" al topBar del overlay (renglón de stats, junto
    a Créditos). Abre el Google Sheet directamente en pestaña nueva,
@@ -865,14 +910,16 @@ function _crearDialOverlay(){
   _dialCtx = _dialCanvas.getContext('2d');
 
   _dialOverlay.style.cssText = [
+    // v6.031: el overlay cubre toda la pantalla (inset:0). La barra
+    // superior fija (hero) se dibuja ENCIMA gracias a su z-index:10000
+    // > 9000. El contenido del overlay (dial + paneles) se desplaza
+    // hacia abajo el alto de la barra mediante el post-proceso de
+    // _reposicionarHUD (offset --hero-h), para no quedar tapado por
+    // ella ni dejar hueco. El fondo cósmico sí ocupa todo (se ve
+    // también detrás de la barra translúcida, lo cual es correcto).
     'position:fixed','inset:0','z-index:9000',
     'display:none','align-items:center','justify-content:center',
     'opacity:0','pointer-events:none',
-    // v5.202: fondo NEGRO sólido. Antes era un radial translúcido
-    // (rgba ...0.65) + backdrop-filter:blur(28px) brightness(0.68) que
-    // "lavaba" los negros del fondo de estrellas → se veía gris/opaco.
-    // El overlay ya tiene su propio fondo de partículas opaco encima,
-    // así que no necesita desenfocar el dashboard de atrás.
     'background:radial-gradient(ellipse at center,#0a0618 0%,#020308 100%)',
   ].join(';');
 
@@ -983,6 +1030,21 @@ function _crearDialOverlay(){
 
     var globalT = 0;
     var galaxyRotation = 0;   // rotación global de la galaxia
+
+    /* v7.030 — FASE 4A · WARP DE TRANSICIÓN
+       Efecto velocidad-luz al cruzar de nivel. _warpEnergia va de 0 a 1
+       y decae sola; mientras es >0, las estrellas se mueven en radio y
+       se dibujan estiradas como líneas (efecto Star Wars). Con energía
+       0, el motor se comporta EXACTAMENTE como antes — es aditivo.
+         _warpDir = +1  → estrellas hacia el centro (sumergirse)
+         _warpDir = -1  → estrellas hacia afuera   (emerger)
+       raw-niveles.js dispara el warp vía window._dispararWarp(dir). */
+    var _warpEnergia = 0;
+    var _warpDir     = 1;
+    window._dispararWarp = function(dir){
+      _warpDir = (dir < 0) ? -1 : 1;
+      _warpEnergia = 1;
+    };
 
     function resize(){
       var dpr = window.devicePixelRatio || 1;
@@ -1705,11 +1767,24 @@ function _crearDialOverlay(){
     }
 
     function drawStars(dt){
+      // v7.030 — FASE 4A: factor warp suavizado (curva, no lineal) para
+      // que el destello golpee fuerte y se desvanezca con gracia.
+      var warp = _warpEnergia > 0 ? (_warpEnergia * _warpEnergia) : 0;
       for(var i = 0; i < stars.length; i++){
         var s = stars[i];
         s.theta += s.omega * dt;
         s.age += dt;
         s.phase += s.twinkleSpeed * dt;
+        // v7.030 — WARP: durante el destello, las estrellas se desplazan
+        // en radio. _warpDir +1 las jala al centro (sumergirse), -1 las
+        // expulsa hacia afuera (emerger). Es un empujón temporal: cuando
+        // _warpEnergia vuelve a 0, las órbitas siguen como siempre.
+        if(warp > 0){
+          s.r += _warpDir * warp * 950 * dt * -1;
+          // -1 porque +dir debe ACERCAR (radio decrece). Re-clamp:
+          if(s.r < 24){ s.r = 24 + Math.random()*40; }
+          if(s.r > MAX_R){ s.r = MAX_R - Math.random()*60; }
+        }
         if(s.age > s.lifespan){
           s.r = 30 + (MAX_R - 30) * Math.pow(Math.random(), 0.7);
           s.theta = Math.random() * Math.PI * 2;
@@ -1720,33 +1795,52 @@ function _crearDialOverlay(){
         }
         var lifeFrac = s.age / s.lifespan;
         var lifeAlpha;
-        if(lifeFrac < 0.20) lifeAlpha = lifeFrac / 0.20;  // v5.170: fade in más largo
-        else if(lifeFrac > 0.75) lifeAlpha = (1 - lifeFrac) / 0.25;  // v5.170: fade out más largo
+        if(lifeFrac < 0.20) lifeAlpha = lifeFrac / 0.20;
+        else if(lifeFrac > 0.75) lifeAlpha = (1 - lifeFrac) / 0.25;
         else lifeAlpha = 1;
         if(lifeAlpha <= 0){ s._cachedX = null; continue; }
         var twinkle = (Math.sin(s.phase) + 1) / 2;
         var rad = s.baseSize * (0.7 + twinkle * 0.7) * (s.isHub ? 1.5 : 1);
         var p = polar2cart(s.r, s.theta);
-        // Modular por nebulosa
         var neb = nebulaIntensityAt(p.x, p.y);
         var alpha = lifeAlpha * (0.5 + twinkle * 0.45) * neb;
         s._cachedX = p.x; s._cachedY = p.y;
-        pctx.fillStyle = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
-        // v5.214 — OPTIMIZACIÓN: shadowBlur es la operación más cara del
-        // canvas. Antes se aplicaba a las ~580 estrellas cada frame. El
-        // glow de una estrella diminuta es invisible de todas formas, así
-        // que ahora SOLO los hubs y las estrellas grandes llevan glow; las
-        // pequeñas se dibujan como círculo plano (baratísimo). Visualmente
-        // casi idéntico, coste muy inferior.
-        if(s.isHub || s.baseSize > 1.4){
-          pctx.shadowColor = s.color;
-          pctx.shadowBlur = (s.isHub ? 8 : 4) + twinkle * (s.isHub ? 16 : 6);
+        var colHex = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
+
+        if(warp > 0.04){
+          // ── Estrella ESTIRADA: línea radial (efecto velocidad-luz) ──
+          // El largo del trazo crece con la energía warp. La línea va
+          // del centro hacia afuera, alineada con el radio de la estrella.
+          var largo = warp * (s.isHub ? 140 : 90) * (0.6 + twinkle*0.5);
+          var ang = s.theta;
+          var x2 = CX + Math.cos(ang) * (s.r - largo);
+          var y2 = CY + Math.sin(ang) * (s.r - largo);
+          pctx.strokeStyle = colHex;
+          pctx.lineWidth = rad * 1.2;
+          pctx.lineCap = 'round';
+          if(s.isHub || s.baseSize > 1.4){
+            pctx.shadowColor = s.color;
+            pctx.shadowBlur = 6 + warp * 10;
+          } else {
+            pctx.shadowBlur = 0;
+          }
+          pctx.beginPath();
+          pctx.moveTo(p.x, p.y);
+          pctx.lineTo(x2, y2);
+          pctx.stroke();
         } else {
-          pctx.shadowBlur = 0;
+          // ── Estrella normal: punto (motor original, sin tocar) ──
+          pctx.fillStyle = colHex;
+          if(s.isHub || s.baseSize > 1.4){
+            pctx.shadowColor = s.color;
+            pctx.shadowBlur = (s.isHub ? 8 : 4) + twinkle * (s.isHub ? 16 : 6);
+          } else {
+            pctx.shadowBlur = 0;
+          }
+          pctx.beginPath();
+          pctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+          pctx.fill();
         }
-        pctx.beginPath();
-        pctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
-        pctx.fill();
       }
       pctx.shadowBlur = 0;
     }
@@ -2471,6 +2565,13 @@ function _crearDialOverlay(){
       globalT += dt;
       galaxyRotation += 0.01 * dt;
 
+      // v7.031 — FASE 4A: decaer la energía del warp. Dura ~1.5s en
+      // apagarse (subido desde 0.9s) — el destello se siente más.
+      if(_warpEnergia > 0){
+        _warpEnergia -= dt / 1.6;
+        if(_warpEnergia < 0) _warpEnergia = 0;
+      }
+
       // 1) Actualizar nebulosa (modulador de estrellas — sin cambios)
       updateNebula(dt);
 
@@ -2635,6 +2736,20 @@ function _crearDialOverlay(){
     // Las funciones draw*() ya comprueban si su array está vacío, así que
     // una capa aún no construida simplemente no se dibuja todavía.
     function start(){
+      // ════════════════════════════════════════════════════════════════
+      // v6.032 — EN MÓVIL: FONDO PLANO, SIN ANIMACIÓN.
+      // La animación cósmica completa (estrellas, nebulosa, warp,
+      // constelaciones, meteoros...) funde y traba los teléfonos. En
+      // móvil NO se arranca nada: el overlay queda con su degradado de
+      // fondo CSS estático. El canvas de partículas se oculta. La
+      // animación rica se conserva íntegra solo para escritorio.
+      // ════════════════════════════════════════════════════════════════
+      if(window.innerWidth < 900){
+        if(_particlesCanvas){ _particlesCanvas.style.display = 'none'; }
+        window._particlesRunning = true;   // marca "ya iniciado" → nadie reintenta
+        return;
+      }
+
       resize();
       // ── Esencial: se construye YA (barato, y es lo que más se nota) ──
       buildStars();
@@ -2653,6 +2768,10 @@ function _crearDialOverlay(){
       // ── Arrancar la animación INMEDIATAMENTE ──
       if(animId) cancelAnimationFrame(animId);
       animId = requestAnimationFrame(frame);
+      // v6.000: bandera global — el fondo cósmico ahora se construye y
+      // anima UNA sola vez en toda la vida de la app. abrirDial consulta
+      // esta bandera para no re-arrancar (ni reconstruir) la animación.
+      window._particlesRunning = true;
 
       // ── Capas pesadas: escalonadas en frames sucesivos, no bloquean ──
       var _buildQueue = [
@@ -2678,6 +2797,7 @@ function _crearDialOverlay(){
 
     function stop(){
       if(animId){ cancelAnimationFrame(animId); animId = null; }
+      window._particlesRunning = false;
     }
 
     window._particlesStart = start;
@@ -3120,7 +3240,13 @@ function _crearDialOverlay(){
       '.hud-user-xp{font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);text-align:right;font-family:JetBrains Mono,monospace}',
       // sim panel band
       // ── MEGA-CARD TOP: tabs + contenido ──
-      '.hud-megatabs{display:flex;align-items:stretch;gap:4px;padding:4px 8px 0;border-bottom:1px solid rgba(255,255,255,0.06)}',
+      // v6.010: la fila de tabs (.hud-megatabs) se OCULTA. La navegación
+      // ahora vive en la barra superior fija del hero (index.html), que
+      // es la barra permanente de la app. Esta fila duplicaba esos tabs.
+      // El resto del panel (.hud-sim-content con las 9 needs del Sim) se
+      // conserva intacto. El listener de click sobre #hud-megatabs queda
+      // inerte porque el elemento está oculto.
+      '.hud-megatabs{display:none !important}',
       '.hud-megatab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;'+
         'padding:4px 6px;border-radius:8px 8px 0 0;background:transparent;border:1px solid transparent;border-bottom:0;'+
         'cursor:pointer;font-family:inherit;font-weight:800;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;'+
@@ -4545,6 +4671,32 @@ function _crearDialOverlay(){
         '</div>';
       });
       stopsEl.innerHTML = html;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // v6.031 — OFFSET DE LA BARRA SUPERIOR
+    // El overlay cubre toda la pantalla, pero la barra fija (hero) ocupa
+    // los primeros --hero-h px. Sin compensar, los paneles y el dial
+    // —centrados respecto al viewport completo— quedan parcialmente bajo
+    // la barra y dejan hueco abajo. Aquí se desplaza TODO el HUD hacia
+    // abajo la mitad del alto de la barra: así el conjunto queda centrado
+    // en el espacio realmente visible (bajo la barra). Solo en modo
+    // normal — el modo expandido tiene su propia lógica de layout.
+    if(!window._hudExpanded){
+      var _heroH = 58;
+      var _heroEl = document.getElementById('hero');
+      if(_heroEl){ _heroH = _heroEl.getBoundingClientRect().height || 58; }
+      var _shift = Math.round(_heroH / 2);
+      if(_shift > 0){
+        if(_dialCanvas && _dialCanvas.style.top){
+          _dialCanvas.style.top = (parseFloat(_dialCanvas.style.top) + _shift) + 'px';
+        }
+        window._hudPanels.forEach(function(hp){
+          if(hp.el && hp.el.style.top && hp.el.style.top !== '-9999px'){
+            hp.el.style.top = (parseFloat(hp.el.style.top) + _shift) + 'px';
+          }
+        });
+      }
     }
 
     // v5.197: en vez de que el DnD hookee esta función (lo que congelaba
@@ -6919,31 +7071,26 @@ function toggleEntradaDropdown(){
     cerrarDial();
     return;
   }
-  // v5.127: hacer que +Nueva produzca el mismo estado que DOMContentLoaded.
+  // ══════════════════════════════════════════════════════════════════
+  // v6.000 — EL OVERLAY ES PERSISTENTE. YA NO SE DESTRUYE.
   //
-  // En la PRIMERA carga: _dialOverlay=null. Después abrirDial llama
-  // _crearDialOverlay que crea canvas+glow+ring Y REGISTRA todos los
-  // listeners del dial. Los paneles _pUser etc. ya existen en el DOM
-  // desde el IIFE inicial, con todos sus listeners (megatabs, expand
-  // buttons, etc.) ya registrados al momento de su creación.
+  // Hasta v5.217 esta función hacía removeChild(_dialOverlay) + null,
+  // y abrirDial→_crearDialOverlay lo reconstruía entero: canvas nuevo,
+  // _particlesStart() de nuevo, fondo cósmico rearmado y toda la
+  // cascada de carga otra vez. Eso era la "animación pesada" que se
+  // repetía en cada regreso al dial.
   //
-  // En +Nueva: _dialOverlay existe con su canvas y sus listeners ya
-  // registrados. Si NO destruyo _dialOverlay, los listeners siguen
-  // funcionando pero el canvas tiene estilos residuales que rompen el
-  // primer _reposicionarHUD. Si SÍ destruyo _dialOverlay, _crearDialOverlay
-  // recrea canvas+listeners → todo bien por ese lado.
+  // En v6 el _dialOverlay (canvas + fondo + paneles + listeners) se
+  // construye UNA sola vez y vive para siempre. Aquí ya NO se destruye
+  // nada. Solo se hace la limpieza QUIRÚRGICA de las propiedades de
+  // LAYOUT de los paneles — las que abrirDial/_reposicionarHUD van a
+  // recalcular — sin tocar styling visual ni listeners. Luego abrirDial
+  // simplemente vuelve a mostrar el overlay con un fade.
   //
-  // Los paneles NO se tocan (sus listeners siguen vivos). Solo limpio
-  // QUIRÚRGICAMENTE las propiedades de posicionamiento que abrirDial
-  // necesita resetear (left/top/width/etc.). NO tocar cssText ni los
-  // estilos visuales (background/border/animation), porque eso rompe
-  // el aspecto de los paneles y los listeners CSS-driven (hovers, etc.)
-  if(_dialOverlay && _dialOverlay.parentNode){
-    _dialOverlay.parentNode.removeChild(_dialOverlay);
-  }
-  _dialOverlay = null;
-  _dialCanvas  = null;
-  _dialCtx     = null;
+  // En el PRIMER arranque _dialOverlay todavía es null: abrirDial llama
+  // a _crearDialOverlay y se construye por única vez. Ese camino sigue
+  // intacto.
+  // ══════════════════════════════════════════════════════════════════
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
   // Limpieza QUIRÚRGICA: solo propiedades de layout, no styling visual.
   if(window._hudPanels){
@@ -7045,14 +7192,154 @@ function _aplicarVidaPaneles(){
 }
 window._aplicarVidaPaneles = _aplicarVidaPaneles;
 
+var _dialYaInicializado = false;   // v6.031: ¿ya corrió la cascada inicial?
+
 function abrirDial(){
   _crearDialOverlay();
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
 
-  // v5.125: el modo rápido fue eliminado. +Nueva ahora destruye el
-  // overlay y deja que abrirDial corra IGUAL que en DOMContentLoaded.
+  // ════════════════════════════════════════════════════════════════
+  // v6.031 — REAPERTURA RÁPIDA
+  // La cascada de aparición (Fase 0 oculta todo → _iniciarFaseAparicion
+  // anima ~5.9s) debe correr UNA sola vez, en el primer arranque de la
+  // app. En cada regreso a Home posterior NO debe repetirse: el overlay,
+  // el dial y los paneles ya están construidos y posicionados. Volver a
+  // Home es solo un fade rápido del overlay completo.
+  // ════════════════════════════════════════════════════════════════
+  if(_dialYaInicializado){
+    if(!_dialBreathRAF){
+      (function _breathLoop(){
+        _dialBreathT++;
+        _dialDraw();
+        _dialBreathRAF = requestAnimationFrame(_breathLoop);
+      })();
+    }
+    _dialVisible = true;
+    window._dialVisible = true;
+    window._hudCascadaEnCurso = false;
+    _dialOverlay.style.display = 'flex';
+    _dialOverlay.style.pointerEvents = 'none';
 
-  // ── FLUJO NORMAL (cascada larga, igual para DOMContentLoaded y +Nueva) ──
+    // ════════════════════════════════════════════════════════════════
+    // v6.062 — REAPERTURA CON FADE REAL (igual al regreso de una card
+    // expandida). Antes, dial/glow/ring/paneles ya estaban en opacity:1
+    // de un cierre previo; reasignarles opacity:'1' NO dispara ninguna
+    // transición → aparecían "de golpe", solo el contenedor hacía fade.
+    // Ahora se replica _hudCollapse: (1) reset de medidas para que el
+    // layout no quede movido, (2) los elementos PARTEN de un estado
+    // oculto/reducido y ANIMAN hacia el final — fade suave de verdad.
+    // ════════════════════════════════════════════════════════════════
+
+    // (1) RESET DE MEDIDAS — borra dimensiones cacheadas (display:none →
+    // reflow → display:''), igual que _hudCollapse, para que
+    // _reposicionarHUD mida limpio y nada quede descolocado.
+    if(window._hudPanels){
+      window._hudPanels.forEach(function(hp){
+        if(hp.el) hp.el.style.display = 'none';
+      });
+      void document.body.offsetHeight;
+      window._hudPanels.forEach(function(hp){
+        if(hp.el) hp.el.style.display = '';
+      });
+    }
+
+    // (2) ESTADO INICIAL OCULTO — sin transición, para poder animar desde aquí.
+    if(_dialCanvas){
+      _dialCanvas.style.transition = 'none';
+      _dialCanvas.style.opacity = '0';
+      _dialCanvas.style.transform = 'scale(0.92)';
+    }
+    var glowR = document.getElementById('dial-ambient');
+    if(glowR){ glowR.style.transition='none'; glowR.style.opacity='0'; }
+    var ringR = document.getElementById('dial-ring-breath');
+    if(ringR){ ringR.style.transition='none'; ringR.style.opacity='0'; ringR.style.transform='scale(0.94)'; }
+    if(window._hudPanels){
+      window._hudPanels.forEach(function(hp){
+        if(!hp.el) return;
+        hp.el._animatingEntry = false;
+        hp.el.style.transition = 'none';
+        hp.el.style.visibility = 'visible';
+        hp.el.style.opacity = '0';
+        // v6.066: desplazamiento inicial algo mayor (14px) para que el
+        // deslizamiento acompañe al fundido largo y se sienta calmado.
+        hp.el.style.transform = 'translateY(14px)';
+      });
+    }
+
+    // Refrescar datos en los espejos antes de medir/animar.
+    if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
+    if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+    if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
+
+    // Posicionar primero (doble rAF con medidas ya limpias).
+    requestAnimationFrame(function(){
+      // v6.066: el overlay aparece con un fundido más largo y calmado.
+      _dialOverlay.style.transition = 'opacity 620ms cubic-bezier(.22,1,.36,1)';
+      _dialOverlay.style.opacity = '1';
+      if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+      requestAnimationFrame(function(){
+        if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+        // (3) ANIMAR HACIA EL ESTADO FINAL — fade + leve escala/translate.
+        // v6.066 — TODO MÁS SUAVE Y CON CALMA. Antes los paneles entraban
+        // casi en bloque (escalonado de solo 35ms, duración 420ms) y el
+        // dial igual de rápido → se sentía brusco. Ahora: las cards
+        // entran una tras otra con un escalonado amplio (110ms entre
+        // cada una) y un fundido largo; el dial entra el último, lento,
+        // ya con las cards asentadas. Sin prisa.
+        requestAnimationFrame(function(){
+          if(window._hudPanels){
+            window._hudPanels.forEach(function(hp, i){
+              if(!hp.el) return;
+              // Escalonado amplio: cada card espera su turno con calma.
+              var d = 80 + (i % 8) * 110;
+              hp.el.style.transition =
+                'opacity 760ms cubic-bezier(.22,1,.36,1) '+d+'ms,'+
+                'transform 820ms cubic-bezier(.22,1,.36,1) '+d+'ms';
+              hp.el.style.opacity = '1';
+              hp.el.style.transform = '';
+            });
+          }
+          // El dial entra el ÚLTIMO y MÁS LENTO — un fundido largo que
+          // arranca cuando las cards ya están entrando, sin competir.
+          var DIAL_DELAY = 360;
+          if(_dialCanvas){
+            _dialCanvas.style.transition =
+              'opacity 1100ms cubic-bezier(.22,1,.36,1) '+DIAL_DELAY+'ms,'+
+              'transform 1200ms cubic-bezier(.22,1,.36,1) '+DIAL_DELAY+'ms';
+            _dialCanvas.style.opacity = '1';
+            _dialCanvas.style.transform = '';
+          }
+          if(glowR){
+            glowR.style.transition = 'opacity 1200ms ease '+DIAL_DELAY+'ms';
+            glowR.style.opacity = '1';
+          }
+          if(ringR){
+            ringR.style.transition =
+              'opacity 1200ms ease '+DIAL_DELAY+'ms,'+
+              'transform 1200ms cubic-bezier(.22,1,.36,1) '+DIAL_DELAY+'ms';
+            ringR.style.opacity = '0.18';
+            ringR.style.transform = 'scale(1)';
+          }
+          // Limpiar transitions inline tras la animación, para que el
+          // flujo normal (resize, DnD) no anime cambios de layout.
+          setTimeout(function(){
+            if(_dialCanvas) _dialCanvas.style.transition = '';
+            if(glowR) glowR.style.transition = '';
+            if(ringR) ringR.style.transition = '';
+            if(window._hudPanels){
+              window._hudPanels.forEach(function(hp){
+                if(hp.el) hp.el.style.transition = '';
+              });
+            }
+          }, 2600);
+        });
+      });
+    });
+    return;
+  }
+
+  // ── PRIMER ARRANQUE — cascada completa (corre una única vez) ──
+  _dialYaInicializado = true;
 
   if(!_dialBreathRAF){
     (function _breathLoop(){
@@ -7073,9 +7360,14 @@ function abrirDial(){
   // un stacking context que atrapaba clicks.
   _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = true;
+  window._dialVisible = true;   // v6.011: expuesto para raw-overlay-dnd.js
 
-  // v5.149: iniciar animación de partículas/circuit-board
-  if(typeof window._particlesStart === 'function'){
+  // v6.000: el fondo cósmico se construye y anima UNA sola vez en toda
+  // la vida de la app (al primer arranque). En reaperturas posteriores
+  // las partículas YA están corriendo — re-arrancarlas reconstruía todo
+  // el fondo y re-disparaba la animación pesada de carga. Ahora solo se
+  // arranca si no está corriendo.
+  if(typeof window._particlesStart === 'function' && !window._particlesRunning){
     setTimeout(function(){ window._particlesStart(); }, 200);
   }
 
@@ -7299,24 +7591,36 @@ function abrirDial(){
 
   }
   } // ← cierre de function _iniciarFaseAparicion
-  var btn=document.getElementById('btn-nueva-entrada');
-  if(btn) btn.classList.add('active');
+  // v6.050: btn-nueva-entrada fue retirado en v6.010 (el formulario RAW
+  // se abre desde el centro del dial). Ya no hay botón que marcar.
 }
 
 function cerrarDial(){
-  if(!_dialOverlay){ _dialVisible=false; return; }
+  if(!_dialOverlay){ _dialVisible=false; window._dialVisible=false; return; }
   _dialOverlay.style.transition = 'opacity 280ms cubic-bezier(.4,0,.6,1)';
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.pointerEvents = 'none';
-  _dialVisible = false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
+  _dialVisible = false; window._dialVisible = false;   // v6.011: expuesto para raw-overlay-dnd.js
+  _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   window._hudCascadaEnCurso = false;
-  // v5.149: detener animación de partículas
-  if(typeof window._particlesStop === 'function'){
-    setTimeout(function(){ window._particlesStop(); }, 320);
+  // v6.011: limpiar los "ghost slots" del DnD al salir del overlay.
+  // Los slots vacíos cuelgan de document.body con position:fixed y
+  // z-index:9001 — si no se limpian aquí, quedan visibles por encima
+  // de Logros / Activity / Bitácora / etc. (bug heredado: nada los
+  // retiraba al navegar fuera del overlay). Solo deben verse sobre el
+  // overlay. clearGhostSlots los elimina del DOM; se reconstruyen solos
+  // al reabrir el dial vía _overlayDnd.rebuild en _reposicionarHUD.
+  if(window._overlayDnd && typeof window._overlayDnd.clear === 'function'){
+    try { window._overlayDnd.clear(); } catch(e){}
   }
+  // v6.000: el fondo cósmico ya NO se detiene al cerrar el dial. El
+  // overlay es persistente: las partículas siguen vivas y animándose
+  // detrás de cualquier sección. Navegar es solo un fade — nunca una
+  // reconstrucción ni una re-animación. (Antes aquí se llamaba
+  // _particlesStop(), lo que obligaba a _particlesStart() en cada
+  // reapertura y reconstruía el fondo entero.)
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
-  var btn=document.getElementById('btn-nueva-entrada');
-  if(btn) btn.classList.remove('active');
+  // v6.050: btn-nueva-entrada retirado en v6.010 — sin botón que limpiar.
   if(window._hudPanels){
     window._hudPanels.forEach(function(hp){
       if(!hp.el) return;
@@ -7454,15 +7758,21 @@ function _aplicarDialPreset(p){
 }
 
 function cerrarEntrada(){
-  cerrarDial();
+  // v6.031: cerrar el formulario RAW ya NO cierra el overlay. El
+  // formulario vive sobre el dial (que es el Home); al cerrarlo debes
+  // quedar en el dial, no salir al anverso vacío. Antes llamaba
+  // cerrarDial() y eso te expulsaba del Home — el "bug del anverso".
   var dd=document.getElementById('entrada-dropdown');
-  var btn=document.getElementById('btn-nueva-entrada');
   if(dd){ dd.classList.remove('show'); dd.style.display='none'; }
-  if(btn) btn.classList.remove('active');
+  // v6.050: btn-nueva-entrada retirado en v6.010 — sin botón que limpiar.
   var p1=document.getElementById('entrada-paso1');
   var p2=document.getElementById('entrada-paso2');
   if(p1) p1.style.display='block';
   if(p2) p2.style.display='none';
+  // Asegurar que el overlay (Home) siga visible y activo.
+  if(typeof abrirDial === 'function' && !window._dialVisible){
+    abrirDial();
+  }
 }
 
 function volverAPaso1(){ cerrarEntrada(); abrirDial(); }
@@ -7513,7 +7823,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(fechaEl) fechaEl.value=hoy;
   _inyectarToggleModo();
 
-  var _dialLandingUsed = false;
+  // v6.050: la variable _dialLandingUsed quedó huérfana al eliminarse
+  // el override de cerrarDial en v6.020 — retirada.
 
   // ── APERTURA INICIAL: usar el mismo timeline de abrirDial ──
   // (antes este bloque tenía su propia animación rota — todo aparecía a la vez).
@@ -7585,7 +7896,28 @@ window.addEventListener('DOMContentLoaded',()=>{
     void document.body.offsetHeight;
   }
 
+  // v6.073 — GUARDA ANTI-BUCLE de recálculo.
+  // Problema: _reposicionarHUD recoloca las cards y, al hacerlo, el
+  // contenido puede oscilar ~1px y hacer aparecer/desaparecer una barra
+  // de scroll. Aparecer una scrollbar CAMBIA el tamaño del visualViewport
+  // → dispara su evento 'resize' → llama _reposicionarHUD otra vez →
+  // bucle infinito (las cards se mueven y parpadean scrolls sin parar).
+  // Solución: recordar el tamaño del viewport y solo reaccionar cuando
+  // cambió DE VERDAD (más que el ancho de una scrollbar, ~20px). Los
+  // micro-cambios que produce el propio bucle se ignoran.
+  var _vpUltW = window.innerWidth;
+  var _vpUltH = window.innerHeight;
+  var _VP_UMBRAL = 24;  // px — un resize real supera esto; una scrollbar no
+  function _viewportCambioReal(){
+    var w = window.innerWidth, h = window.innerHeight;
+    var dw = Math.abs(w - _vpUltW), dh = Math.abs(h - _vpUltH);
+    if(dw < _VP_UMBRAL && dh < _VP_UMBRAL) return false;
+    _vpUltW = w; _vpUltH = h;
+    return true;
+  }
+
   window.addEventListener('resize', function(){
+    if(!_viewportCambioReal()) return;       // v6.073: ignora micro-cambios
     if(_dialVisible && typeof _reposicionarHUD==='function'){
       _resetDuroLayout();
       _reposicionarHUD();
@@ -7599,6 +7931,9 @@ window.addEventListener('DOMContentLoaded',()=>{
     window.visualViewport.addEventListener('resize', function(){
       if(_vvT) clearTimeout(_vvT);
       _vvT = setTimeout(function(){
+        // v6.073: misma guarda — solo recolocar si el viewport cambió de
+        // verdad, no por una scrollbar que aparece/desaparece.
+        if(!_viewportCambioReal()) return;
         if(_dialVisible && typeof _reposicionarHUD==='function'){
           _resetDuroLayout();
           _reposicionarHUD();
@@ -7607,24 +7942,12 @@ window.addEventListener('DOMContentLoaded',()=>{
     });
   }
 
-  var _origCerrarDial = cerrarDial;
-  cerrarDial = function(){
-    if(!_dialLandingUsed){
-      _dialLandingUsed = true;
-      // El primer cierre desde el landing usa el mismo fade-out del cerrarDial
-      // estándar para que se vea suave. Antes era un cierre instantáneo (display:none)
-      // y se veía corte. Llamamos a la implementación original.
-      var anv = document.getElementById('board-anverso');
-      if(anv){
-        anv.style.display = '';
-        anv.style.visibility = '';
-        anv.style.opacity = '1';
-      }
-      _origCerrarDial();
-    } else {
-      _origCerrarDial();
-    }
-  };
+  // v6.020: el override de cerrarDial que revelaba 'board-anverso' en el
+  // primer cierre se ELIMINA. En v6 el "Home" es el overlay (dial+cards),
+  // no la board-anverso. El router (_osMostrar) coordina overlay y
+  // secciones; revelar board-anverso aquí haría aparecer la vista vieja
+  // por debajo. board-anverso queda oculta permanentemente (se retira
+  // del DOM en la fase v6.050). cerrarDial se usa tal cual, sin envoltura.
 
   setChip('load','Cargando');
   api.getAll()

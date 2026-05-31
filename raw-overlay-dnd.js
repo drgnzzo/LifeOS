@@ -1,6 +1,17 @@
-/* RAW Entry — Overlay Drag & Drop v.5.199
-   v5.199 — REESCRITURA del drop: ahora es INTERCAMBIO PURO. Al soltar
-   una card sobre otra, ambas permutan posicion fisica (top/left/width)
+/* RAW Entry — Overlay Drag & Drop v.6.011
+   v6.011 — FIX slots vacíos visibles fuera del overlay.
+   Los "ghost slots" del DnD cuelgan de document.body con position:
+   fixed / z-index:9001. Al navegar a Logros/Activity/Bitácora/etc. no
+   se limpiaban y quedaban visibles detrás de esas secciones. Causa de
+   fondo: la guarda de buildGhostSlots usaba getElementById('dial-
+   overlay'), pero desde v6.000 el overlay es persistente y ese nodo
+   SIEMPRE existe — la guarda quedó neutralizada. Ahora la guarda usa
+   window._dialVisible (expuesto por raw-overlay.js v6.011) y cerrarDial
+   llama _overlayDnd.clear() al salir del overlay. Los slots solo
+   existen mientras el overlay está visible.
+   ── Heredado v5.199 — REESCRITURA del drop: ahora es INTERCAMBIO PURO.
+   Al soltar una card sobre otra, ambas permutan posicion fisica
+   (top/left/width)
    y estado logico (_side/_order). Soltar en slot vacio = la card toma
    la posicion del slot. YA NO se llama _reposicionarHUD al soltar — el
    recalculador gigante era lo que colapsaba el layout (v5.193-198
@@ -234,7 +245,14 @@
   function buildGhostSlots(){
     clearGhostSlots();
     if(!window._hudPanels) return;
-    if(!window._dialVisible && !document.getElementById('dial-overlay')) return;
+    // v6.011: el dial-overlay ahora SIEMPRE existe en el DOM (es
+    // persistente desde v6.000). Su mera presencia ya NO indica que el
+    // overlay esté visible — antes la guarda dependía de getElementById
+    // ('dial-overlay'), que ahora siempre da true, dejando la guarda
+    // neutralizada y los slots colándose detrás de Logros/Activity/etc.
+    // raw-overlay.js v6.011 expone window._dialVisible: esa es ahora la
+    // única señal válida. Si el overlay no está visible, no hay slots.
+    if(!window._dialVisible) return;
     if(window._hudExpanded) return;
     // Mientras la cascada de apertura está en curso, NO mostrar slots vacíos.
     // Se construirán al final cuando _hudCascadaEnCurso pase a false.

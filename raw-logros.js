@@ -1,7 +1,14 @@
 /* ═══════════════════════════════════════════════════════
-   RAW LOGROS — Panel rediseñado estilo dial
-   Cards con glow de color por categoría, header con nivel/XP,
-   sidebar completados + categorías + recompensa por nivel
+   RAW LOGROS — Panel rediseñado estilo dial · v.6.068
+
+   v6.020 — irALogros se reconecta al router de capas v6
+   (_osMostrar). Toggle: si ya estás en Logros, vuelve a Home.
+   Mantiene un fallback defensivo si el router no estuviera cargado.
+
+   v6.011 — El botón de ocultar/mostrar logros completados ahora
+   comunica claramente su estado: ícono de ojo (abierto/tachado) y
+   texto que anuncia la acción del siguiente clic ("Ocultar logrados"
+   ↔ "Mostrar logrados"). resetReverso resincroniza el botón.
    v2.0 · Mismo lenguaje visual que el dial
 ═══════════════════════════════════════════════════════ */
 
@@ -136,12 +143,12 @@
 
 /* ── GRID DE CARDS ── */
 #lgr-grid-wrap {
-  overflow-y:auto;overflow-x:hidden;
+  /* v6.067: sin scroll vertical — la app no tiene scroll en ninguna
+     sección (igual que el overlay/Home). */
+  overflow:hidden;
   padding:16px 20px 24px;
   background:transparent;
 }
-#lgr-grid-wrap::-webkit-scrollbar { width:4px; }
-#lgr-grid-wrap::-webkit-scrollbar-thumb { background:rgba(139,92,246,0.3); border-radius:2px; }
 
 #inv-grid-full {
   display:grid;
@@ -329,7 +336,8 @@
 
 /* ── SIDEBAR ── */
 #lgr-sidebar {
-  overflow-y:auto;
+  /* v6.067: sin scroll vertical. */
+  overflow:hidden;
   border-left:1px solid rgba(140,100,220,0.18);
   display:flex;
   flex-direction:column;
@@ -338,8 +346,6 @@
   backdrop-filter:blur(12px);
   -webkit-backdrop-filter:blur(12px);
 }
-#lgr-sidebar::-webkit-scrollbar { width:3px; }
-#lgr-sidebar::-webkit-scrollbar-thumb { background:rgba(139,92,246,0.3); border-radius:2px; }
 
 .lgr-sidebar-section {
   border-bottom:1px solid rgba(140,100,220,0.12);
@@ -454,12 +460,19 @@
 /* Responsive */
 @media(max-width:899px){
   #lgr-body { grid-template-columns:1fr !important; }
-  #lgr-sidebar { border-left:none; border-top:1px solid rgba(255,255,255,0.10); max-height:380px; }
+  #lgr-sidebar { border-left:none; border-top:1px solid rgba(255,255,255,0.10); }
   #lgr-header { padding:10px 14px 8px; gap:10px; }
   #lgr-nivel-badge { width:52px; height:52px; }
   #lgr-nivel-num { font-size:17px; }
   #inv-grid-full { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:6px; }
   #lgr-grid-wrap { padding:10px 12px 16px; }
+  /* v6.068: en móvil el scroll vertical SÍ se permite — es la forma
+     natural de desplazarse en un teléfono. En escritorio Logros no
+     tiene scroll, pero aquí (móvil) se restaura en grid y sidebar. */
+  #lgr-grid-wrap { overflow-y:auto !important; overflow-x:hidden !important; -webkit-overflow-scrolling:touch; }
+  #lgr-sidebar   { overflow-y:auto !important; overflow-x:hidden !important; -webkit-overflow-scrolling:touch; }
+  #lgr-grid-wrap::-webkit-scrollbar, #lgr-sidebar::-webkit-scrollbar { width:4px; }
+  #lgr-grid-wrap::-webkit-scrollbar-thumb, #lgr-sidebar::-webkit-scrollbar-thumb { background:rgba(139,92,246,0.3); border-radius:2px; }
 }
   `;
   document.head.appendChild(s);
@@ -658,8 +671,9 @@ function _lgrMontarShell(){
           <button class="lgr-pill"    id="lord-desc" onclick="setOrdenLogros('monto-desc')">$ ↓</button>
           <button class="lgr-pill"    id="lord-asc"  onclick="setOrdenLogros('monto')">$ ↑</button>
         </div>
-        <button class="lgr-btn-done on" id="reverso-tog-done" onclick="toggleReversoMostrarDone()">
-          <i class="fas fa-check-circle" style="font-size:10px"></i> Completados
+        <button class="lgr-btn-done on" id="reverso-tog-done" onclick="toggleReversoMostrarDone()" title="Ocultar o mostrar los logros ya completados">
+          <i class="fas fa-eye" id="reverso-tog-done-ico" style="font-size:11px"></i>
+          <span id="reverso-tog-done-txt">Ocultar logrados</span>
         </button>
         <button class="lgr-btn-volver" onclick="volverAlAnverso()">
           <i class="fas fa-chevron-left" style="font-size:10px"></i> Volver
@@ -946,6 +960,12 @@ function toggleReversoMostrarDone(){
   _lgr.mostrarDone=!_lgr.mostrarDone;
   var btn=document.getElementById('reverso-tog-done');
   if(btn) btn.classList.toggle('on',_lgr.mostrarDone);
+  // v6.011: el botón comunica su estado — ícono de ojo + texto que
+  // dice qué acción hará el siguiente clic.
+  var ico=document.getElementById('reverso-tog-done-ico');
+  var txt=document.getElementById('reverso-tog-done-txt');
+  if(ico) ico.className='fas '+(_lgr.mostrarDone?'fa-eye':'fa-eye-slash');
+  if(txt) txt.textContent=_lgr.mostrarDone?'Ocultar logrados':'Mostrar logrados';
   _lgrPintarGrid();
 }
 function resetReverso(){
@@ -953,6 +973,13 @@ function resetReverso(){
   var pEl=document.getElementById('reverso-fil-proyecto');
   var gEl=document.getElementById('reverso-fil-grupo');
   if(pEl) pEl.value=''; if(gEl) gEl.value='';
+  // v6.011: resincronizar el botón ocultar/mostrar logrados al reset.
+  var dBtn=document.getElementById('reverso-tog-done');
+  var dIco=document.getElementById('reverso-tog-done-ico');
+  var dTxt=document.getElementById('reverso-tog-done-txt');
+  if(dBtn) dBtn.classList.add('on');
+  if(dIco) dIco.className='fas fa-eye';
+  if(dTxt) dTxt.textContent='Ocultar logrados';
   setOrdenLogros('az');
   _lgrPintarGrid(); _lgrPintarSidebar();
 }
@@ -970,26 +997,22 @@ function _lgrVolver(){
   document.querySelectorAll('.board-face').forEach(function(f){ f.classList.remove('active'); });
   var anv=document.getElementById('board-anverso');
   if(anv) anv.classList.add('active');
-  if(typeof _syncMobTab==='function') _syncMobTab('entrada');
+  // v6.061: _syncMobTab eliminado (mob-tabbar retirada en v6.050).
 }
 
 function irALogros(){
-  // Toggle: si ya estás en logros, vuelve al anverso
-  var board = document.getElementById('board-logros');
-  if(board && board.classList.contains('active')){
-    if(typeof volverAlAnverso==='function') volverAlAnverso();
-    return;
+  // v6.020: navegación vía router de capas (_osMostrar).
+  // Toggle: si ya estás en Logros, vuelve a Home.
+  if(window._osSeccion === 'logros'){
+    if(typeof _osMostrar==='function'){ _osMostrar('home'); return; }
   }
-  if(typeof _syncMobTab==='function') _syncMobTab('logros');
-  document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){ f.classList.remove('active'); });
-  // Ocultar anverso
-  var anv = document.getElementById('board-anverso');
-  if(anv) anv.classList.add('slide-right');
-  if(board){ board.classList.add('active'); board.scrollTop=0; }
-  // Marcar btn activo
-  document.querySelectorAll('.btn-flip').forEach(function(b){ b.classList.remove('active'); });
-  var btn = document.getElementById('btn-logros'); if(btn) btn.classList.add('active');
-  var bh  = document.getElementById('btn-home');   if(bh)  bh.classList.remove('on');
+  if(typeof _osMostrar==='function'){
+    _osMostrar('logros');
+  } else {
+    // Fallback defensivo (router no cargado): comportamiento legacy.
+    document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){ f.classList.remove('active'); });
+    var b=document.getElementById('board-logros'); if(b){ b.classList.add('active'); b.scrollTop=0; }
+  }
   if(_lgr.items.length===0 && window._logrosData) renderLogros(window._logrosData);
 }
 
