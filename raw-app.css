@@ -1004,7 +1004,12 @@ html.mob .hero{
   flex-direction:column !important;
   align-items:stretch !important;
   height:auto !important;min-height:unset !important;
-  padding:0 !important;gap:0 !important;
+  /* v7.063 — respetar safe area del iPhone (notch / dynamic island).
+     env(safe-area-inset-top) le dice al CSS cuántos píxeles necesita
+     la app para no chocar con la barra de estado. Sin esto, el header
+     se enciman con la hora/batería del iPhone. */
+  padding:env(safe-area-inset-top) 0 0 0 !important;
+  gap:0 !important;
   background:#05060f !important;
   border-bottom:1px solid rgba(140,100,220,0.20) !important;
   z-index:10000 !important;
