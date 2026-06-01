@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.060
+/* RAW Entry — Overlay v.7.061
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.066 — REGRESO A HOME MÁS SUAVE Y CALMADO                      ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -2737,17 +2737,18 @@ function _crearDialOverlay(){
     // una capa aún no construida simplemente no se dibuja todavía.
     function start(){
       // ════════════════════════════════════════════════════════════════
-      // v6.032 — EN MÓVIL: FONDO PLANO, SIN ANIMACIÓN.
-      // La animación cósmica completa (estrellas, nebulosa, warp,
-      // constelaciones, meteoros...) funde y traba los teléfonos. En
-      // móvil NO se arranca nada: el overlay queda con su degradado de
-      // fondo CSS estático. El canvas de partículas se oculta. La
-      // animación rica se conserva íntegra solo para escritorio.
-      // ════════════════════════════════════════════════════════════════
+      // v7.061 — En móvil v6.032 apagaba el motor entero porque "fundía
+      // los teléfonos". Pero esa decisión se tomó cuando además se
+      // montaban las 14 cards HUD pesadas. v7.060 las eliminó. Ahora
+      // probamos el motor encendido en móvil PERO en modo bajo: forzamos
+      // _lowEndDevice = true (55% estrellas, sin shadowBlur en chicas,
+      // menos constelaciones, menos partículas warp). El frame ya se
+      // pausa con document.hidden (v5.214), así que ahorra batería al
+      // bloquear el iPhone. Si el teléfono se traba o se calienta,
+      // revertir esta versión a la guard original de v6.032.
       if(window.innerWidth < 900){
-        if(_particlesCanvas){ _particlesCanvas.style.display = 'none'; }
-        window._particlesRunning = true;   // marca "ya iniciado" → nadie reintenta
-        return;
+        _lowEndDevice = true;
+        window._ovLowEnd = true;
       }
 
       resize();
