@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.067
+/* RAW Entry — Overlay v.7.068
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.066 — REGRESO A HOME MÁS SUAVE Y CALMADO                      ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -2630,15 +2630,11 @@ function _crearDialOverlay(){
       updateNebula(dt);
 
       // 1b) v5.201: NEBULOSA VISIBLE — capa offscreen al fondo de todo.
-      // v7.067 OPT — actualizar solo cada 2 frames (15fps efectivo).
-      // La nebulosa se mueve muy lento; nadie nota la diferencia entre
-      // 30 y 15 fps en ella. Ahorra ~3-5% del costo total por frame.
-      // Pinta en frames impares (1,3,5...) para que el primer frame
-      // ya tenga nebulosa visible (sin parpadeo inicial).
+      // (v7.067 intentó pintar cada 2 frames para ahorrar costo, pero
+      // como el canvas se limpia cada frame, esto causaba parpadeo
+      // estroboscópico a 15Hz. Revertido a pintar siempre.)
       _frameCounter++;
-      if(_frameCounter % 2 === 1){
-        drawNebulaLayer(dt * 2);  // dt ajustado para mantener velocidad real
-      }
+      drawNebulaLayer(dt);
 
       // 2) Polvo cósmico (capa más al fondo)
       drawDust(dt);
