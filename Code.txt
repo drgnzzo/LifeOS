@@ -1,5 +1,14 @@
 // ============================================================
-//  LifeOS — Code.gs  v.5.009
+//  LifeOS — Code.gs  v.5.010
+//  v5.010: CACHE TTL bajado de 6h a 2min (línea ~1504). El TTL de
+//          6h causaba que las ediciones MANUALES al Sheet no se
+//          reflejaran en la app durante horas (la app solo invalida
+//          el cache al ESCRIBIR, no al leer cambios externos).
+//          Con 2 min, las ediciones manuales aparecen casi al
+//          instante y el cache sigue ayudando durante sesiones
+//          activas (varios getAll en pocos minutos van rápido).
+//          + Expuesto 'invalidarCache' como acción doGet para
+//          botón de emergencia (URL?action=invalidarCache).
 //  v5.009: FIX recursión infinita en _memoSS() de v5.008.
 //          Mi script de sustitución reemplazó accidentalmente
 //          SpreadsheetApp.getActiveSpreadsheet() DENTRO de la propia
@@ -1501,7 +1510,7 @@ function getAll() {
     try {
       var serialized = JSON.stringify(result);
       if (serialized.length < 100000) {
-        cache.put('lifeos_getAll_v1', serialized, 21600); // 6h
+        cache.put('lifeos_getAll_v1', serialized, 120); // v5.010 — 2 min (antes 6h, causaba datos viejos al editar Sheet a mano)
       }
     } catch(cacheErr) {}
 
@@ -2433,6 +2442,7 @@ function doGet(e) {
       case 'getFinancieroAvanzado': result = getFinancieroAvanzado();                                                                     break;
       case 'getRevision':         result = getRevision(e.parameter.tipo||'mensual', e.parameter.anio, e.parameter.mes, e.parameter.semana); break;
       case 'getNotas':            result = getNotas();                                                                                    break;
+      case 'invalidarCache':      invalidarCache(); result = { ok:true, msg:'Cache invalidado — siguiente getAll será fresco' };          break;
       case '':                    return servirHTML();
       default:                    result = { error: 'Acción desconocida: ' + action };
     }
