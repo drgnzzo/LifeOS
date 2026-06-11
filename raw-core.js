@@ -522,16 +522,15 @@ function upM(){
 // ══════════════════════════════════════════
 //  SALDO
 // ══════════════════════════════════════════
-// v6.073 — COMPUERTA DE ARRANQUE (fix de los 20-54s de carga).
-// Apps Script ENCOLA EN SERIE las peticiones del mismo usuario: las
+// v6.073 — COMPUERTA DE ARRANQUE.
+// Apps Script encola las peticiones del mismo usuario en SERIE: las
 // ~8 llamadas GET del arranque (necesidades, revision, nutricion,
 // flujo, saldo, notas...) se formaban delante o alrededor de getAll
-// y la app no pintaba nada hasta que toda la fila avanzara (20s+).
-// Esta compuerta difiere TODAS las lecturas secundarias hasta que la
-// PRIMERA getAll resuelva: el arranque es getAll solo (~2s con cache
-// caliente), las cards pintan, y el resto llena sus paneles despues,
-// progresivamente. Las ESCRITURAS no se difieren. Salvavidas: la
-// compuerta se abre sola a los 12s pase lo que pase.
+// y nada pintaba hasta que toda la fila avanzara (20s+).
+// Esta compuerta DIFIERE todas las lecturas secundarias hasta que la
+// PRIMERA getAll resuelva: arranque = getAll solo (~2s con cache
+// caliente), las cards pintan, el resto llena sus paneles despues.
+// Escrituras NO se difieren. Salvavidas a 12s.
 (function(){
   var DIFERIR = ['getNecesidades','getRevision','getNutricion','getFlujoPorMes',
                  'getNotas','getScoreVida','getSaldoDia','getPensamientos',
@@ -550,7 +549,7 @@ function upM(){
     if(p && typeof p.then === 'function') p.then(abrirGate, abrirGate);
     return p;
   };
-  setTimeout(abrirGate, 12000);   // salvavidas
+  setTimeout(abrirGate, 12000);
   DIFERIR.forEach(function(fn){
     var orig = api[fn];
     if(typeof orig !== 'function') return;

@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.080  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.079  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -135,6 +135,22 @@
     if(_warpClaseTO) clearTimeout(_warpClaseTO);
     _warpClaseTO = setTimeout(function(){
       h.classList.remove('niv-warp');
+      // v7.081 — al cerrar el warp limpiamos los transforms inline que
+      // el CSS de niv-warp pudo dejar inertes en el dial. Sin esto, al
+      // volver a niv-0 desde niv-2 (clic en pestaña + scroll arriba),
+      // el dial quedaba pegado arriba-izquierda con el ultimo transform.
+      var ov = document.getElementById('dial-overlay');
+      if(ov){
+        ov.style.transform = '';
+        ov.style.opacity = '';
+        Array.prototype.forEach.call(ov.children, function(ch){
+          if(ch.id === 'dial-particles') return;
+          ch.style.transform = '';
+        });
+      }
+      if(typeof window._reposicionarHUD === 'function'){
+        try { window._reposicionarHUD(); } catch(e){}
+      }
     }, 1150);
   }
 
@@ -221,7 +237,7 @@
           child.style.visibility = '';
         }
       });
-      ov.style.pointerEvents = 'none';   // v7.080 — abrirDial deja el overlay en 'none' A PROPÓSITO (no atrapa clics; sus hijos sí). Restaurar '' activaba el clic-en-fondo que cierra el dial sin retorno.
+      ov.style.pointerEvents = '';
     }
     // Restaurar las cards HUD.
     document.querySelectorAll('.hud-pnl').forEach(function(p){
@@ -977,9 +993,10 @@
           if(child.id === 'dial-particles') return;
           heal(child);
         });
-        // v7.080 — bloque de restauración de pointerEvents ELIMINADO:
-        // 'none' es el estado correcto del overlay abierto (abrirDial).
-        // Forzar '' hacía que tocar el fondo cerrara el dial sin retorno.
+        if(ov.style.pointerEvents === 'none'){
+          ov.style.pointerEvents = '';
+          window._dialVisible = true;
+        }
       }
     } else if(real === 2 && ov){
       // v7.076 — SOLO apagar si una sección está REALMENTE visible en
