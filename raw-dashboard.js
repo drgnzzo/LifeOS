@@ -1,4 +1,4 @@
-/* RAW Entry — Dashboard v.6.041
+/* RAW Entry — Dashboard v.6.042
    ╔══════════════════════════════════════════════════════════════════╗
    ║ FASE v6.040 — BOTÓN ACTUALIZAR                                   ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -406,7 +406,13 @@ function refreshTodo(){
   const btn=document.getElementById('btn-rf');
   if(btn){btn.classList.add('spinning');btn.disabled=true;}
   progStart();setChip('load','Actualizando');
-  Promise.all([api.getAll(),consultarSaldo()]).then(([d])=>{
+  // v6.042 — consultarSaldo es una llamada GAS aparte (getSaldoDia,
+  // 3-15s sin cache) que solo actualiza el numerito del saldo. Estaba
+  // dentro del Promise.all GATEANDO todo el render: las cards no se
+  // pintaban hasta que el saldo respondiera. Ahora corre en paralelo
+  // sin bloquear nada — el saldo aparece cuando llegue.
+  consultarSaldo();
+  api.getAll().then((d)=>{
     if(d&&d.catalogos)onCats(d.catalogos);
     if(d&&d.apartados)renderApartados(d.apartados);
     if(d&&d.fijos)renderEntes(d.fijos);

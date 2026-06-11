@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.075  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.076  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -157,10 +157,18 @@
       Array.prototype.forEach.call(ov.children, function(child){
         if(child.id === 'dial-particles') return;   // el fondo SE QUEDA
         if(!child._n2Backup){
+          // v7.076 — si el apagado atrapa al elemento a MEDIA animación
+          // (opacity '0' / visibility 'hidden' inline), NO memorizar ese
+          // estado: el restore lo dejaría invisible para siempre ("todo
+          // en blanco" al subir de Nivel 2 tras entrar por pestaña). El
+          // destino correcto de restauración es su estado de stylesheet.
+          var _op = child.style.opacity, _vi = child.style.visibility;
+          if(_op !== '' && parseFloat(_op) < 0.05) _op = '';
+          if(_vi === 'hidden') _vi = '';
           child._n2Backup = {
             transition: child.style.transition,
-            opacity: child.style.opacity,
-            visibility: child.style.visibility
+            opacity: _op,
+            visibility: _vi
           };
         }
         child.style.transition = 'none';
@@ -173,11 +181,17 @@
     // Apagar todas las cards HUD (que cuelgan de <body>).
     document.querySelectorAll('.hud-pnl').forEach(function(p){
       if(!p._n2Backup){
+        // v7.076 — mismo saneo que los hijos del overlay: jamás
+        // memorizar un estado invisible/inerte como destino de restore.
+        var _pop = p.style.opacity, _pvi = p.style.visibility, _ppe = p.style.pointerEvents;
+        if(_pop !== '' && parseFloat(_pop) < 0.05) _pop = '';
+        if(_pvi === 'hidden') _pvi = '';
+        if(_ppe === 'none') _ppe = '';
         p._n2Backup = {
           transition: p.style.transition,
-          opacity: p.style.opacity,
-          pointerEvents: p.style.pointerEvents,
-          visibility: p.style.visibility
+          opacity: _pop,
+          pointerEvents: _ppe,
+          visibility: _pvi
         };
       }
       p.style.transition = 'none';
@@ -927,14 +941,20 @@
     // pestaña que se saltó el flujo), apagarlo.
     var ov = document.getElementById('dial-overlay');
     if(real <= 1 && !window._hudCascadaEnCurso){
+      // v7.076 — heal ampliado: basta opacity:'0' inline (con o sin
+      // visibility) para ser candidato, pero solo se repara si LLEVA
+      // DOS ticks seguidos así (>600ms) — las animaciones legítimas
+      // (fades de v6, <600ms) nunca persisten dos ticks.
       var heal = function(el){
-        if(el.style.opacity === '0' && el.style.visibility === 'hidden'){
-          el.style.transition = 'none';
-          el.style.opacity = '';
-          el.style.visibility = '';
-          el.style.pointerEvents = '';
-          requestAnimationFrame(function(){ el.style.transition = ''; });
-        }
+        var invisible = (el.style.opacity === '0');
+        if(!invisible){ el._healPend = 0; return; }
+        if(!el._healPend){ el._healPend = 1; return; }   // 1er tick: marcar
+        el._healPend = 0;                                 // 2o tick: reparar
+        el.style.transition = 'none';
+        el.style.opacity = '';
+        el.style.visibility = '';
+        el.style.pointerEvents = '';
+        requestAnimationFrame(function(){ el.style.transition = ''; });
       };
       document.querySelectorAll('.hud-pnl').forEach(heal);
       if(ov){
@@ -942,23 +962,27 @@
           if(child.id === 'dial-particles') return;
           heal(child);
         });
-        if(ov.style.pointerEvents === 'none' && window._dialVisible === false){
-          // el overlay quedó sin clics tras un N2 mal cerrado
+        if(ov.style.pointerEvents === 'none'){
           ov.style.pointerEvents = '';
           window._dialVisible = true;
         }
       }
     } else if(real === 2 && ov){
-      // ¿Hay algún hijo del overlay todavía visible? (firma de que el
-      // apagado de N2 no corrió). Si sí → apagar con el flujo oficial.
-      var visible = false;
-      for(var vi = 0; vi < ov.children.length; vi++){
-        var ch = ov.children[vi];
-        if(ch.id === 'dial-particles') continue;
-        if(ch.style.opacity !== '0' || ch.style.visibility !== 'hidden'){ visible = true; break; }
-      }
-      if(visible && typeof _apagarOverlayInstant === 'function'){
-        _apagarOverlayInstant();
+      // v7.076 — SOLO apagar si una sección está REALMENTE visible en
+      // el DOM (.board-face.active). Si _osSeccion dice "sección" pero
+      // ninguna face está activa, es un desync de estado: apagar aquí
+      // sería declarar la guerra al flujo de subida (pantalla en
+      // blanco). En desync, no tocar nada.
+      if(document.querySelector('.board-face.active:not(.anverso)')){
+        var visible = false;
+        for(var vi = 0; vi < ov.children.length; vi++){
+          var ch = ov.children[vi];
+          if(ch.id === 'dial-particles') continue;
+          if(ch.style.opacity !== '0' || ch.style.visibility !== 'hidden'){ visible = true; break; }
+        }
+        if(visible && typeof _apagarOverlayInstant === 'function'){
+          _apagarOverlayInstant();
+        }
       }
     }
   }, 600);
