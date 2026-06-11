@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.073
+/* RAW Entry — Overlay v.7.074
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -2866,6 +2866,41 @@ function _crearDialOverlay(){
       // anima UNA sola vez en toda la vida de la app. abrirDial consulta
       // esta bandera para no re-arrancar (ni reconstruir) la animación.
       window._particlesRunning = true;
+
+      // v7.074 — AUTO-RECUPERACIÓN DE LA NEBULOSA.
+      // _nebCanvas es un offscreen pintado UNA vez. Si Chrome desaloja
+      // la memoria gráfica (ventana tapada — p.ej. Task Manager con
+      // Shift+Esc — o suspensión), queda EN BLANCO para siempre y el
+      // fondo "se pierde" hasta recargar. Al recuperar foco se muestrean
+      // 9 puntos de alpha: si TODOS son 0, la nebulosa fue desalojada y
+      // se reconstruye (~10-30ms, una vez). Si no, no se toca — así el
+      // patrón aleatorio no cambia en cada alt-tab.
+      function _nebulaEnBlanco(){
+        if(!_nebCanvas) return false;   // aún no construida: la cascada la hará
+        try {
+          var nc2 = _nebCanvas.getContext('2d');
+          var nw = _nebCanvas.width, nh = _nebCanvas.height;
+          for(var gy = 1; gy <= 3; gy++){
+            for(var gx = 1; gx <= 3; gx++){
+              var d = nc2.getImageData(Math.floor(nw*gx/4), Math.floor(nh*gy/4), 1, 1).data;
+              if(d[3] > 0) return false;
+            }
+          }
+          return true;
+        } catch(e){ return false; }
+      }
+      var _nebRebuildT = 0;
+      function _recuperarNebula(){
+        var now = Date.now();
+        if(now - _nebRebuildT < 4000) return;   // throttle anti alt-tab rápido
+        if(!_nebulaEnBlanco()) return;
+        _nebRebuildT = now;
+        try { buildNebulaLayer(); } catch(e){}
+      }
+      window.addEventListener('focus', _recuperarNebula);
+      document.addEventListener('visibilitychange', function(){
+        if(!document.hidden) _recuperarNebula();
+      });
 
       // ── Capas pesadas: escalonadas en frames sucesivos, no bloquean ──
       var _buildQueue = [
