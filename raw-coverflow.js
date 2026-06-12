@@ -1,120 +1,95 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.092 (intento 4 — arquitectura segura)
+/* RAW Entry — Cover Flow Nivel 1 v.7.094 (clones reales + giro)
    ╔══════════════════════════════════════════════════════════════════╗
-   ║ COVER FLOW CIRCULAR INFINITO — diseño "aro lógico + fantasmas"   ║
+   ║ COVER FLOW — vecinas como CLONES REALES de las cards + animación ║
    ╚══════════════════════════════════════════════════════════════════╝
-   POR QUÉ ESTE DISEÑO NO PUEDE ROMPER LA APP (lecciones v7.067/68/82):
-   · NO toca NINGUNA card real: ni transforms, ni opacity, ni z-index.
-     La card central es la expansión NATIVA de la app, intacta.
-   · Las vecinas del aro se representan con FANTASMAS: mini-cards
-     propias (título + color de la card real), posicionadas junto a la
-     expandida. Elementos míos, control total, riesgo cero.
-   · NO hay MutationObserver (chocaba con el watchdog de niveles).
-   · NO hay hook recursivo de _reposicionarHUD.
-   · Reactividad: wrap NO-recursivo de _hudExpand/_hudCollapse (llama
-     al original y agenda un repintado) + intervalo de reconciliación
-     idempotente de 500ms (solo escribe si el estado difiere).
-   · CORTACIRCUITOS: si aplicar() lanza 3 excepciones, el módulo se
-     auto-desactiva y lo reporta en consola. Jamás vuelve a trabar
-     una computadora.
-
-   COMPORTAMIENTO (spec de Electronics):
-   · UN solo aro con TODAS las laterales-expandibles (7 hoy, n mañana:
-     el aro se construye en runtime desde _hudPanels — escalable).
-   · Orden del aro: left-1, left-2, right-1, right-2 (por _order).
-   · Bucle infinito: tras la última viene la primera (módulo).
-   · Cards ORTOGONALES: cero rotateY, cero 3D.
-   · Navegación: flechas ◀ ▶ en pantalla, ← → del teclado, y clic
-     en los fantasmas. Cada paso: colapsar actual → expandir siguiente
-     (API nativa _hudCollapse/_hudExpand — animaciones de la casa).
+   Evolución del v7.092 tras la referencia visual de Electronics:
+   · Las vecinas del aro ya NO son cajas abstractas: son CLONES del DOM
+     real de la card vecina (contenido vivo: header, datos, sparklines
+     copiadas bitmap a bitmap), escalados, atenuados, asomándose por
+     detrás de la card central (z 9040 < 9050 de .hud-expanded).
+   · GIRO: al navegar, los clones se deslizan hacia el centro y los
+     nuevos vecinos entran desde los bordes (sensación de aro girando).
+   · FIX del flash: durante la navegación el estado del aro SE SOSTIENE
+     (cf-on y data-cf-ring no se limpian en el micro-colapso), así las
+     compactas jamás parpadean entre card y card.
+   Reglas heredadas intactas: cero escrituras sobre cards reales (los
+   clones son copias mías), cero MutationObserver, cero hook de
+   _reposicionarHUD, cortacircuitos de 3 fallos.
 */
 (function(){
   'use strict';
 
-  // ── Limpiar restos de CUALQUIER intento anterior ──
+  // ── Limpieza de restos de intentos anteriores ──
   try {
-    document.documentElement.classList.remove('coverflow-on','cf-on');
-    document.querySelectorAll('[data-cf]').forEach(function(el){
+    document.documentElement.classList.remove('coverflow-on','cf-on','cf-girando');
+    document.querySelectorAll('[data-cf],[data-cf-ring],[data-cf-center]').forEach(function(el){
       el.removeAttribute('data-cf');
-      ['--cf-tx','--cf-rotY','--cf-scale','--cf-op','--cf-blur','--cf-z']
-        .forEach(function(v){ el.style.removeProperty(v); });
+      el.removeAttribute('data-cf-ring');
+      el.removeAttribute('data-cf-center');
     });
-    ['coverflow-css','cf4-css'].forEach(function(id){
+    ['coverflow-css','cf4-css','cf5-css'].forEach(function(id){
       var n = document.getElementById(id);
       if(n && n.parentNode) n.parentNode.removeChild(n);
     });
-    document.querySelectorAll('.cf-arrows,.cf4-ghost,.cf4-arrow').forEach(function(n){
+    document.querySelectorAll('.cf-arrows,.cf4-ghost,.cf4-arrow,.cf5-ghost,.cf5-arrow').forEach(function(n){
       if(n.parentNode) n.parentNode.removeChild(n);
     });
   } catch(e){}
 
   if(window.innerWidth < 900) return;   // solo escritorio
 
-  /* ════════════════════════════════════════════════════════════════
-     CSS — solo elementos cf4-* (míos). Tokens HUD ya definidos v5.077.
-  ════════════════════════════════════════════════════════════════ */
+  /* ════════ CSS ════════ */
   var css = document.createElement('style');
-  css.id = 'cf4-css';
+  css.id = 'cf5-css';
   css.textContent =
-    /* v7.092 — las cards del ARO que no son el centro se OCULTAN en
-       cf-on (estaban fijas en columnas contradiciendo el carrusel).
-       Solo atributo data-cf-ring puesto/quitado por este modulo. */
+    /* Cards del aro no-centrales: ocultas mientras cf-on */
     'html.cf-on .hud-pnl[data-cf-ring]{opacity:0 !important;'+
       'visibility:hidden !important;pointer-events:none !important;'+
       'transition:opacity .3s ease, visibility 0s linear .3s}'+
-    '.cf4-ghost{position:fixed;width:240px;max-width:20vw;z-index:8990;'+
-      'background:var(--hud-form-bg);border:1px solid var(--cf4-col,var(--hud-border));'+
-      'box-shadow:0 0 22px rgba(0,0,0,.55),0 0 14px var(--cf4-glow,transparent);'+
-      'padding:13px 15px;cursor:pointer;user-select:none;opacity:0;'+
-      'transform:scale(.92);pointer-events:none;'+
-      'transition:opacity .35s ease,transform .35s ease,box-shadow .2s ease;'+
-      'display:flex;flex-direction:column;gap:10px;justify-content:center}'+
-    'html.cf-on .cf4-ghost{opacity:.78;pointer-events:auto;transform:scale(1)}'+
-    '.cf4-ghost:hover{opacity:1 !important;'+
-      'box-shadow:0 0 26px rgba(0,0,0,.6),0 0 22px var(--cf4-glow,transparent)}'+
-    '.cf4-g-top{display:flex;align-items:center;gap:8px}'+
-    '.cf4-g-dot{width:9px;height:9px;border-radius:50%;flex:none;'+
-      'background:var(--cf4-col);box-shadow:0 0 8px var(--cf4-col)}'+
-    '.cf4-g-tit{font-size:11px;font-weight:700;letter-spacing:.09em;'+
-      'text-transform:uppercase;color:var(--hud-text);white-space:nowrap;'+
-      'overflow:hidden;text-overflow:ellipsis}'+
-    '.cf4-g-sub{font-size:10px;color:var(--hud-text-dim);letter-spacing:.04em}'+
-    '.cf4-g-pos{font-size:9px;color:var(--hud-text-faint);letter-spacing:.12em;'+
-      'text-transform:uppercase}'+
-    '.cf4-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:8995;'+
+    /* Marco fantasma: ventana del clon */
+    '.cf5-ghost{position:fixed;z-index:9040;overflow:hidden;cursor:pointer;'+
+      'background:rgba(8,6,18,.55);border:1px solid var(--cf5-col,var(--hud-border));'+
+      'box-shadow:0 0 28px rgba(0,0,0,.6),0 0 16px var(--cf5-glow,transparent);'+
+      'opacity:0;pointer-events:none;'+
+      'transition:opacity .4s ease,transform .42s cubic-bezier(.25,.8,.3,1),'+
+        'left .42s cubic-bezier(.25,.8,.3,1),width .3s ease,height .3s ease}'+
+    'html.cf-on .cf5-ghost{opacity:.62;pointer-events:auto}'+
+    '.cf5-ghost:hover{opacity:.95 !important}'+
+    /* Contenido clonado: atenuado tipo referencia */
+    '.cf5-wrap{position:absolute;left:0;top:0;transform-origin:top left;'+
+      'pointer-events:none;filter:saturate(.55) brightness(.8)}'+
+    /* Chip de posición en el aro */
+    '.cf5-pos{position:absolute;top:8px;left:0;right:0;text-align:center;'+
+      'font-size:10px;letter-spacing:.14em;text-transform:uppercase;'+
+      'color:var(--hud-text-dim);z-index:2;text-shadow:0 0 6px #000;'+
+      'pointer-events:none}'+
+    /* GIRO: los fantasmas se deslizan hacia el centro y se apagan */
+    'html.cf-girando .cf5-ghost.lado-izq{transform:translateX(120px);opacity:.15}'+
+    'html.cf-girando .cf5-ghost.lado-der{transform:translateX(-120px);opacity:.15}'+
+    /* Flechas */
+    '.cf5-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:9060;'+
       'width:42px;height:74px;display:flex;align-items:center;justify-content:center;'+
       'background:rgba(10,7,22,.7);border:1px solid var(--hud-border);'+
       'color:var(--hud-text-dim);font-size:20px;cursor:pointer;user-select:none;'+
       'opacity:0;pointer-events:none;transition:opacity .3s ease,border-color .2s,color .2s}'+
-    'html.cf-on .cf4-arrow{opacity:1;pointer-events:auto}'+
-    '.cf4-arrow:hover{border-color:var(--hud-border-hov);color:#fff;'+
+    'html.cf-on .cf5-arrow{opacity:1;pointer-events:auto}'+
+    '.cf5-arrow:hover{border-color:var(--hud-border-hov);color:#fff;'+
       'box-shadow:0 0 16px var(--hud-glow)}'+
-    '.cf4-arrow.izq{left:18px}.cf4-arrow.der{right:18px}';
+    '.cf5-arrow.izq{left:14px}.cf5-arrow.der{right:14px}';
   document.head.appendChild(css);
 
-  /* ════════════════════════════════════════════════════════════════
-     ESTADO
-  ════════════════════════════════════════════════════════════════ */
+  /* ════════ ESTADO ════════ */
   var SIDES = { 'left-1':0, 'left-2':1, 'right-1':2, 'right-2':3 };
-  var NOMBRES = {   // título y subtítulo por id de card
-    'hud-patrimonio':  ['Patrimonio',     'Saldos y apartados'],
-    'hud-bitacora':    ['Bitácora',       'Registros de vida'],
-    'hud-necesidades': ['Necesidades',    'Pirámide Maslow'],
-    'hud-fijos':       ['Fijos',          'Pagos recurrentes'],
-    'hud-financiero':  ['Financiero',     'Flujo del mes'],
-    'hud-variables':   ['Variables',      'Gastos variables'],
-    'hud-activity':    ['Activity+Logros','Hábitos y rachas']
+  var COLORES = {
+    'hud-patrimonio':'#22C55E','hud-necesidades':'#A855F7',
+    'hud-bitacora':'#C084FC','hud-financiero':'#22D3EE',
+    'hud-activity':'#FB923C','hud-fijos':'#67E8F9','hud-variables':'#A5B4FC'
   };
-  var _ghostL = null, _ghostR = null, _arrL = null, _arrR = null;
-  var _centroActual = null;       // card expandida del último pintado
-  var _fallos = 0;                // cortacircuitos
-  var _muerto = false;
+  var _gL=null,_gR=null,_aL=null,_aR=null;
+  var _cloneIdL=null,_cloneIdR=null;
+  var _fallos=0,_muerto=false,_navegando=false;
 
-  function esLateral(el){
-    return !!(el && el._side && (el._side in SIDES));
-  }
-
-  // El ARO: se construye fresco en cada uso desde _hudPanels (si mañana
-  // agregas cards laterales, entran solas). Orden estable y circular.
+  function esLateral(el){ return !!(el && el._side && (el._side in SIDES)); }
   function anillo(){
     if(!window._hudPanels) return [];
     return window._hudPanels
@@ -126,63 +101,68 @@
       });
   }
 
-  function colorDe(el){
-    // El accent vive en el borde/estilos del panel; fallback por id.
-    var FALLBACK = {
-      'hud-patrimonio':'#22C55E','hud-necesidades':'#A855F7',
-      'hud-bitacora':'#C084FC','hud-financiero':'#22D3EE',
-      'hud-activity':'#FB923C','hud-fijos':'#67E8F9','hud-variables':'#A5B4FC'
-    };
-    return FALLBACK[el.id] || '#8b5cf6';
-  }
-
-  /* ════════════════════════════════════════════════════════════════
-     FANTASMAS Y FLECHAS (creación única, reutilización siempre)
-  ════════════════════════════════════════════════════════════════ */
+  /* ════════ FANTASMAS (marco + clon real) ════════ */
   function _mkGhost(lado){
     var g = document.createElement('div');
-    g.className = 'cf4-ghost';
-    g.innerHTML =
-      '<div class="cf4-g-pos"></div>'+
-      '<div class="cf4-g-top"><span class="cf4-g-dot"></span>'+
-      '<span class="cf4-g-tit"></span></div>'+
-      '<div class="cf4-g-sub"></div>';
-    g.addEventListener('click', function(){
-      navegar(lado === 'izq' ? -1 : +1);
-    });
+    g.className = 'cf5-ghost lado-' + lado;
+    g.innerHTML = '<div class="cf5-pos"></div><div class="cf5-wrap"></div>';
+    g.addEventListener('click', function(){ navegar(lado==='izq' ? -1 : +1); });
     document.body.appendChild(g);
     return g;
   }
   function _mkArrow(lado){
     var a = document.createElement('div');
-    a.className = 'cf4-arrow ' + lado;
-    a.textContent = lado === 'izq' ? '◀' : '▶';
-    a.addEventListener('click', function(){
-      navegar(lado === 'izq' ? -1 : +1);
-    });
+    a.className = 'cf5-arrow ' + lado;
+    a.textContent = lado==='izq' ? '◀' : '▶';
+    a.addEventListener('click', function(){ navegar(lado==='izq' ? -1 : +1); });
     document.body.appendChild(a);
     return a;
   }
   function asegurarUI(){
-    if(!_ghostL) _ghostL = _mkGhost('izq');
-    if(!_ghostR) _ghostR = _mkGhost('der');
-    if(!_arrL)   _arrL   = _mkArrow('izq');
-    if(!_arrR)   _arrR   = _mkArrow('der');
+    if(!_gL) _gL=_mkGhost('izq');
+    if(!_gR) _gR=_mkGhost('der');
+    if(!_aL) _aL=_mkArrow('izq');
+    if(!_aR) _aR=_mkArrow('der');
   }
 
-  function pintarGhost(g, cardEl, etiqueta){
-    var info = NOMBRES[cardEl.id] || [cardEl.id, ''];
-    var col = colorDe(cardEl);
-    g.style.setProperty('--cf4-col', col);
-    g.style.setProperty('--cf4-glow', col + '44');
-    g.querySelector('.cf4-g-pos').textContent = etiqueta;
-    g.querySelector('.cf4-g-tit').textContent = info[0];
-    g.querySelector('.cf4-g-sub').textContent = info[1];
+  // Clonar el DOM real de la card vecina dentro del fantasma.
+  // El clon es MÍO: se neutraliza por completo (sin ids duplicados, sin
+  // clase hud-pnl que lo oculte, sin animaciones, sin eventos).
+  function montarClon(g, cardEl, etiqueta, anchoMarco){
+    var col = COLORES[cardEl.id] || '#8b5cf6';
+    g.style.setProperty('--cf5-col', col);
+    g.style.setProperty('--cf5-glow', col + '55');
+    g.querySelector('.cf5-pos').textContent = etiqueta;
+    var wrap = g.querySelector('.cf5-wrap');
+    wrap.innerHTML = '';
+    var c = cardEl.cloneNode(true);
+    c.removeAttribute('id');
+    c.removeAttribute('data-cf-ring');
+    c.removeAttribute('data-cf-center');
+    c.classList.remove('hud-pnl','hud-expanded');
+    c.querySelectorAll('[id]').forEach(function(n){ n.removeAttribute('id'); });
+    var wReal = cardEl.getBoundingClientRect().width || 330;
+    if(wReal < 50) wReal = 330;   // oculta: rect 0 -> usar ancho típico
+    c.style.cssText = 'position:static;display:block;width:'+Math.round(wReal)+
+      'px;opacity:1;visibility:visible;transform:none;animation:none;'+
+      'pointer-events:none;margin:0;left:auto;top:auto';
+    wrap.appendChild(c);
+    // Copiar bitmaps de los canvas (cloneNode deja canvases en blanco)
+    try {
+      var orig = cardEl.querySelectorAll('canvas');
+      var dup  = c.querySelectorAll('canvas');
+      for(var i=0;i<orig.length && i<dup.length;i++){
+        dup[i].width = orig[i].width; dup[i].height = orig[i].height;
+        var ctx = dup[i].getContext('2d');
+        if(ctx && orig[i].width>0) ctx.drawImage(orig[i],0,0);
+      }
+    } catch(e){}
+    var escala = anchoMarco / wReal;
+    wrap.style.transform = 'scale(' + escala.toFixed(3) + ')';
+    wrap.style.top = '26px';
   }
 
-  /* ════════════════════════════════════════════════════════════════
-     APLICAR — idempotente. Solo escribe si cambió el centro o el rect.
-  ════════════════════════════════════════════════════════════════ */
+  /* ════════ APLICAR (idempotente) ════════ */
   function aplicar(){
     if(_muerto) return;
     try {
@@ -191,7 +171,10 @@
       var activo = h.classList.contains('niv-1') && centro && esLateral(centro);
 
       if(!activo){
-        if(_centroActual !== null || h.classList.contains('cf-on')) limpiar();
+        // Sostener el aro durante la navegación: el micro-colapso entre
+        // card y card NO limpia (asi las compactas jamás parpadean).
+        if(_navegando) return;
+        if(h.classList.contains('cf-on')) limpiar();
         return;
       }
 
@@ -202,11 +185,8 @@
 
       asegurarUI();
       var n = aro.length;
-      var prev = aro[(idx - 1 + n) % n];   // bucle infinito por módulo
-      var next = aro[(idx + 1) % n];
+      var prev = aro[(idx-1+n)%n], next = aro[(idx+1)%n];
 
-      // v7.092 — marcar centro y miembros del aro con ATRIBUTOS (cero
-      // estilos sobre cards reales; el CSS de cf-on hace el resto).
       aro.forEach(function(el){
         if(el === centro){
           el.removeAttribute('data-cf-ring');
@@ -217,55 +197,49 @@
         }
       });
 
-      // Fantasmas estilo CARD VECINA: altos (60% de la central), pegados
-      // a sus bordes. Leemos el rect de la central, jamas escribimos en ella.
       var r = centro.getBoundingClientRect();
-      if(r.width < 50){ return; }   // aún animando: el próximo tick lo toma
-      var gw = Math.min(240, window.innerWidth * 0.20);
-      var gh = Math.max(180, r.height * 0.6);
-      var gap = 18;
-      var top = Math.max(70, r.top + (r.height - gh)/2);
-      _ghostL.style.height = gh + 'px';
-      _ghostR.style.height = gh + 'px';
-      _ghostL.style.left = Math.max(8, r.left - gw - gap) + 'px';
-      _ghostL.style.top  = top + 'px';
-      _ghostR.style.left = Math.min(window.innerWidth - gw - 8, r.right + gap) + 'px';
-      _ghostR.style.top  = top + 'px';
+      if(r.width < 50) return;
+      // Marcos: asoman por DETRÁS de la central (solapados ~34px)
+      var gw = Math.min(460, Math.max(280, r.width * 0.42));
+      var gh = Math.round(r.height * 0.92);
+      var top = Math.max(64, r.top + (r.height - gh)/2);
+      var solape = 34;
+      _gL.style.width = gw+'px'; _gL.style.height = gh+'px';
+      _gR.style.width = gw+'px'; _gR.style.height = gh+'px';
+      _gL.style.left = Math.round(Math.max(6, r.left - gw + solape)) + 'px';
+      _gL.style.top = top+'px';
+      _gR.style.left = Math.round(Math.min(window.innerWidth - gw - 6, r.right - solape)) + 'px';
+      _gR.style.top = top+'px';
 
-      pintarGhost(_ghostL, prev, '◀ ' + (((idx - 1 + n) % n) + 1) + '/' + n);
-      pintarGhost(_ghostR, next, ((idx + 1) % n + 1) + '/' + n + ' ▶');
+      if(_cloneIdL !== prev.id){ montarClon(_gL, prev, '◀ '+(((idx-1+n)%n)+1)+' / '+n, gw); _cloneIdL = prev.id; }
+      if(_cloneIdR !== next.id){ montarClon(_gR, next, (((idx+1)%n)+1)+' / '+n+' ▶', gw); _cloneIdR = next.id; }
 
       h.classList.add('cf-on');
-      _centroActual = centro;
       _fallos = 0;
     } catch(e){
       _fallos++;
       if(_fallos >= 3){
         _muerto = true;
-        limpiar();
+        try{ limpiar(); }catch(e2){}
         console.warn('[CoverFlow] auto-desactivado tras 3 fallos:', e.message);
       }
     }
   }
 
   function limpiar(){
-    document.documentElement.classList.remove('cf-on');
-    _centroActual = null;
-    // v7.092 — retirar atributos del aro (las cards vuelven a la vida
-    // normal del nivel; sus estilos jamas fueron tocados).
+    var h = document.documentElement;
+    h.classList.remove('cf-on','cf-girando');
     document.querySelectorAll('.hud-pnl[data-cf-ring],.hud-pnl[data-cf-center]')
       .forEach(function(el){
         el.removeAttribute('data-cf-ring');
         el.removeAttribute('data-cf-center');
       });
-    // Los fantasmas/flechas se ocultan vía CSS (sin .cf-on → opacity 0,
-    // pointer-events none). No se destruyen: reutilización sin churn.
+    _cloneIdL = _cloneIdR = null;
+    if(_gL) _gL.querySelector('.cf5-wrap').innerHTML='';
+    if(_gR) _gR.querySelector('.cf5-wrap').innerHTML='';
   }
 
-  /* ════════════════════════════════════════════════════════════════
-     NAVEGAR — gira el aro un paso usando la API NATIVA de la app.
-  ════════════════════════════════════════════════════════════════ */
-  var _navegando = false;
+  /* ════════ NAVEGAR — giro del aro ════════ */
   function navegar(delta){
     if(_muerto || _navegando) return;
     var centro = window._hudExpanded;
@@ -273,23 +247,27 @@
     var aro = anillo();
     var idx = aro.indexOf(centro);
     if(idx < 0) return;
-    var destino = aro[(idx + delta + aro.length) % aro.length];
+    var destino = aro[(idx+delta+aro.length)%aro.length];
     if(!destino || destino === centro) return;
     _navegando = true;
+    var h = document.documentElement;
+    h.classList.add('cf-girando');   // los clones se deslizan al centro
     try {
       if(typeof window._hudCollapse === 'function') window._hudCollapse();
       setTimeout(function(){
-        try {
-          if(typeof window._hudExpand === 'function') window._hudExpand(destino);
-        } catch(e){}
-        setTimeout(function(){ _navegando = false; aplicar(); }, 120);
+        try { if(typeof window._hudExpand === 'function') window._hudExpand(destino); } catch(e){}
+        setTimeout(function(){
+          _navegando = false;
+          aplicar();                 // nuevos vecinos montados…
+          requestAnimationFrame(function(){
+            h.classList.remove('cf-girando');   // …y entran deslizándose
+          });
+        }, 150);
       }, 70);
-    } catch(e){ _navegando = false; }
+    } catch(e){ _navegando = false; h.classList.remove('cf-girando'); }
   }
 
-  /* ════════════════════════════════════════════════════════════════
-     REACTIVIDAD — wraps NO recursivos + reconciliación idempotente.
-  ════════════════════════════════════════════════════════════════ */
+  /* ════════ REACTIVIDAD ════════ */
   function hookear(){
     if(typeof window._hudExpand === 'function' && !window._hudExpand._cf4){
       var oe = window._hudExpand;
@@ -304,13 +282,8 @@
     if(!window._hudExpand || !window._hudExpand._cf4) setTimeout(hookear, 400);
   }
   hookear();
-
-  // Reconciliación: barata e idempotente (aplicar solo escribe si hay
-  // cambio real). Cubre rutas que no pasan por _hudExpand/_hudCollapse
-  // (p. ej. regreso de nivel 2 por warp).
   setInterval(aplicar, 500);
 
-  // Teclado: ← → giran el aro cuando el Cover Flow está activo.
   document.addEventListener('keydown', function(e){
     if(_muerto) return;
     if(!document.documentElement.classList.contains('cf-on')) return;
@@ -319,15 +292,15 @@
     if(e.key === 'ArrowRight'){ e.preventDefault(); navegar(+1); }
   });
 
-  // API de depuración (regla: pedir datos, no percepciones).
   window._coverflow = {
     estado: function(){
       var aro = anillo();
       return {
         activo: document.documentElement.classList.contains('cf-on'),
-        muerto: _muerto,
-        fallos: _fallos,
+        girando: document.documentElement.classList.contains('cf-girando'),
+        muerto: _muerto, fallos: _fallos,
         centro: window._hudExpanded ? window._hudExpanded.id : null,
+        clones: [_cloneIdL, _cloneIdR],
         aro: aro.map(function(el){ return el.id; })
       };
     },
