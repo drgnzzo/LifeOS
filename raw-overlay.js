@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.084
+/* RAW Entry — Overlay v.7.085
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -8057,6 +8057,10 @@ function _aplicarDialPreset(p){
 }
 
 function cerrarEntrada(){
+  // v7.085 — cerrar el popup CONCEPTO si quedo abierto: cerrar el form
+  // con el popup vivo lo dejaba huerfano cruzandose con el dial.
+  var _pc = document.getElementById('popup-concepto');
+  if(_pc) _pc.classList.remove('show');
   // v6.031: cerrar el formulario RAW ya NO cierra el overlay. El
   // formulario vive sobre el dial (que es el Home); al cerrarlo debes
   // quedar en el dial, no salir al anverso vacío. Antes llamaba

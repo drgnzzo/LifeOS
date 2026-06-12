@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   RAW Entry — Estilos v.5.076
+   RAW Entry — Estilos v.5.077
    Reescrito sobre el design system unificado del dial.
    Depende de raw-tokens.css (cargar antes).
 
@@ -3294,3 +3294,60 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(7) { transition-delay:.36s, .36s; }
 html:not(.mob).hud-listo .hud-pnl:nth-child(8) { transition-delay:.42s, .42s; }
 html:not(.mob).hud-listo .hud-pnl:nth-child(9) { transition-delay:.48s, .48s; }
 html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   v5.077 — SISTEMA DE TOKENS HUD (definicion que NUNCA existio).
+   La entrega v5.074 estilizo popups con var(--hud-*) pero los tokens
+   jamas se definieron en ningun archivo: el navegador ignoraba esas
+   propiedades y el popup se veia negro plano con input blanco nativo.
+   Definirlos aqui revive ademas TODAS las reglas HUD que los usan.
+═══════════════════════════════════════════════════════════════════ */
+:root{
+  --hud-bg-base: #070512;
+  --hud-bg-deep: #04030c;
+  --hud-form-bg: rgba(12,9,26,.97);
+  --hud-panel-bg: rgba(15,11,32,.78);
+  --hud-panel-bg-hov: rgba(22,16,46,.88);
+  --hud-panel-bg-act: rgba(28,20,58,.94);
+  --hud-border: rgba(139,92,246,.32);
+  --hud-border-hov: rgba(167,139,250,.55);
+  --hud-border-strong: rgba(167,139,250,.8);
+  --hud-glow: rgba(139,92,246,.22);
+  --hud-glow-strong: rgba(139,92,246,.45);
+  --hud-text: rgba(235,233,248,.95);
+  --hud-text-dim: rgba(199,196,224,.55);
+  --hud-text-faint: rgba(199,196,224,.3);
+  --hud-ok: #34d399;
+  --hud-warn: #fbbf24;
+  --hud-err: #f87171;
+  --hud-rad: 10px;
+  --hud-rad-pill: 999px;
+  --hud-shadow: 0 8px 28px rgba(0,0,0,.55);
+  --hud-shadow-md: 0 14px 44px rgba(0,0,0,.65);
+  --hud-grid-color: rgba(139,92,246,.05);
+  --hud-grid-size: 22px;
+  --hud-corner-size: 12px;
+  --hud-corner-thick: 1.5px;
+  --hud-breath-dur: 6s;
+  --hud-breath-easing: cubic-bezier(.45,0,.55,1);
+}
+
+/* ── v5.077 — POPUP CONCEPTO: estilos faltantes ── */
+.popup-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--hud-border)}
+.popup-title{font-size:13px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--hud-text)}
+.popup-close{background:none;border:1px solid transparent;color:var(--hud-text-dim);
+  font-size:15px;line-height:1;cursor:pointer;padding:6px 9px;border-radius:6px;
+  transition:all .15s}
+.popup-close:hover{color:#fff;border-color:var(--hud-border-hov);
+  box-shadow:0 0 12px var(--hud-glow)}
+.pop-search{margin:12px 18px 4px;padding:9px 13px;width:calc(100% - 36px);
+  background:rgba(255,255,255,.05);border:1px solid var(--hud-border);
+  border-radius:8px;color:var(--hud-text);font-size:13px;font-family:inherit;
+  outline:none;transition:border-color .15s,box-shadow .15s}
+.pop-search::placeholder{color:var(--hud-text-faint)}
+.pop-search:focus{border-color:var(--hud-border-hov);
+  box-shadow:0 0 14px var(--hud-glow)}
+#pop-body{overflow-y:auto;flex:1;padding-bottom:10px}

@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.084  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.085  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -421,18 +421,6 @@
   // Baja un nivel (más profundo).
   function bajarNivel(){
     if(_bloqueado) return;
-
-    // v7.084 — POPUP CONCEPTO huerfano: solo tiene sentido con el
-    // form RAW abierto. Si quedo con .show sin form (cambio de vista,
-    // cierre del form con popup abierto), cerrarlo.
-    var _popC = document.getElementById('popup-concepto');
-    if(_popC && _popC.classList.contains('show')){
-      var _dd = document.getElementById('entrada-dropdown');
-      if(!_dd || !_dd.classList.contains('show')){
-        _popC.classList.remove('show');
-      }
-    }
-
     sync();
     if(_nivel >= NIVEL_MAX) return;
     _bloqueado = true;
@@ -958,6 +946,18 @@
     if(!esEscritorio()) return;
     if(document.hidden) return;
     if(_bloqueado) return;   // v7.075 — jamás interferir con una transición en curso
+
+    // v7.085 — POPUP CONCEPTO huerfano (ahora SI en el watchdog; en
+    // v7.084 quedo por error dentro de bajarNivel y solo corria al
+    // bajar de nivel). El popup solo tiene sentido con el form RAW
+    // abierto: si quedo con .show sin form, cerrarlo.
+    var _popC = document.getElementById('popup-concepto');
+    if(_popC && _popC.classList.contains('show')){
+      var _dd = document.getElementById('entrada-dropdown');
+      if(!_dd || !_dd.classList.contains('show')){
+        _popC.classList.remove('show');
+      }
+    }
 
     // v7.077 — el cosmos es el fondo de TODOS los niveles. Si por
     // cualquier camino no está corriendo (p.ej. pestaña tocada antes
