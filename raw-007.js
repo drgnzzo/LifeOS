@@ -1,17 +1,43 @@
-/* RAW Entry — Agente 007 v.1.0 (Q + espía integrados)
+/* RAW Entry — Agente 007 v.1.1 (Q + espía integrados)
    ═══════════════════════════════════════════════════════════════════
    Sistema oficial de debugging de LifeOS. Duerme hasta que se invoca.
    USO en consola:
      q007()        → corre Q (check de entrega) y deja a 007 en misión
      q007.stop()   → retira al agente
      q007.ver      → versión del agente
+   v1.1: sensores de fluidez — fps (banda de cuadros/seg), jsErr
+   (contador de errores JS en vivo), cfSlots (mapa de slots del
+   carrusel: cada card y su posición -3…+3 relativa al centro).
    Claude actualiza este archivo con sensores nuevos en cada entrega
    que lo requiera, igual que cualquier otro archivo del proyecto.
    ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
-  var VER = '007 v1.0 · esperado app v7.096';
+  var VER = '007 v1.1 · esperado app v7.097';
   var _id = null;
+
+  /* errores JS: contador pasivo desde la carga (peso cero) */
+  var _jsErr = 0, _ultimoErr = '';
+  window.addEventListener('error', function(e){
+    _jsErr++;
+    _ultimoErr = (e.message||'?').slice(0,80);
+  });
+
+  /* FPS: solo mide cuando 007 está en misión */
+  var _fps = '·', _fpsRAF = null;
+  function medirFPS(){
+    var cuadros = 0, t0 = performance.now();
+    (function tick(){
+      cuadros++;
+      var dt = performance.now() - t0;
+      if(dt >= 500){
+        var f = Math.round(cuadros * 1000 / dt);
+        _fps = f >= 55 ? '60' : f >= 40 ? '45' : f >= 25 ? '30' : '<25!';
+        cuadros = 0; t0 = performance.now();
+      }
+      _fpsRAF = requestAnimationFrame(tick);
+    })();
+  }
 
   function Q(){
     var L = ['══ Q · ' + VER + ' ══'];
@@ -22,6 +48,7 @@
         var e0 = window._coverflow.estado();
         L.push('  muerto: ' + e0.muerto + ' | fallos: ' + e0.fallos);
         L.push('  aro (' + (e0.aro||[]).length + '): ' + (e0.aro||[]).join(' → '));
+        if(e0.slots) L.push('  slots: ' + e0.slots);
       } catch(e){}
     }
     try {
@@ -30,6 +57,7 @@
     } catch(e){ L.push('Compuerta: error'); }
     L.push('Tokens HUD: ' + (getComputedStyle(document.documentElement)
       .getPropertyValue('--hud-form-bg').trim() ? '✅' : '❌'));
+    L.push('Errores JS desde carga: ' + _jsErr + (_ultimoErr ? ' (último: '+_ultimoErr+')' : ''));
     console.log(L.join('\n'));
   }
 
@@ -54,9 +82,11 @@
       exp: window._hudExpanded ? window._hudExpanded.id : 'no',
       cfOn: String(!!c2.activo),
       girando: String(!!c2.girando),
-      clones: (c2.clones||[]).join('|'),
+      cfSlots: c2.slots || '·',
       aroOcultas: String(document.querySelectorAll('.hud-pnl[data-cf-ring]').length),
       cfFallos: String(c2.fallos||0) + (c2.muerto ? '☠' : ''),
+      fps: _fps,
+      jsErr: String(_jsErr),
       form: dd ? String(dd.classList.contains('show')) : '-',
       popup: pc ? String(pc.classList.contains('show')) : '-'
     };
@@ -65,6 +95,8 @@
   function q007(){
     Q();
     if(_id) clearInterval(_id);
+    if(_fpsRAF) cancelAnimationFrame(_fpsRAF);
+    medirFPS();
     var prev = {};
     _id = setInterval(function(){
       var a = sensores();
@@ -75,11 +107,13 @@
         prev = a;
       }
     }, 150);
-    console.log('▶ 007 en misión. Retirar: q007.stop()');
+    console.log('▶ 007 v1.1 en misión (con FPS y radar de errores). Retirar: q007.stop()');
     return VER;
   }
   q007.stop = function(){
-    if(_id){ clearInterval(_id); _id = null; console.log('🕴 007 retirado.'); }
+    if(_id){ clearInterval(_id); _id = null; }
+    if(_fpsRAF){ cancelAnimationFrame(_fpsRAF); _fpsRAF = null; _fps='·'; }
+    console.log('🕴 007 retirado.');
   };
   q007.ver = VER;
   window.q007 = q007;

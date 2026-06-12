@@ -1,19 +1,22 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.095 (carrusel 5 cards + giro 3D)
+/* RAW Entry — Cover Flow Nivel 1 v.7.098 (marcos persistentes + rocola)
    ╔══════════════════════════════════════════════════════════════════╗
-   ║ "Estoy dentro del dial y las cards giran a mi alrededor"          ║
+   ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
+   ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
    ╚══════════════════════════════════════════════════════════════════╝
-   · 5 cards: central (expansión nativa) + 2 marcos por lado. La 2a
-     capa asoma detrás de la 1a, más pequeña y profunda.
-   · Inclinación rotateY (±16° capa 1, ±26° capa 2) con perspectiva.
-   · GIRO direccional: al navegar todo se desliza un slot con rotación
-     (cf-turn-izq/der) y re-encaja con snap invisible. Sin fades.
-   · CLONES dignos: prefieren .hud-expanded-content si tiene datos;
-     si no, compacta SIN placeholders ("Ver detalle completo" etc.);
-     si no queda nada, panel de marca (título+color). JAMÁS upscale.
-   · Sin recálculo de geometría durante niv-warp (fix "achurradas").
-   · La navegación no se libera hasta confirmar niv-1 (fix flash de
-     compactas que 007 capturó en 92.2s/128.8s/153.4s).
-   · Barras top/bottom atenuadas en cf-on (foco en el carrusel).
+   · Slots relativos al centro: -3…+3 (camino corto con módulo).
+     0 = geometría del centro con opacity 0 (el marco viaja AL centro
+     y se funde con la expansión nativa: continuidad del giro).
+     ±1 visibles grandes (±20°), ±2 detrás (±32°, tenues),
+     ±3 fuera del viewport (entran/salen deslizándose, jamás "pop").
+   · Navegar reasigna slots: CSS interpola left/top/size/ángulo/
+     opacidad de TODOS a la vez (.5s). Sin clases de turn, sin snap.
+   · El overlay del dial se vela durante el giro (adiós parpadeo en
+     la esquina que 007 documentó).
+   · ROCOLA: mantener presionada una flecha encadena giros continuos
+     (ticker 120ms que respeta _navegando: dispara el siguiente paso
+     en cuanto el anterior libera; suelta y se detiene donde va).
+   · Clon por marco montado al entrar al rango visible; se refresca
+     solo al reentrar (datos al día sin cortes visibles).
    Reglas vigentes: cero escrituras sobre cards reales, cero
    MutationObserver, cero hook de _reposicionarHUD, cortacircuitos.
 */
@@ -21,72 +24,69 @@
   'use strict';
 
   try {
-    document.documentElement.classList.remove('coverflow-on','cf-on','cf-girando','cf-turn-izq','cf-turn-der','cf-snap');
+    document.documentElement.classList.remove('coverflow-on','cf-on','cf-girando','cf-turn-izq','cf-turn-der','cf-snap','cf-nav');
     document.querySelectorAll('[data-cf],[data-cf-ring],[data-cf-center]').forEach(function(el){
       el.removeAttribute('data-cf'); el.removeAttribute('data-cf-ring'); el.removeAttribute('data-cf-center');
     });
-    ['coverflow-css','cf4-css','cf5-css','cf6-css'].forEach(function(id){
+    ['coverflow-css','cf4-css','cf5-css','cf6-css','cf7-css'].forEach(function(id){
       var n=document.getElementById(id); if(n&&n.parentNode) n.parentNode.removeChild(n);
     });
-    document.querySelectorAll('.cf-arrows,.cf4-ghost,.cf4-arrow,.cf5-ghost,.cf5-arrow,.cf6-ghost,.cf6-arrow').forEach(function(n){
+    document.querySelectorAll('.cf-arrows,.cf4-ghost,.cf4-arrow,.cf5-ghost,.cf5-arrow,.cf6-ghost,.cf6-arrow,.cf7-ghost,.cf7-arrow').forEach(function(n){
       if(n.parentNode) n.parentNode.removeChild(n);
     });
   } catch(e){}
 
   if(window.innerWidth < 900) return;
 
-  /* ════════ CSS ════════ */
   var css = document.createElement('style');
-  css.id = 'cf6-css';
+  css.id = 'cf7-css';
   css.textContent =
     'html.cf-on .hud-pnl[data-cf-ring]{opacity:0 !important;visibility:hidden !important;'+
       'pointer-events:none !important;transition:opacity .3s ease,visibility 0s linear .3s}'+
-    /* foco: top/bottom atenuadas sin moverlas */
     'html.cf-on .hud-pnl:not([data-cf-center]):not([data-cf-ring]){opacity:.3;'+
       'transition:opacity .35s ease}'+
-    /* marcos del carrusel */
-    '.cf6-ghost{position:fixed;overflow:hidden;cursor:pointer;'+
+    /* vela del dial durante el giro: adiós parpadeo de esquina */
+    'html.cf-nav #dial-overlay{opacity:0 !important;transition:opacity .15s ease !important}'+
+    '.cf7-ghost{position:fixed;overflow:hidden;cursor:pointer;'+
       'background:var(--hud-form-bg);'+
-      'border:1px solid var(--cf6-col,var(--hud-border));'+
+      'border:1px solid var(--cf7-col,var(--hud-border));'+
       'background-image:linear-gradient(var(--hud-grid-color) 1px,transparent 1px),'+
         'linear-gradient(90deg,var(--hud-grid-color) 1px,transparent 1px);'+
       'background-size:var(--hud-grid-size) var(--hud-grid-size);'+
-      'box-shadow:0 0 30px rgba(0,0,0,.65),0 0 18px var(--cf6-glow,transparent);'+
+      'box-shadow:0 0 30px rgba(0,0,0,.65),0 0 18px var(--cf7-glow,transparent);'+
       'opacity:0;pointer-events:none;'+
-      'transform:perspective(1400px) translateX(var(--turnX,0px)) rotateY(var(--rotY,0deg));'+
-      'transition:opacity .35s ease,left .38s cubic-bezier(.3,.8,.35,1),'+
-        'top .3s ease,width .3s ease,height .3s ease,'+
-        'transform .38s cubic-bezier(.3,.8,.35,1)}'+
-    'html.cf-on .cf6-ghost.capa-1{opacity:.92;pointer-events:auto;z-index:9040}'+
-    'html.cf-on .cf6-ghost.capa-2{opacity:.5;pointer-events:auto;z-index:9034}'+
-    '.cf6-ghost:hover{opacity:1 !important}'+
-    /* giro: todo se desliza un slot en la dirección */
-    'html.cf-turn-der .cf6-ghost{--turnX:-150px}'+
-    'html.cf-turn-izq .cf6-ghost{--turnX:150px}'+
-    'html.cf-snap .cf6-ghost{transition:none !important}'+
-    '.cf6-wrap{position:absolute;left:0;top:30px;transform-origin:top left;'+
+      'transform:perspective(1500px) rotateY(var(--rotY,0deg));'+
+      'transition:left .5s cubic-bezier(.22,.9,.3,1),top .5s cubic-bezier(.22,.9,.3,1),'+
+        'width .5s cubic-bezier(.22,.9,.3,1),height .5s cubic-bezier(.22,.9,.3,1),'+
+        'transform .5s cubic-bezier(.22,.9,.3,1),opacity .4s ease}'+
+    'html.cf-on .cf7-ghost[data-slot="1"],html.cf-on .cf7-ghost[data-slot="-1"]{'+
+      'opacity:.92;pointer-events:auto;z-index:9040}'+
+    'html.cf-on .cf7-ghost[data-slot="2"],html.cf-on .cf7-ghost[data-slot="-2"]{'+
+      'opacity:.5;pointer-events:auto;z-index:9034}'+
+    'html.cf-on .cf7-ghost[data-slot="0"]{opacity:0;pointer-events:none;z-index:9030}'+
+    '.cf7-ghost:hover{opacity:1 !important}'+
+    '.cf7-wrap{position:absolute;left:0;top:30px;transform-origin:top left;'+
       'pointer-events:none;filter:saturate(.6) brightness(.82);width:100%}'+
-    '.cf6-pos{position:absolute;top:8px;left:0;right:0;text-align:center;'+
+    '.cf7-pos{position:absolute;top:8px;left:0;right:0;text-align:center;'+
       'font-size:10px;letter-spacing:.14em;text-transform:uppercase;'+
       'color:var(--hud-text-dim);z-index:2;text-shadow:0 0 6px #000;pointer-events:none}'+
-    '.cf6-brand{display:flex;flex-direction:column;align-items:center;'+
+    '.cf7-brand{display:flex;flex-direction:column;align-items:center;'+
       'justify-content:center;gap:12px;height:100%;padding:20px}'+
-    '.cf6-brand-dot{width:14px;height:14px;border-radius:50%;'+
-      'background:var(--cf6-col);box-shadow:0 0 14px var(--cf6-col)}'+
-    '.cf6-brand-tit{font-size:16px;font-weight:700;letter-spacing:.1em;'+
+    '.cf7-brand-dot{width:14px;height:14px;border-radius:50%;'+
+      'background:var(--cf7-col);box-shadow:0 0 14px var(--cf7-col)}'+
+    '.cf7-brand-tit{font-size:16px;font-weight:700;letter-spacing:.1em;'+
       'text-transform:uppercase;color:var(--hud-text);text-align:center}'+
-    '.cf6-brand-sub{font-size:11px;color:var(--hud-text-dim);text-align:center}'+
-    '.cf6-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:9060;'+
+    '.cf7-brand-sub{font-size:11px;color:var(--hud-text-dim);text-align:center}'+
+    '.cf7-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:9060;'+
       'width:42px;height:74px;display:flex;align-items:center;justify-content:center;'+
       'background:rgba(10,7,22,.7);border:1px solid var(--hud-border);'+
       'color:var(--hud-text-dim);font-size:20px;cursor:pointer;user-select:none;'+
       'opacity:0;pointer-events:none;transition:opacity .3s,border-color .2s,color .2s}'+
-    'html.cf-on .cf6-arrow{opacity:1;pointer-events:auto}'+
-    '.cf6-arrow:hover{border-color:var(--hud-border-hov);color:#fff;box-shadow:0 0 16px var(--hud-glow)}'+
-    '.cf6-arrow.izq{left:12px}.cf6-arrow.der{right:12px}';
+    'html.cf-on .cf7-arrow{opacity:1;pointer-events:auto}'+
+    '.cf7-arrow:hover{border-color:var(--hud-border-hov);color:#fff;box-shadow:0 0 16px var(--hud-glow)}'+
+    '.cf7-arrow.izq{left:12px}.cf7-arrow.der{right:12px}';
   document.head.appendChild(css);
 
-  /* ════════ ESTADO ════════ */
   var SIDES = { 'left-1':0,'left-2':1,'right-1':2,'right-2':3 };
   var COLORES = {
     'hud-patrimonio':'#22C55E','hud-necesidades':'#A855F7','hud-bitacora':'#C084FC',
@@ -102,8 +102,8 @@
     'hud-activity':['Activity+Logros','Hábitos y rachas']
   };
   var PLACEHOLDERS = /^(VER DETALLE COMPLETO|TABLA Y GRÁFICO AL EXPANDIR|VER ANÁLISIS|ABRIR BITÁCORA|VER RESUMEN FINANCIERO|IR A ACTIVITY CHECK)$/i;
-  var F = {};                       // marcos: L2,L1,R1,R2
-  var _cloneIds = {};               // marco -> id clonado
+  var MARCOS = {};          // id de card -> marco persistente
+  var _fresco = {};         // id -> id del centro cuando se montó (refresh al reentrar)
   var _fallos=0,_muerto=false,_navegando=false;
   var _aL=null,_aR=null;
 
@@ -119,57 +119,79 @@
       });
   }
 
-  /* ════════ MARCOS ════════ */
-  function _mkGhost(clave, lado, capa, pasos){
+  function marcoDe(cardEl){
+    if(MARCOS[cardEl.id]) return MARCOS[cardEl.id];
     var g = document.createElement('div');
-    g.className = 'cf6-ghost lado-'+lado+' capa-'+capa;
-    g.innerHTML = '<div class="cf6-pos"></div><div class="cf6-wrap"></div>';
-    g.addEventListener('click', function(){ navegar(lado==='izq' ? -pasos : +pasos); });
+    g.className = 'cf7-ghost';
+    g.innerHTML = '<div class="cf7-pos"></div><div class="cf7-wrap"></div>';
+    var col = COLORES[cardEl.id] || '#8b5cf6';
+    g.style.setProperty('--cf7-col', col);
+    g.style.setProperty('--cf7-glow', col+'55');
+    g.addEventListener('click', function(){
+      var d = parseInt(g.getAttribute('data-slot')||'0',10);
+      if(d !== 0) navegar(d);
+    });
     document.body.appendChild(g);
-    F[clave] = g;
+    MARCOS[cardEl.id] = g;
     return g;
   }
-  function asegurarUI(){
-    if(!F.L1) _mkGhost('L1','izq',1,1);
-    if(!F.L2) _mkGhost('L2','izq',2,2);
-    if(!F.R1) _mkGhost('R1','der',1,1);
-    if(!F.R2) _mkGhost('R2','der',2,2);
-    if(!_aL){ _aL=document.createElement('div'); _aL.className='cf6-arrow izq'; _aL.textContent='◀';
-      _aL.addEventListener('click',function(){ navegar(-1); }); document.body.appendChild(_aL); }
-    if(!_aR){ _aR=document.createElement('div'); _aR.className='cf6-arrow der'; _aR.textContent='▶';
-      _aR.addEventListener('click',function(){ navegar(+1); }); document.body.appendChild(_aR); }
+  // Rocola: presionar dispara ya; mantener encadena giros hasta soltar.
+  var _rocolaID = null;
+  function _rocolaStart(dir){
+    _rocolaStop();
+    navegar(dir);
+    _rocolaID = setInterval(function(){
+      if(_muerto){ _rocolaStop(); return; }
+      if(!_navegando) navegar(dir);
+    }, 120);
   }
+  function _rocolaStop(){
+    if(_rocolaID){ clearInterval(_rocolaID); _rocolaID = null; }
+  }
+  function _mkFlecha(clase, simbolo, dir){
+    var f = document.createElement('div');
+    f.className = 'cf7-arrow ' + clase;
+    f.textContent = simbolo;
+    f.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      try{ f.setPointerCapture(e.pointerId); }catch(e2){}
+      _rocolaStart(dir);
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+      f.addEventListener(ev, _rocolaStop);
+    });
+    document.body.appendChild(f);
+    return f;
+  }
+  function asegurarFlechas(){
+    if(!_aL) _aL = _mkFlecha('izq', '◀', -1);
+    if(!_aR) _aR = _mkFlecha('der', '▶', +1);
+  }
+  window.addEventListener('blur', _rocolaStop);
 
-  // Clon digno: expandido > compacta sin placeholders > panel de marca.
-  function montarClon(g, cardEl, etiqueta, innerW){
-    var col = COLORES[cardEl.id] || '#8b5cf6';
-    g.style.setProperty('--cf6-col', col);
-    g.style.setProperty('--cf6-glow', col+'55');
-    g.querySelector('.cf6-pos').textContent = etiqueta;
-    var wrap = g.querySelector('.cf6-wrap');
+  function montarClon(g, cardEl, innerW){
+    var wrap = g.querySelector('.cf7-wrap');
     wrap.innerHTML = '';
     wrap.style.transform = '';
+    var col = COLORES[cardEl.id] || '#8b5cf6';
 
     function neutralizar(n){
-      n.removeAttribute('id');
-      n.removeAttribute('data-cf-ring');
-      n.removeAttribute('data-cf-center');
+      n.removeAttribute('id'); n.removeAttribute('data-cf-ring'); n.removeAttribute('data-cf-center');
       n.classList.remove('hud-pnl','hud-expanded');
       n.querySelectorAll('[id]').forEach(function(x){ x.removeAttribute('id'); });
       return n;
     }
-    function copiarCanvas(origRoot, dupRoot){
+    function copiarCanvas(o, d){
       try {
-        var o=origRoot.querySelectorAll('canvas'), d=dupRoot.querySelectorAll('canvas');
-        for(var i=0;i<o.length&&i<d.length;i++){
-          d[i].width=o[i].width; d[i].height=o[i].height;
-          var ctx=d[i].getContext('2d');
-          if(ctx&&o[i].width>0) ctx.drawImage(o[i],0,0);
+        var a=o.querySelectorAll('canvas'), b=d.querySelectorAll('canvas');
+        for(var i=0;i<a.length&&i<b.length;i++){
+          b[i].width=a[i].width; b[i].height=a[i].height;
+          var ctx=b[i].getContext('2d');
+          if(ctx&&a[i].width>0) ctx.drawImage(a[i],0,0);
         }
       } catch(e){}
     }
 
-    // 1) Contenido EXPANDIDO si tiene datos reales
     var expC = cardEl.querySelector('.hud-expanded-content');
     if(expC && expC.textContent.trim().length > 60){
       var info = NOMBRES[cardEl.id] || [cardEl.id,''];
@@ -188,8 +210,6 @@
       copiarCanvas(expC, body);
       return;
     }
-
-    // 2) Compacta SIN placeholders
     var c = neutralizar(cardEl.cloneNode(true));
     Array.prototype.slice.call(c.querySelectorAll('*')).forEach(function(n){
       var t = (n.textContent||'').trim();
@@ -203,76 +223,85 @@
         'pointer-events:none;margin:0;left:auto;top:auto';
       wrap.appendChild(c);
       copiarCanvas(cardEl, c);
-      var escala = Math.min(1, innerW / wReal);   // JAMÁS upscale
-      if(escala < 1) wrap.style.transform = 'scale('+escala.toFixed(3)+')';
+      var esc = Math.min(1, innerW / wReal);
+      if(esc < 1) wrap.style.transform = 'scale('+esc.toFixed(3)+')';
       else c.style.margin = '0 auto';
       return;
     }
-
-    // 3) Panel de marca (nunca un esqueleto con "ver detalle")
     var info2 = NOMBRES[cardEl.id] || [cardEl.id,''];
-    wrap.innerHTML = '<div class="cf6-brand">'+
-      '<span class="cf6-brand-dot"></span>'+
-      '<span class="cf6-brand-tit">'+info2[0]+'</span>'+
-      '<span class="cf6-brand-sub">'+info2[1]+'</span></div>';
+    wrap.innerHTML = '<div class="cf7-brand"><span class="cf7-brand-dot"></span>'+
+      '<span class="cf7-brand-tit">'+info2[0]+'</span>'+
+      '<span class="cf7-brand-sub">'+info2[1]+'</span></div>';
     wrap.style.height='100%';
   }
 
-  /* ════════ APLICAR ════════ */
+  // Geometría de cada slot relativo al centro.
+  function slotGeo(d, r){
+    var vw = window.innerWidth;
+    var w1 = Math.min(470, Math.max(300, r.width*0.46));
+    var h1 = Math.round(r.height*0.88);
+    var w2 = Math.round(w1*0.8), h2 = Math.round(h1*0.84);
+    var t1 = Math.max(60, r.top + (r.height-h1)/2);
+    var t2 = Math.max(60, r.top + (r.height-h2)/2);
+    if(d === 0)  return { w:Math.round(r.width), h:Math.round(r.height), top:Math.round(r.top), left:Math.round(r.left), rot:0 };
+    if(d === -1) return { w:w1,h:h1,top:t1, left:Math.max(4, r.left - w1 + 28), rot:+20 };
+    if(d === +1) return { w:w1,h:h1,top:t1, left:Math.min(vw-w1-4, r.right - 28), rot:-20 };
+    if(d === -2) return { w:w2,h:h2,top:t2, left:Math.max(2, r.left - w1 + 28 - Math.round(w2*0.5)), rot:+32 };
+    if(d === +2) return { w:w2,h:h2,top:t2, left:Math.min(vw-w2-2, r.right - 28 + Math.round(w1*0.5)), rot:-32 };
+    if(d < 0)    return { w:w2,h:h2,top:t2, left:-w2-80, rot:+40 };
+    return             { w:w2,h:h2,top:t2, left:vw+80,  rot:-40 };
+  }
+
+  var _slots = {};   // id -> slot actual (para q007)
+
   function aplicar(){
     if(_muerto) return;
     try {
       var h = document.documentElement;
-      if(h.classList.contains('niv-warp')) return;   // geometría en vuelo: no medir
+      if(h.classList.contains('niv-warp')) return;
       var centro = window._hudExpanded || null;
       var activo = h.classList.contains('niv-1') && centro && esLateral(centro);
 
       if(!activo){
-        if(_navegando) return;                        // sostener durante el giro
+        if(_navegando) return;
         if(h.classList.contains('cf-on')) limpiar();
         return;
       }
-
       var aro = anillo();
-      if(aro.length < 2){ limpiar(); return; }
+      var n = aro.length;
+      if(n < 2){ limpiar(); return; }
       var idx = aro.indexOf(centro);
       if(idx < 0){ limpiar(); return; }
 
-      asegurarUI();
-      var n = aro.length;
-      var vecinos = {
-        L1: aro[(idx-1+n)%n], L2: aro[(idx-2+n)%n],
-        R1: aro[(idx+1)%n],   R2: aro[(idx+2)%n]
-      };
-
+      asegurarFlechas();
       aro.forEach(function(el){
         if(el === centro){ el.removeAttribute('data-cf-ring'); el.setAttribute('data-cf-center','1'); }
         else { el.removeAttribute('data-cf-center'); el.setAttribute('data-cf-ring','1'); }
       });
 
       var r = centro.getBoundingClientRect();
-      if(r.width < 300) return;                       // esperar geometría estable
-      var w1 = Math.min(470, Math.max(300, r.width*0.46));
-      var h1 = Math.round(r.height*0.88);
-      var w2 = Math.round(w1*0.8), h2 = Math.round(h1*0.84);
-      var t1 = Math.max(60, r.top + (r.height-h1)/2);
-      var t2 = Math.max(60, r.top + (r.height-h2)/2);
-      var geo = {
-        L1: { w:w1,h:h1,top:t1, left: Math.max(4, r.left - w1 + 28),            rot:+16 },
-        R1: { w:w1,h:h1,top:t1, left: Math.min(window.innerWidth-w1-4, r.right - 28), rot:-16 },
-        L2: { w:w2,h:h2,top:t2, left: Math.max(2, r.left - w1 + 28 - Math.round(w2*0.5)), rot:+26 },
-        R2: { w:w2,h:h2,top:t2, left: Math.min(window.innerWidth-w2-2, r.right - 28 + Math.round(w1*0.5)), rot:-26 }
-      };
-      ['L1','R1','L2','R2'].forEach(function(k){
-        var g=F[k], q=geo[k];
+      if(r.width < 300) return;
+
+      aro.forEach(function(card, i){
+        var d = ((i - idx) % n + n) % n;          // 0..n-1
+        if(d > n/2) d -= n;                       // camino corto: -3..+3
+        var g = marcoDe(card);
+        var q = slotGeo(d, r);
+        g.setAttribute('data-slot', String(d));
         g.style.width=q.w+'px'; g.style.height=q.h+'px';
         g.style.left=q.left+'px'; g.style.top=q.top+'px';
         g.style.setProperty('--rotY', q.rot+'deg');
-        if(_cloneIds[k] !== vecinos[k].id){
-          var pos = aro.indexOf(vecinos[k])+1;
-          var lbl = (k[0]==='L' ? '◀ ' : '') + pos + ' / ' + n + (k[0]==='R' ? ' ▶' : '');
-          montarClon(g, vecinos[k], lbl, q.w - 4);
-          _cloneIds[k] = vecinos[k].id;
+        _slots[card.id] = d;
+        // Clon: montar/refrescar al entrar al rango visible
+        if(Math.abs(d) <= 2 && d !== 0){
+          if(_fresco[card.id] !== centro.id){
+            var pos = i+1;
+            g.querySelector('.cf7-pos').textContent =
+              (d<0 ? '◀ ' : '') + pos + ' / ' + n + (d>0 ? ' ▶' : '');
+            // refrescar contenido solo si el wrap está vacío o cambió el centro
+            montarClon(g, card, q.w - 4);
+            _fresco[card.id] = centro.id;
+          }
         }
       });
 
@@ -290,16 +319,12 @@
 
   function limpiar(){
     var h = document.documentElement;
-    h.classList.remove('cf-on','cf-turn-izq','cf-turn-der','cf-snap');
+    h.classList.remove('cf-on','cf-nav');
     document.querySelectorAll('.hud-pnl[data-cf-ring],.hud-pnl[data-cf-center]')
       .forEach(function(el){ el.removeAttribute('data-cf-ring'); el.removeAttribute('data-cf-center'); });
-    _cloneIds = {};
-    Object.keys(F).forEach(function(k){
-      var w=F[k] && F[k].querySelector('.cf6-wrap'); if(w) w.innerHTML='';
-    });
+    _slots = {};
   }
 
-  /* ════════ NAVEGAR — giro con confirmación de niv-1 ════════ */
   function navegar(delta){
     if(_muerto || _navegando) return;
     var centro = window._hudExpanded;
@@ -311,38 +336,27 @@
     if(!destino || destino === centro) return;
     _navegando = true;
     var h = document.documentElement;
-    h.classList.add(delta>0 ? 'cf-turn-der' : 'cf-turn-izq');
+    h.classList.add('cf-nav');                    // vela del dial
     try {
+      if(typeof window._hudCollapse === 'function') window._hudCollapse();
       setTimeout(function(){
-        try{ if(typeof window._hudCollapse==='function') window._hudCollapse(); }catch(e){}
-        setTimeout(function(){
-          try{ if(typeof window._hudExpand==='function') window._hudExpand(destino); }catch(e){}
-          // No liberar hasta confirmar niv-1 (fix flash de compactas)
-          var intentos = 0;
-          (function release(){
-            intentos++;
-            if(h.classList.contains('niv-1') || intentos > 14){
-              aplicar();                                   // nuevos vecinos
-              h.classList.add('cf-snap');                  // snap invisible
-              h.classList.remove('cf-turn-izq','cf-turn-der');
-              requestAnimationFrame(function(){
-                requestAnimationFrame(function(){
-                  h.classList.remove('cf-snap');
-                  _navegando = false;
-                  aplicar();
-                });
-              });
-            } else setTimeout(release, 60);
-          })();
-        }, 70);
-      }, 130);                                             // se aprecia el arranque del giro
+        try{ if(typeof window._hudExpand === 'function') window._hudExpand(destino); }catch(e){}
+        var intentos = 0;
+        (function release(){
+          intentos++;
+          if(h.classList.contains('niv-1') || intentos > 14){
+            _navegando = false;
+            aplicar();                            // slots nuevos → todo se desliza
+            setTimeout(function(){ h.classList.remove('cf-nav'); }, 140);
+          } else setTimeout(release, 60);
+        })();
+      }, 40);
     } catch(e){
       _navegando = false;
-      h.classList.remove('cf-turn-izq','cf-turn-der','cf-snap');
+      h.classList.remove('cf-nav');
     }
   }
 
-  /* ════════ REACTIVIDAD ════════ */
   function hookear(){
     if(typeof window._hudExpand === 'function' && !window._hudExpand._cf4){
       var oe = window._hudExpand;
@@ -372,10 +386,12 @@
       var aro = anillo();
       return {
         activo: document.documentElement.classList.contains('cf-on'),
-        girando: /cf-turn/.test(document.documentElement.className),
+        girando: _navegando,
         muerto: _muerto, fallos: _fallos,
         centro: window._hudExpanded ? window._hudExpanded.id : null,
-        clones: [_cloneIds.L2,_cloneIds.L1,_cloneIds.R1,_cloneIds.R2],
+        slots: Object.keys(_slots).map(function(k){
+          return k.replace('hud-','').slice(0,3)+':'+_slots[k];
+        }).join(' '),
         aro: aro.map(function(el){ return el.id; })
       };
     },
