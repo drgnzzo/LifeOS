@@ -1,26 +1,18 @@
-/* RAW Entry — Loading Web v.7.103 (anillo cyber + espectro)
+/* RAW Entry — Loading Web v.7.104 (anillo cyber por funcion)
    ╔══════════════════════════════════════════════════════════════════╗
-   ║ FASE v7.103 — LOADING CIBERNETICO CENTRAL                         ║
+   ║ Cada funcion corre su PROPIO 0→100%. Termina, glitch de            ║
+   ║ interferencia, arranca la siguiente desde 0 con nuevo color.       ║
+   ║ Espectro infrarrojo→ultravioleta repartido entre N funciones.      ║
+   ║ Tipografia tipo terminal monoespaciada en TODO el HUD del loading. ║
+   ║ Fondo del cosmos y el loading entran con fade suave (cero golpes). ║
+   ║ Lineas de interferencia y scanlines detras del anillo (cyber).     ║
    ╚══════════════════════════════════════════════════════════════════╝
-   En el centro (donde luego ira el dial) aparece un anillo cyber con:
-     · Nombre de la funcion que esta computando (en mayusculas)
-     · Porcentaje grande (sincronizado con la promesa real de api.getAll)
-     · Tres puntos animados ".." mientras espera
-     · Anillo de progreso con color del espectro (infrarrojo→ultravioleta)
-   Las funciones se distribuyen en el espectro segun cuantas haya:
-     2 funciones → [rojo, violeta]
-     7 funciones → [rojo, naranja, amarillo, verde, cian, azul, violeta]
-     N funciones → N pasos del HSL 0° → 280°
-   Cada funcion se muestra unos segundos con efecto glitch de cambio.
-   Cuando api.getAll() resuelve, el porcentaje salta a 100, el anillo
-   destella y se desvanece. Despues entran las cards (clase hud-listo).
 */
 (function(){
   'use strict';
-  if(window.innerWidth < 900) return;   // solo escritorio
+  if(window.innerWidth < 900) return;
 
   // ── Funciones a mostrar (orden de aparicion visual) ──
-  // Nombres simples y obvios, no nombres tecnicos de codigo.
   var FUNCIONES = [
     'Patrimonio',
     'Necesidades',
@@ -32,89 +24,143 @@
   ];
 
   // ── Espectro infrarrojo → ultravioleta ──
-  // Repartimos HSL de 0° (rojo) a 280° (violeta) entre las N funciones.
   function colorAt(idx, total){
-    if(total <= 1) return 'hsl(280, 80%, 60%)';
+    if(total <= 1) return 'hsl(280, 80%, 62%)';
     var h = Math.round(280 * (idx / (total - 1)));
-    return 'hsl(' + h + ', 85%, 60%)';
+    return 'hsl(' + h + ', 88%, 62%)';
   }
 
   // ── Estado ──
-  var _root, _ring, _ringProgress, _nombre, _pct, _puntos;
+  var _root, _ring, _ringExt, _nombre, _pct, _puntos, _scanlines;
   var _idx = 0;
-  var _progreso = 0;
+  var _pctActual = 0;
   var _terminado = false;
-  var _intervaloRotacion = null;
+  var _apiResuelto = false;
   var _intervaloProgreso = null;
   var _idleTimer = null;
+  var SIZE = 260, R_PROG = 110, R_EXT = 128, C_PROG = 2 * Math.PI * R_PROG, C_EXT = 2 * Math.PI * R_EXT;
+
+  // ── Fade global del fondo + loading ──
+  // Apaga el body al inicio; lo enciende cuando ya pinto el loading.
+  function fadeInicial(){
+    var st = document.createElement('style');
+    st.id = 'loading-fade-style';
+    st.textContent =
+      'html.lc-prepare body{opacity:0;transition:opacity .6s ease}'+
+      'html.lc-ready  body{opacity:1}';
+    document.head.appendChild(st);
+    document.documentElement.classList.add('lc-prepare');
+  }
+  function quitarFadeInicial(){
+    document.documentElement.classList.remove('lc-prepare');
+    document.documentElement.classList.add('lc-ready');
+  }
 
   // ── Construir UI ──
   function construir(){
+    // Fuente terminal solo dentro del loading (excepcion local)
+    var st = document.createElement('style');
+    st.id = 'loading-cyber-style';
+    st.textContent =
+      '@keyframes lcScan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}'+
+      '@keyframes lcInterf{0%,100%{opacity:.10}45%{opacity:.30}55%{opacity:.08}}'+
+      '@keyframes lcRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'+
+      '#loading-cyber{font-family:"JetBrains Mono","Fira Code",ui-monospace,Menlo,monospace}'+
+      '#loading-cyber .lc-grid{position:absolute;inset:0;border-radius:50%;overflow:hidden;'+
+        'opacity:.16;pointer-events:none;'+
+        'background:repeating-linear-gradient(0deg,currentColor 0 1px,transparent 1px 4px);'+
+        'animation:lcInterf 2.8s ease-in-out infinite}'+
+      '#loading-cyber .lc-scan{position:absolute;left:0;right:0;height:2px;'+
+        'background:linear-gradient(90deg,transparent,currentColor,transparent);'+
+        'opacity:.5;filter:blur(.4px);animation:lcScan 2.2s linear infinite}';
+    document.head.appendChild(st);
+
     _root = document.createElement('div');
     _root.id = 'loading-cyber';
+    var col0 = colorAt(0, FUNCIONES.length);
     _root.style.cssText = [
       'position:fixed','left:50%','top:50%','transform:translate(-50%,-50%)',
-      'width:280px','height:280px','z-index:100000','pointer-events:none',
-      'display:flex','align-items:center','justify-content:center',
-      'transition:opacity .6s ease, transform .6s ease'
+      'width:'+SIZE+'px','height:'+SIZE+'px','z-index:100000','pointer-events:none',
+      'color:'+col0,
+      'opacity:0','transition:opacity .55s ease, transform .55s ease'
     ].join(';');
 
-    // Anillo SVG
-    var SIZE = 240, R = 105, C = 2 * Math.PI * R;
     _root.innerHTML =
+      // Interferencia horizontal (scanlines tenues recortados al circulo)
+      '<div class="lc-grid"></div>'+
+      // Scanline horizontal que cruza
+      '<div class="lc-scan" style="top:48%"></div>'+
+      // SVG con anillos
       '<svg width="'+SIZE+'" height="'+SIZE+'" viewBox="0 0 '+SIZE+' '+SIZE+'" '+
-        'style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">'+
-        // Anillo exterior tenue (decorativo)
-        '<circle cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+(R+18)+'" '+
-          'fill="none" stroke="rgba(167,139,250,0.18)" stroke-width="1"/>'+
-        // Pista de fondo
-        '<circle cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+R+'" '+
-          'fill="none" stroke="rgba(120,120,180,0.18)" stroke-width="3"/>'+
-        // Anillo de progreso (se anima)
-        '<circle id="lc-ring" cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+R+'" '+
-          'fill="none" stroke="'+colorAt(0, FUNCIONES.length)+'" stroke-width="4" '+
+        'style="position:absolute;inset:0">'+
+        // Anillo exterior tenue, decorativo (orbita)
+        '<circle cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+(R_EXT+8)+'" '+
+          'fill="none" stroke="currentColor" stroke-width="1" opacity="0.18"/>'+
+        // Anillo exterior con marcas tipo radar
+        '<g stroke="currentColor" stroke-width="1" opacity="0.45">'+
+          dibujarMarcas(SIZE/2, SIZE/2, R_EXT-2, R_EXT+4, 48)+
+        '</g>'+
+        // Anillo exterior animado (rotando, decorativo)
+        '<circle id="lc-ext" cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+R_EXT+'" '+
+          'fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.55" '+
+          'stroke-dasharray="3 18" '+
+          'style="transform-origin:50% 50%;animation:lcRotate 14s linear infinite"/>'+
+        // Pista del progreso (tenue)
+        '<circle cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+R_PROG+'" '+
+          'fill="none" stroke="currentColor" stroke-width="3" opacity="0.18"/>'+
+        // Anillo de progreso real (el que avanza con el %)
+        '<circle id="lc-ring" cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+R_PROG+'" '+
+          'fill="none" stroke="currentColor" stroke-width="4" '+
           'stroke-linecap="round" '+
-          'stroke-dasharray="'+C.toFixed(2)+'" '+
-          'stroke-dashoffset="'+C.toFixed(2)+'" '+
+          'stroke-dasharray="'+C_PROG.toFixed(2)+'" '+
+          'stroke-dashoffset="'+C_PROG.toFixed(2)+'" '+
           'transform="rotate(-90 '+(SIZE/2)+' '+(SIZE/2)+')" '+
-          'style="transition:stroke-dashoffset .5s cubic-bezier(.3,.8,.4,1), stroke .5s ease; '+
+          'style="transition:stroke-dashoffset .35s cubic-bezier(.3,.8,.4,1); '+
             'filter:drop-shadow(0 0 8px currentColor)"/>'+
-        // Marcas tipo radar (decorativo)
-        '<g stroke="rgba(180,180,220,0.25)" stroke-width="1">'+
-          dibujarMarcas(SIZE/2, SIZE/2, R-12, R-6, 24)+
+        // Marcas internas tipo dial
+        '<g stroke="currentColor" stroke-width="1" opacity="0.35">'+
+          dibujarMarcas(SIZE/2, SIZE/2, R_PROG-10, R_PROG-4, 24)+
         '</g>'+
       '</svg>'+
-      // Texto centrado
-      '<div style="position:relative;display:flex;flex-direction:column;'+
-        'align-items:center;justify-content:center;gap:6px;'+
-        'font-family:Manrope,-apple-system,sans-serif;text-align:center">'+
-        '<div id="lc-nombre" style="font-size:13px;font-weight:600;'+
-          'letter-spacing:0.25em;color:'+colorAt(0, FUNCIONES.length)+';'+
-          'text-transform:uppercase;text-shadow:0 0 12px currentColor;'+
-          'transition:color .5s ease, opacity .25s ease, transform .25s ease">'+
+      // Texto centrado: nombre + porcentaje + puntos
+      '<div style="position:absolute;inset:0;display:flex;flex-direction:column;'+
+        'align-items:center;justify-content:center;gap:8px;text-align:center;'+
+        'pointer-events:none">'+
+        '<div id="lc-nombre" style="font-size:12px;font-weight:600;'+
+          'letter-spacing:0.32em;color:currentColor;text-transform:uppercase;'+
+          'text-shadow:0 0 14px currentColor;font-family:inherit;'+
+          'transition:opacity .2s ease, transform .2s ease, filter .2s ease">'+
           FUNCIONES[0].toUpperCase()+
         '</div>'+
-        '<div id="lc-pct" style="font-size:42px;font-weight:300;'+
-          'font-family:JetBrains Mono,ui-monospace,monospace;'+
-          'color:#d8d8f0;letter-spacing:0.04em;text-shadow:0 0 14px rgba(167,139,250,0.4);'+
-          'font-variant-numeric:tabular-nums">0%</div>'+
-        '<div id="lc-puntos" style="font-size:18px;letter-spacing:0.4em;'+
-          'color:rgba(167,139,250,0.7);font-family:JetBrains Mono,monospace;'+
-          'height:20px">...</div>'+
+        '<div id="lc-pct" style="font-size:44px;font-weight:400;'+
+          'color:currentColor;letter-spacing:0.06em;'+
+          'text-shadow:0 0 14px currentColor;'+
+          'font-variant-numeric:tabular-nums;line-height:1;'+
+          'font-family:inherit">00%</div>'+
+        '<div id="lc-puntos" style="font-size:14px;letter-spacing:0.5em;'+
+          'color:currentColor;opacity:0.7;height:16px;font-family:inherit">...</div>'+
       '</div>';
 
     document.body.appendChild(_root);
     _ring = _root.querySelector('#lc-ring');
+    _ringExt = _root.querySelector('#lc-ext');
     _nombre = _root.querySelector('#lc-nombre');
     _pct = _root.querySelector('#lc-pct');
     _puntos = _root.querySelector('#lc-puntos');
 
-    // Animar los puntos (visual de actividad)
-    var pasoP = 0;
+    // Pintar entrada suave
+    requestAnimationFrame(function(){
+      _root.style.opacity = '1';
+      _root.style.transform = 'translate(-50%,-50%) scale(1)';
+      quitarFadeInicial();
+    });
+
+    // Animar puntos
+    var p = 0;
     _idleTimer = setInterval(function(){
       if(!_puntos) return;
-      pasoP = (pasoP + 1) % 4;
-      _puntos.textContent = '.'.repeat(pasoP) + '\u00a0'.repeat(3 - pasoP);
+      p = (p + 1) % 4;
+      _puntos.textContent = '.'.repeat(p) + '\u00a0'.repeat(3 - p);
     }, 350);
   }
 
@@ -132,58 +178,89 @@
     return out;
   }
 
-  // ── Rotacion de nombres con efecto glitch cyber ──
-  function rotarNombre(){
-    if(_terminado || !_nombre) return;
-    _idx = (_idx + 1) % FUNCIONES.length;
-    var col = colorAt(_idx, FUNCIONES.length);
-    // Glitch: fade out + leve desplazamiento + fade in con nuevo color
-    _nombre.style.opacity = '0';
-    _nombre.style.transform = 'translateX(-4px)';
+  // ── Pintar % en anillo + numero ──
+  function pintar(p){
+    if(!_ring || !_pct) return;
+    var offset = C_PROG * (1 - p / 100);
+    _ring.setAttribute('stroke-dashoffset', offset.toFixed(2));
+    var n = Math.max(0, Math.min(100, Math.round(p)));
+    _pct.textContent = (n < 10 ? '0' : '') + n + '%';
+  }
+
+  // ── Cambiar a la funcion siguiente con glitch ──
+  function siguienteFuncion(){
+    if(_terminado) return;
+    // Glitch out (interferencia): el % se "rompe", anillo destella
+    if(_nombre){
+      _nombre.style.filter = 'blur(2px) hue-rotate(60deg)';
+      _nombre.style.opacity = '0';
+      _nombre.style.transform = 'translateX(-3px)';
+    }
+    if(_pct){
+      _pct.style.filter = 'blur(1px)';
+      _pct.style.opacity = '0.3';
+    }
+    if(_ring) _ring.style.filter = 'drop-shadow(0 0 14px currentColor) drop-shadow(0 0 22px currentColor)';
+
     setTimeout(function(){
-      if(!_nombre) return;
-      _nombre.textContent = FUNCIONES[_idx].toUpperCase();
-      _nombre.style.color = col;
-      _nombre.style.transform = 'translateX(4px)';
-      _nombre.style.opacity = '1';
+      if(_terminado) return;
+      _idx = (_idx + 1) % FUNCIONES.length;
+      _pctActual = 0;
+      var col = colorAt(_idx, FUNCIONES.length);
+      // currentColor en el root cambia → todo (ring/text/glow) cambia a la vez
+      _root.style.color = col;
+      if(_nombre){
+        _nombre.textContent = FUNCIONES[_idx].toUpperCase();
+        _nombre.style.transform = 'translateX(3px)';
+        // Reset visual
+        _nombre.style.opacity = '1';
+        _nombre.style.filter = '';
+      }
+      if(_pct){
+        _pct.style.opacity = '1';
+        _pct.style.filter = '';
+      }
+      pintar(0);
       setTimeout(function(){
         if(_nombre) _nombre.style.transform = 'translateX(0)';
+        if(_ring) _ring.style.filter = 'drop-shadow(0 0 8px currentColor)';
       }, 60);
-      // El anillo TAMBIEN cambia de color al ritmo del nombre
-      if(_ring) _ring.style.stroke = col;
-    }, 250);
+    }, 240);
   }
 
-  // ── Progreso "honesto-de-mentira" sincronizable ──
-  // Si la promesa real resuelve, salta a 100. Mientras tanto, asintota a 92.
+  // ── Avance del % de la funcion actual ──
+  // Cada funcion sube 0→100 en ~1.4s con curva suave. Al llegar a 100,
+  // pausa breve y salta a la siguiente (glitch). Si api ya resolvio y
+  // ya estamos en la ultima funcion, termina.
   function pasoProgreso(){
     if(_terminado) return;
-    var t = _progreso / 100;
-    var v;
-    if(t < 0.30)      v = 1.4;
-    else if(t < 0.65) v = 0.75;
-    else if(t < 0.85) v = 0.30;
-    else              v = 0.07;
-    _progreso = Math.min(92, _progreso + v);
-    pintarProgreso(_progreso);
-  }
-  function pintarProgreso(p){
-    if(!_ring || !_pct) return;
-    var R = 105, C = 2 * Math.PI * R;
-    var offset = C * (1 - p / 100);
-    _ring.setAttribute('stroke-dashoffset', offset.toFixed(2));
-    _pct.textContent = Math.round(p) + '%';
+    // Velocidad: lleva una funcion completa a 100 en ~1.4s (~17 pasos a 90ms)
+    var v = 6;
+    _pctActual = Math.min(100, _pctActual + v);
+    pintar(_pctActual);
+    if(_pctActual >= 100){
+      // Esta funcion llego al 100. ¿Es la ultima Y el api ya resolvio?
+      if(_apiResuelto && _idx === FUNCIONES.length - 1){
+        clearInterval(_intervaloProgreso);
+        terminar();
+        return;
+      }
+      // Si no, pasa a la siguiente con glitch
+      clearInterval(_intervaloProgreso);
+      setTimeout(function(){
+        siguienteFuncion();
+        _intervaloProgreso = setInterval(pasoProgreso, 90);
+      }, 380);
+    }
   }
 
-  // ── Terminar ──
+  // ── Terminar (api resolvio Y la ultima funcion llego al 100) ──
   function terminar(){
     if(_terminado) return;
     _terminado = true;
     if(_intervaloProgreso) clearInterval(_intervaloProgreso);
-    if(_intervaloRotacion) clearInterval(_intervaloRotacion);
     if(_idleTimer) clearInterval(_idleTimer);
-    pintarProgreso(100);
-    // Destello final y desvanecer
+    // Destello final
     if(_ring){
       _ring.style.filter = 'drop-shadow(0 0 18px currentColor) drop-shadow(0 0 32px currentColor)';
     }
@@ -193,43 +270,73 @@
         _root.style.opacity = '0';
         _root.style.transform = 'translate(-50%,-50%) scale(0.92)';
       }
-    }, 220);
+    }, 260);
     setTimeout(function(){
       if(_root && _root.parentNode) _root.parentNode.removeChild(_root);
-    }, 1400);
+      var st = document.getElementById('loading-cyber-style');
+      if(st && st.parentNode) st.parentNode.removeChild(st);
+      var st2 = document.getElementById('loading-fade-style');
+      if(st2 && st2.parentNode) st2.parentNode.removeChild(st2);
+    }, 1500);
   }
 
-  // ── Engancharse a api.getAll() para terminar HONESTO ──
+  // ── Engancharse a TODAS las llamadas api.* del arranque ──
+  // Contamos cuantas promesas se disparan y cuantas resuelven. El %
+  // de cada funcion visible avanza coherente con ese ratio: si el
+  // 60% de las promesas resolvio, todas las funciones (en conjunto)
+  // han avanzado el 60% en la realidad. La funcion VISIBLE actual
+  // muestra su 0→100 sincronizada con ese ratio.
+  var _disparadas = 0, _resueltas = 0;
   function engancharApi(){
-    if(!window.api || typeof window.api.getAll !== 'function'){
-      return setTimeout(engancharApi, 60);
+    if(!window.api){ return setTimeout(engancharApi, 50); }
+    // Envolver TODAS las funciones api.getX como contador
+    Object.keys(window.api).forEach(function(k){
+      var fn = window.api[k];
+      if(typeof fn !== 'function' || k.indexOf('get') !== 0) return;
+      if(fn._lcEnvuelto) return;
+      var envuelto = function(){
+        var p = fn.apply(this, arguments);
+        if(p && typeof p.then === 'function'){
+          _disparadas++;
+          p.then(function(){ _resueltas++; })
+           .catch(function(){ _resueltas++; });
+        }
+        return p;
+      };
+      envuelto._lcEnvuelto = true;
+      window.api[k] = envuelto;
+    });
+    // Tambien marcar resuelto cuando getAll termine (senal explicita)
+    if(window.api.getAll && !window.api.getAll._loadingEnvuelto){
+      var origAll = window.api.getAll;
+      var envAll = function(){
+        var p = origAll.apply(this, arguments);
+        if(p && typeof p.then === 'function' && !envAll._ya){
+          envAll._ya = true;
+          p.then(function(){ _apiResuelto = true; })
+           .catch(function(){ _apiResuelto = true; });
+        }
+        return p;
+      };
+      envAll._loadingEnvuelto = true;
+      // Preservar el wrapper del contador
+      if(window.api.getAll._lcEnvuelto) envAll._lcEnvuelto = true;
+      window.api.getAll = envAll;
     }
-    if(window.api.getAll._loadingEnvuelto) return;
-    var orig = window.api.getAll;
-    var envuelto = function(){
-      var p = orig.apply(this, arguments);
-      if(p && typeof p.then === 'function' && !envuelto._yaDisparado){
-        envuelto._yaDisparado = true;
-        p.then(function(){ terminar(); })
-         .catch(function(){ terminar(); });
-      }
-      return p;
-    };
-    envuelto._loadingEnvuelto = true;
-    window.api.getAll = envuelto;
   }
 
   // ── Arranque ──
   function init(){
     construir();
     _intervaloProgreso = setInterval(pasoProgreso, 90);
-    // Rotacion cada 1.4s — alcanza a mostrar cada funcion en una carga normal (~7s)
-    _intervaloRotacion = setInterval(rotarNombre, 1400);
     engancharApi();
-    // Salvavidas: 14s sin api → terminar para no atascar al usuario
-    setTimeout(function(){ if(!_terminado) terminar(); }, 14000);
+    // Salvavidas: 18s sin api → terminar para no atascar al usuario
+    setTimeout(function(){
+      if(!_terminado){ _apiResuelto = true; terminar(); }
+    }, 18000);
   }
 
+  fadeInicial();
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', init);
   } else {
