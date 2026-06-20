@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.106
+/* RAW Entry — Overlay v.7.107
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -8215,7 +8215,32 @@ window.addEventListener('DOMContentLoaded',()=>{
   //   t=2900   slots vacíos
   //   t=3300   dial canvas
   //   t=4800   cleanup + vida
-  abrirDial();
+  // v7.107 — APERTURA INICIAL ENGANCHADA A hud-listo (la del loading).
+  // El parche v7.106 cubrio una llamada secundaria pero ESTA, la
+  // apertura inicial real, seguia disparando abrirDial al instante
+  // que termina el DOMContentLoaded — antes que las promesas paralelas
+  // (getNutricion, getNecesidades, getNotas...) hayan resuelto. Ahora
+  // esperamos a hud-listo que el loading marca cuando _resueltas >=
+  // _disparadas. Si por alguna razon no hay loading (movil, error),
+  // salvavidas de 18s para no atorar al usuario.
+  (function _aperturaInicialGated(){
+    var html = document.documentElement;
+    if(html.classList.contains('hud-listo')){ abrirDial(); return; }
+    var obs = new MutationObserver(function(){
+      if(html.classList.contains('hud-listo')){
+        obs.disconnect();
+        abrirDial();
+      }
+    });
+    obs.observe(html, { attributes: true, attributeFilter: ['class'] });
+    setTimeout(function(){
+      try { obs.disconnect(); } catch(e){}
+      if(!html.classList.contains('hud-listo')){
+        html.classList.add('hud-listo');
+        abrirDial();
+      }
+    }, 18000);
+  })();
 
   // v5.144: hacer fade-out del splash SINCRONIZADO con el fade-in del
   // overlay para evitar el "flash gris" entre que se quita el splash y
