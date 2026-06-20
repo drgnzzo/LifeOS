@@ -1,31 +1,37 @@
-/* RAW Entry — Agente 007 v.1.1 (Q + espía integrados)
+/* RAW Entry — Agente 007 v.1.2 (autoarranque ligero)
    ═══════════════════════════════════════════════════════════════════
-   Sistema oficial de debugging de LifeOS. Duerme hasta que se invoca.
-   USO en consola:
-     q007()        → corre Q (check de entrega) y deja a 007 en misión
-     q007.stop()   → retira al agente
-     q007.ver      → versión del agente
-   v1.1: sensores de fluidez — fps (banda de cuadros/seg), jsErr
-   (contador de errores JS en vivo), cfSlots (mapa de slots del
-   carrusel: cada card y su posición -3…+3 relativa al centro).
-   Claude actualiza este archivo con sensores nuevos en cada entrega
-   que lo requiera, igual que cualquier otro archivo del proyecto.
+   v1.2 — AUTOARRANQUE LIGERO desde el segundo cero:
+     · El espia arranca solo a los 800ms del DOMContentLoaded.
+     · Tick a 250ms (vs 150ms antes) — menor presion sobre el hilo.
+     · Sin rAF continuo de FPS (queda bajo demanda con q007.fps()).
+     · SILENCIOSO al inicio: no imprime Q ni nada. Solo registra
+       cambios reales en su buffer interno (window._007log).
+   USO:
+     q007()        → enciende verbose: imprime Q completo + cambios en vivo
+     q007.stop()   → retira por completo (apaga buffer y verbose)
+     q007.fps()    → activa el medidor de FPS (rAF) bajo demanda
+     q007.log      → ver buffer interno (ultimos 200 eventos)
+     q007.ver      → version del agente
    ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
-  var VER = '007 v1.1 · esperado app v7.097';
+  var VER = '007 v1.2 · esperado app v7.103';
   var _id = null;
+  var _verbose = false;
+  var _buffer = [];           // historial circular de cambios
+  var BUFFER_MAX = 200;
 
-  /* errores JS: contador pasivo desde la carga (peso cero) */
+  /* Contador pasivo de errores JS (peso cero, siempre activo) */
   var _jsErr = 0, _ultimoErr = '';
   window.addEventListener('error', function(e){
     _jsErr++;
     _ultimoErr = (e.message||'?').slice(0,80);
   });
 
-  /* FPS: solo mide cuando 007 está en misión */
+  /* FPS bajo demanda — solo arranca si q007.fps() lo enciende */
   var _fps = '·', _fpsRAF = null;
   function medirFPS(){
+    if(_fpsRAF) return;
     var cuadros = 0, t0 = performance.now();
     (function tick(){
       cuadros++;
@@ -37,6 +43,9 @@
       }
       _fpsRAF = requestAnimationFrame(tick);
     })();
+  }
+  function detenerFPS(){
+    if(_fpsRAF){ cancelAnimationFrame(_fpsRAF); _fpsRAF = null; _fps = '·'; }
   }
 
   function Q(){
@@ -58,6 +67,7 @@
     L.push('Tokens HUD: ' + (getComputedStyle(document.documentElement)
       .getPropertyValue('--hud-form-bg').trim() ? '✅' : '❌'));
     L.push('Errores JS desde carga: ' + _jsErr + (_ultimoErr ? ' (último: '+_ultimoErr+')' : ''));
+    L.push('Buffer interno: ' + _buffer.length + ' eventos (q007.log)');
     console.log(L.join('\n'));
   }
 
@@ -92,29 +102,67 @@
     };
   }
 
-  function q007(){
-    Q();
+  var _prev = {};
+  function tick(){
+    var a = sensores();
+    var c = Object.keys(a).filter(function(k){ return a[k] !== _prev[k]; });
+    if(c.length){
+      var linea = (performance.now()/1000).toFixed(1) + 's  ' +
+        c.map(function(k){ return k + ': ' + (_prev[k]||'·') + '→' + a[k]; }).join(' | ');
+      // Siempre al buffer
+      _buffer.push(linea);
+      if(_buffer.length > BUFFER_MAX) _buffer.shift();
+      // Verbose: tambien a consola
+      if(_verbose) console.log('🔄 ' + linea);
+      _prev = a;
+    }
+  }
+
+  function arrancarTick(intervalo){
     if(_id) clearInterval(_id);
-    if(_fpsRAF) cancelAnimationFrame(_fpsRAF);
-    medirFPS();
-    var prev = {};
-    _id = setInterval(function(){
-      var a = sensores();
-      var c = Object.keys(a).filter(function(k){ return a[k] !== prev[k]; });
-      if(c.length){
-        console.log('🔄 ' + (performance.now()/1000).toFixed(1) + 's  ' +
-          c.map(function(k){ return k + ': ' + (prev[k]||'·') + '→' + a[k]; }).join(' | '));
-        prev = a;
-      }
-    }, 150);
-    console.log('▶ 007 v1.1 en misión (con FPS y radar de errores). Retirar: q007.stop()');
+    _id = setInterval(tick, intervalo);
+  }
+
+  function q007(){
+    _verbose = true;
+    Q();
+    // Subir ritmo cuando se enciende verbose (vigilancia activa)
+    arrancarTick(150);
+    console.log('▶ 007 v1.2 verbose ACTIVO. Retirar: q007.stop()');
+    console.log('  Buffer previo (' + _buffer.length + ' eventos) en q007.log');
     return VER;
   }
   q007.stop = function(){
     if(_id){ clearInterval(_id); _id = null; }
-    if(_fpsRAF){ cancelAnimationFrame(_fpsRAF); _fpsRAF = null; _fps='·'; }
-    console.log('🕴 007 retirado.');
+    detenerFPS();
+    _verbose = false;
+    console.log('🕴 007 retirado por completo.');
+  };
+  q007.fps = function(){
+    medirFPS();
+    console.log('📊 FPS encendido. Apagar: q007.stop() o reiniciar verbose.');
   };
   q007.ver = VER;
+  Object.defineProperty(q007, 'log', {
+    get: function(){
+      console.log('── Buffer 007 (' + _buffer.length + ' eventos) ──');
+      _buffer.forEach(function(l){ console.log('  ' + l); });
+      return _buffer.length + ' eventos impresos';
+    }
+  });
   window.q007 = q007;
+
+  // ── AUTOARRANQUE LIGERO ──
+  // Tras DOMContentLoaded + 800ms, arrancar el tick silencioso a 250ms.
+  // Asi capturamos el arranque sin pesar en el hilo durante la carga.
+  function autoArrancar(){
+    setTimeout(function(){
+      if(!_id) arrancarTick(250);
+    }, 800);
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', autoArrancar);
+  } else {
+    autoArrancar();
+  }
 })();

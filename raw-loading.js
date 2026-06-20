@@ -1,127 +1,217 @@
-/* RAW Entry — Loading Web v.7.064
+/* RAW Entry — Loading Web v.7.103 (anillo cyber + espectro)
    ╔══════════════════════════════════════════════════════════════════╗
-   ║ FASE v7.064 — ARRANQUE FLUIDO EN WEB                             ║
+   ║ FASE v7.103 — LOADING CIBERNETICO CENTRAL                         ║
    ╚══════════════════════════════════════════════════════════════════╝
-   El problema: al arrancar la app en web, el navegador tiene que:
-     1. Construir el dial y el cosmos.
-     2. Construir 14 cards HUD con SVG corners, estilos, listeners.
-     3. Llamar 8 endpoints de Apps Script en paralelo (~3-6 segundos).
-     4. Renderizar los datos en cada card.
-   Todo eso peleando por el mismo hilo. Resultado: web se siente lenta
-   los primeros segundos. En móvil esto no pasa porque las cards son
-   shells vacíos (v7.060) — el cosmos se respira limpio.
-
-   La solución: aplicar el patrón móvil al arranque web.
-     · Las cards .hud-pnl nacen con opacity:0 + pointer-events:none.
-     · Una BARRA DE PROGRESO sutil arriba del dial indica "cargando".
-     · Cuando los datos llegan (api.getAll() resuelve), la barra hace
-       un destello breve, el <html> recibe la clase .hud-listo, y las
-       cards aparecen con una CASCADA suave (cada una con un retraso
-       de 80ms — sensación orquestada, no popping).
-   Solo escritorio. Móvil ya está bien.
-
-   La barra es "honesta-de-mentira": avanza con curva suave fingiendo
-   progreso real. No mide computo, pero el usuario tampoco lo nota —
-   solo nota que la app SE SIENTE viva en vez de quieta.
+   En el centro (donde luego ira el dial) aparece un anillo cyber con:
+     · Nombre de la funcion que esta computando (en mayusculas)
+     · Porcentaje grande (sincronizado con la promesa real de api.getAll)
+     · Tres puntos animados ".." mientras espera
+     · Anillo de progreso con color del espectro (infrarrojo→ultravioleta)
+   Las funciones se distribuyen en el espectro segun cuantas haya:
+     2 funciones → [rojo, violeta]
+     7 funciones → [rojo, naranja, amarillo, verde, cian, azul, violeta]
+     N funciones → N pasos del HSL 0° → 280°
+   Cada funcion se muestra unos segundos con efecto glitch de cambio.
+   Cuando api.getAll() resuelve, el porcentaje salta a 100, el anillo
+   destella y se desvanece. Despues entran las cards (clase hud-listo).
 */
 (function(){
   'use strict';
+  if(window.innerWidth < 900) return;   // solo escritorio
 
-  // Solo escritorio. Móvil tiene su propia experiencia fluida.
-  if(window.innerWidth < 900) return;
+  // ── Funciones a mostrar (orden de aparicion visual) ──
+  // Nombres simples y obvios, no nombres tecnicos de codigo.
+  var FUNCIONES = [
+    'Patrimonio',
+    'Necesidades',
+    'Bitacora',
+    'Fijos',
+    'Financiero',
+    'Variables',
+    'Activity'
+  ];
+
+  // ── Espectro infrarrojo → ultravioleta ──
+  // Repartimos HSL de 0° (rojo) a 280° (violeta) entre las N funciones.
+  function colorAt(idx, total){
+    if(total <= 1) return 'hsl(280, 80%, 60%)';
+    var h = Math.round(280 * (idx / (total - 1)));
+    return 'hsl(' + h + ', 85%, 60%)';
+  }
 
   // ── Estado ──
-  var _barra;
-  var _pista;
-  var _progreso = 0;        // 0 a 100
+  var _root, _ring, _ringProgress, _nombre, _pct, _puntos;
+  var _idx = 0;
+  var _progreso = 0;
   var _terminado = false;
-  var _rafProgreso = 0;
+  var _intervaloRotacion = null;
+  var _intervaloProgreso = null;
+  var _idleTimer = null;
 
-  /* ── Construir la UI ──────────────────────────────────────────── */
-  function construirBarra(){
-    // Pista fina arriba (estilo Apple/Linear)
-    _pista = document.createElement('div');
-    _pista.id = 'loading-track';
-    _pista.style.cssText = [
-      'position:fixed','top:0','left:0','right:0','height:2px',
-      'background:rgba(139,92,246,0.06)','z-index:100000',
-      'pointer-events:none','transition:opacity .55s ease'
+  // ── Construir UI ──
+  function construir(){
+    _root = document.createElement('div');
+    _root.id = 'loading-cyber';
+    _root.style.cssText = [
+      'position:fixed','left:50%','top:50%','transform:translate(-50%,-50%)',
+      'width:280px','height:280px','z-index:100000','pointer-events:none',
+      'display:flex','align-items:center','justify-content:center',
+      'transition:opacity .6s ease, transform .6s ease'
     ].join(';');
 
-    _barra = document.createElement('div');
-    _barra.id = 'loading-bar';
-    _barra.style.cssText = [
-      'position:absolute','top:0','left:0','height:100%','width:0%',
-      'background:linear-gradient(90deg, rgba(167,139,250,0.85) 0%, rgba(34,211,238,0.85) 100%)',
-      'box-shadow:0 0 14px rgba(167,139,250,0.6)',
-      'transition:width .35s cubic-bezier(.4,0,.2,1)'
-    ].join(';');
-    _pista.appendChild(_barra);
-    document.body.appendChild(_pista);
+    // Anillo SVG
+    var SIZE = 240, R = 105, C = 2 * Math.PI * R;
+    _root.innerHTML =
+      '<svg width="'+SIZE+'" height="'+SIZE+'" viewBox="0 0 '+SIZE+' '+SIZE+'" '+
+        'style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">'+
+        // Anillo exterior tenue (decorativo)
+        '<circle cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+(R+18)+'" '+
+          'fill="none" stroke="rgba(167,139,250,0.18)" stroke-width="1"/>'+
+        // Pista de fondo
+        '<circle cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+R+'" '+
+          'fill="none" stroke="rgba(120,120,180,0.18)" stroke-width="3"/>'+
+        // Anillo de progreso (se anima)
+        '<circle id="lc-ring" cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+R+'" '+
+          'fill="none" stroke="'+colorAt(0, FUNCIONES.length)+'" stroke-width="4" '+
+          'stroke-linecap="round" '+
+          'stroke-dasharray="'+C.toFixed(2)+'" '+
+          'stroke-dashoffset="'+C.toFixed(2)+'" '+
+          'transform="rotate(-90 '+(SIZE/2)+' '+(SIZE/2)+')" '+
+          'style="transition:stroke-dashoffset .5s cubic-bezier(.3,.8,.4,1), stroke .5s ease; '+
+            'filter:drop-shadow(0 0 8px currentColor)"/>'+
+        // Marcas tipo radar (decorativo)
+        '<g stroke="rgba(180,180,220,0.25)" stroke-width="1">'+
+          dibujarMarcas(SIZE/2, SIZE/2, R-12, R-6, 24)+
+        '</g>'+
+      '</svg>'+
+      // Texto centrado
+      '<div style="position:relative;display:flex;flex-direction:column;'+
+        'align-items:center;justify-content:center;gap:6px;'+
+        'font-family:Manrope,-apple-system,sans-serif;text-align:center">'+
+        '<div id="lc-nombre" style="font-size:13px;font-weight:600;'+
+          'letter-spacing:0.25em;color:'+colorAt(0, FUNCIONES.length)+';'+
+          'text-transform:uppercase;text-shadow:0 0 12px currentColor;'+
+          'transition:color .5s ease, opacity .25s ease, transform .25s ease">'+
+          FUNCIONES[0].toUpperCase()+
+        '</div>'+
+        '<div id="lc-pct" style="font-size:42px;font-weight:300;'+
+          'font-family:JetBrains Mono,ui-monospace,monospace;'+
+          'color:#d8d8f0;letter-spacing:0.04em;text-shadow:0 0 14px rgba(167,139,250,0.4);'+
+          'font-variant-numeric:tabular-nums">0%</div>'+
+        '<div id="lc-puntos" style="font-size:18px;letter-spacing:0.4em;'+
+          'color:rgba(167,139,250,0.7);font-family:JetBrains Mono,monospace;'+
+          'height:20px">...</div>'+
+      '</div>';
+
+    document.body.appendChild(_root);
+    _ring = _root.querySelector('#lc-ring');
+    _nombre = _root.querySelector('#lc-nombre');
+    _pct = _root.querySelector('#lc-pct');
+    _puntos = _root.querySelector('#lc-puntos');
+
+    // Animar los puntos (visual de actividad)
+    var pasoP = 0;
+    _idleTimer = setInterval(function(){
+      if(!_puntos) return;
+      pasoP = (pasoP + 1) % 4;
+      _puntos.textContent = '.'.repeat(pasoP) + '\u00a0'.repeat(3 - pasoP);
+    }, 350);
   }
 
-  /* ── Avance simulado ─────────────────────────────────────────────
-     Curva: avanza rápido al principio, va frenando al acercarse al
-     90%, y se queda esperando ahí hasta que el evento real "terminado"
-     llegue. Así, si los datos tardan más de lo esperado, la barra no
-     se queda fija — sigue moviéndose despacio. */
-  function paso(){
+  function dibujarMarcas(cx, cy, r1, r2, n){
+    var out = '';
+    for(var i = 0; i < n; i++){
+      var ang = (i / n) * Math.PI * 2 - Math.PI / 2;
+      var x1 = cx + r1 * Math.cos(ang);
+      var y1 = cy + r1 * Math.sin(ang);
+      var x2 = cx + r2 * Math.cos(ang);
+      var y2 = cy + r2 * Math.sin(ang);
+      out += '<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" '+
+              'x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"/>';
+    }
+    return out;
+  }
+
+  // ── Rotacion de nombres con efecto glitch cyber ──
+  function rotarNombre(){
+    if(_terminado || !_nombre) return;
+    _idx = (_idx + 1) % FUNCIONES.length;
+    var col = colorAt(_idx, FUNCIONES.length);
+    // Glitch: fade out + leve desplazamiento + fade in con nuevo color
+    _nombre.style.opacity = '0';
+    _nombre.style.transform = 'translateX(-4px)';
+    setTimeout(function(){
+      if(!_nombre) return;
+      _nombre.textContent = FUNCIONES[_idx].toUpperCase();
+      _nombre.style.color = col;
+      _nombre.style.transform = 'translateX(4px)';
+      _nombre.style.opacity = '1';
+      setTimeout(function(){
+        if(_nombre) _nombre.style.transform = 'translateX(0)';
+      }, 60);
+      // El anillo TAMBIEN cambia de color al ritmo del nombre
+      if(_ring) _ring.style.stroke = col;
+    }, 250);
+  }
+
+  // ── Progreso "honesto-de-mentira" sincronizable ──
+  // Si la promesa real resuelve, salta a 100. Mientras tanto, asintota a 92.
+  function pasoProgreso(){
     if(_terminado) return;
     var t = _progreso / 100;
-    var velocidad;
-    if(t < 0.30)      velocidad = 1.6;   // arranque vivo
-    else if(t < 0.65) velocidad = 0.85;
-    else if(t < 0.85) velocidad = 0.35;
-    else              velocidad = 0.08;  // casi en suspenso al final
-    _progreso = Math.min(92, _progreso + velocidad);
-    if(_barra) _barra.style.width = _progreso + '%';
-    _rafProgreso = setTimeout(paso, 90);
+    var v;
+    if(t < 0.30)      v = 1.4;
+    else if(t < 0.65) v = 0.75;
+    else if(t < 0.85) v = 0.30;
+    else              v = 0.07;
+    _progreso = Math.min(92, _progreso + v);
+    pintarProgreso(_progreso);
+  }
+  function pintarProgreso(p){
+    if(!_ring || !_pct) return;
+    var R = 105, C = 2 * Math.PI * R;
+    var offset = C * (1 - p / 100);
+    _ring.setAttribute('stroke-dashoffset', offset.toFixed(2));
+    _pct.textContent = Math.round(p) + '%';
   }
 
-  /* ── Terminar con destello ──────────────────────────────────────
-     Sube la barra a 100% rápido, hace un parpadeo de luz, y luego
-     desvanece la pista entera. */
+  // ── Terminar ──
   function terminar(){
     if(_terminado) return;
     _terminado = true;
-    clearTimeout(_rafProgreso);
-    if(_barra){
-      _barra.style.transition = 'width .35s cubic-bezier(.4,0,.2,1), box-shadow .35s';
-      _barra.style.width = '100%';
-      _barra.style.boxShadow = '0 0 24px rgba(167,139,250,0.95), 0 0 48px rgba(167,139,250,0.5)';
+    if(_intervaloProgreso) clearInterval(_intervaloProgreso);
+    if(_intervaloRotacion) clearInterval(_intervaloRotacion);
+    if(_idleTimer) clearInterval(_idleTimer);
+    pintarProgreso(100);
+    // Destello final y desvanecer
+    if(_ring){
+      _ring.style.filter = 'drop-shadow(0 0 18px currentColor) drop-shadow(0 0 32px currentColor)';
     }
-    // Disparar la cascada de cards: clase .hud-listo en <html>
     setTimeout(function(){
       document.documentElement.classList.add('hud-listo');
+      if(_root){
+        _root.style.opacity = '0';
+        _root.style.transform = 'translate(-50%,-50%) scale(0.92)';
+      }
     }, 220);
-    // Desvanecer la pista
     setTimeout(function(){
-      if(_pista) _pista.style.opacity = '0';
-    }, 700);
-    setTimeout(function(){
-      if(_pista && _pista.parentNode) _pista.parentNode.removeChild(_pista);
+      if(_root && _root.parentNode) _root.parentNode.removeChild(_root);
     }, 1400);
   }
 
-  /* ── Hook: detectar cuándo los datos están listos ───────────────
-     La forma más segura sin tocar raw-core/raw-dashboard: envolver
-     api.getAll() para que cuando resuelva, terminemos el loading. */
+  // ── Engancharse a api.getAll() para terminar HONESTO ──
   function engancharApi(){
     if(!window.api || typeof window.api.getAll !== 'function'){
-      // Reintenta — api se define dentro del closure de raw-core,
-      // puede no estar lista al primer instante.
       return setTimeout(engancharApi, 60);
     }
     if(window.api.getAll._loadingEnvuelto) return;
     var orig = window.api.getAll;
     var envuelto = function(){
       var p = orig.apply(this, arguments);
-      // Cuando termina la PRIMERA carga, disparamos terminar().
-      // Las siguientes llamadas (refrescos) no relanzan loading.
       if(p && typeof p.then === 'function' && !envuelto._yaDisparado){
         envuelto._yaDisparado = true;
         p.then(function(){ terminar(); })
-         .catch(function(){ terminar(); });   // aun con error, quitar barra
+         .catch(function(){ terminar(); });
       }
       return p;
     };
@@ -129,16 +219,15 @@
     window.api.getAll = envuelto;
   }
 
-  /* ── Arranque ────────────────────────────────────────────────── */
+  // ── Arranque ──
   function init(){
-    construirBarra();
-    paso();
+    construir();
+    _intervaloProgreso = setInterval(pasoProgreso, 90);
+    // Rotacion cada 1.4s — alcanza a mostrar cada funcion en una carga normal (~7s)
+    _intervaloRotacion = setInterval(rotarNombre, 1400);
     engancharApi();
-    // Salvavidas: si por lo que sea api.getAll no se llamó en 14s,
-    // terminamos solos para no dejar al usuario con la barra para siempre.
-    setTimeout(function(){
-      if(!_terminado) terminar();
-    }, 14000);
+    // Salvavidas: 14s sin api → terminar para no atascar al usuario
+    setTimeout(function(){ if(!_terminado) terminar(); }, 14000);
   }
 
   if(document.readyState === 'loading'){
