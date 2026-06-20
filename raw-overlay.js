@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.103
+/* RAW Entry — Overlay v.7.106
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -7396,7 +7396,32 @@ function toggleEntradaDropdown(){
     });
   }
   void document.body.offsetHeight; // reflow
-  abrirDial();
+  // v7.106 — SINCRONIZACION DURA CON EL LOADING: el dial entra EXACTAMENTE
+  // cuando el loading dispara hud-listo (todas las promesas resueltas).
+  // Antes, abrirDial corria de inmediato y el dial aparecia mientras
+  // todavia se cargaban datos en paralelo. Ahora:
+  //   · si hud-listo ya esta (rarisimo): abrir ya.
+  //   · si no: observar el atributo class del <html> y abrir cuando llegue.
+  //   · salvavidas 18s por si el loading no se monto (movil, error, etc).
+  function _abrirDialCuandoListo(){
+    var html = document.documentElement;
+    if(html.classList.contains('hud-listo')){ abrirDial(); return; }
+    var observer = new MutationObserver(function(){
+      if(html.classList.contains('hud-listo')){
+        observer.disconnect();
+        abrirDial();
+      }
+    });
+    observer.observe(html, { attributes: true, attributeFilter: ['class'] });
+    setTimeout(function(){
+      try { observer.disconnect(); } catch(e){}
+      if(!html.classList.contains('hud-listo')){
+        html.classList.add('hud-listo');   // fallback
+        abrirDial();
+      }
+    }, 18000);
+  }
+  _abrirDialCuandoListo();
 }
 
 // P-D: Aplicar animaciones de "vida" a TODOS los paneles del overlay:
