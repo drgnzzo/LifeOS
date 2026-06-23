@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.101  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.116  (reposicionar tras warp)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -148,10 +148,22 @@
         ov.style.transform = '';
         ov.style.opacity = '';
       }
-      // v7.084 — solo reposicionar si NO hay card expandida: hacerlo
-      // en nivel 1 provocaba el crece-encoge-crece de la card.
-      if(!window._hudExpanded && typeof window._reposicionarHUD === 'function'){
+      // v7.116 — REPOSICIONAR SIEMPRE al terminar warp. El guard v7.084
+      // (!window._hudExpanded) evitaba el crece-encoge-crece pero causaba
+      // un bug peor: al regresar de nivel 2→1, SIEMPRE hay card expandida
+      // (es el centro del Cover Flow), entonces _reposicionarHUD JAMAS se
+      // llamaba, y la card quedaba con valores intermedios capturados
+      // durante el warp (zonaY=416, zonaH=352 en vez de zonaY=147,
+      // zonaH=623). Confirmado con diagnostico: llamar _reposicionarHUD
+      // manualmente arregla todo.
+      // Llamamos siempre — si causa crece-encoge en algun escenario, ese
+      // se arregla por separado, no a costa de la card aplastada.
+      if(typeof window._reposicionarHUD === 'function'){
         try { window._reposicionarHUD(); } catch(e){}
+        // Tambien forzar el ajuste de tamano expandido si hay card
+        if(window._hudExpanded && typeof window._hudAjustarTamañoExpandido === 'function'){
+          try { window._hudAjustarTamañoExpandido(); } catch(e){}
+        }
       }
     }, 1150);
   }
