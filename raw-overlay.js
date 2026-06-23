@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.112
+/* RAW Entry — Overlay v.7.113
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -4659,13 +4659,7 @@ function _crearDialOverlay(){
       }
     });
     // topMaxH = altura del Sim (la mayor) — usada para calcular colTopY.
-    // v7.103 — GRID FIJO: clamp duro al rango de diseño [50, 220]. Cuando
-    // la barra top esta en transicion (regreso de nivel 2, warp, drop), su
-    // scrollHeight puede medir fuera de rango y descalibrar TODO el HUD
-    // (colTopY se dispara o se colapsa). El rango maximo natural es 200px;
-    // 220 da holgura. Si alguna card real necesita mas, ajustar aqui.
     var topMaxH = Math.max(hUser, hSim, hStats, 50);
-    if(topMaxH > 220) topMaxH = 220;
     // USER y Stats NO se estiran. Solo se centran verticalmente con Sim:
     // aplicamos un transform translateY a sus inline top.
 
@@ -4752,10 +4746,6 @@ function _crearDialOverlay(){
     }
 
     // Medir altura natural de las 4 cards
-    // v7.103 — GRID FIJO: clamp duro al rango [70, 140]. Una card bottom
-    // en transicion (regreso de expandido, cascada de entrada) puede medir
-    // 0, miles o NaN. El rango real de las cards de mision/nivel/logro
-    // ronda 75-95px; 140 da holgura. Si crece mas, se recorta.
     var botH = 0;
     [pMision,pTrack,pLogro,pNivel].forEach(function(hp){
       if(hp && hp.el){
@@ -4763,8 +4753,7 @@ function _crearDialOverlay(){
         if(h>botH) botH = h;
       }
     });
-    if(botH < 70)  botH = 70;
-    if(botH > 140) botH = 140;
+    if(botH===0) botH = 80;
 
     var botY = vH - botPad - botH;
 
