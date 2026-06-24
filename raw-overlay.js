@@ -1,4 +1,11 @@
-/* RAW Entry — Overlay v.7.113
+/* RAW Entry — Overlay v.7.118
+   ╔══════════════════════════════════════════════════════════════════╗
+   ║ v7.118 — FIX cards aplastadas al regresar 2→1 / 1→0.             ║
+   ║   topRowBottom blindado contra _pUser.style.top corrupto durante ║
+   ║   el warp (media animación ~293px → daba zonaH 352px). Ahora     ║
+   ║   detecta top anómalo (>200px) y reconstruye desde geometría     ║
+   ║   estable. Raíz en la fuente (overlay), no en raw-niveles.       ║
+   ╚══════════════════════════════════════════════════════════════════╝
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -4265,8 +4272,36 @@ function _crearDialOverlay(){
     if(expandedEl){
       // Zona disponible verticalmente: entre la fila top (USER/Sim/Stats)
       // y la fila bottom (Misión/Logro/Nivel). El panel se centra ahí.
-      var topRowBottom = parseFloat(_pUser.style.top || 0) +
-                         (_pUser.offsetHeight || 100) + GAP*2;
+      //
+      // ── v7.118 — FIX cards aplastadas al regresar 2→1 / 1→0 ──────────────
+      // CAUSA RAÍZ (cazada con datos, sesión 2026-06-23):
+      //   topRowBottom leía _pUser.style.top, pero durante la transición de
+      //   regreso (warp) ese top está A MEDIA ANIMACIÓN en ~293px (debería
+      //   ser ~22px). Resultado: 293+81+44 = 418 → zonaH = 352px (aplastada).
+      //   El bug disparaba en niv-0, FUERA del guardia de raw-niveles v7.117,
+      //   por eso aquel fix no lo atrapó.
+      // SOLUCIÓN: la fila superior SIEMPRE vive pegada arriba (top ≈ topPad =
+      //   GAP = 22px). Un top > 200px es geométricamente IMPOSIBLE para esa
+      //   fila → es un valor corrupto de media animación. Cuando se detecta,
+      //   reconstruimos topRowBottom desde la geometría ESTABLE (topPad +
+      //   altura natural de la fila top), ignorando el style.top contaminado.
+      var _puTopRaw  = parseFloat(_pUser.style.top || 0);
+      var _puH       = _pUser.offsetHeight || 100;
+      // Altura de la fila superior = la mayor entre _pUser y _pSim (el Sim
+      // banda es el más alto). Se mide directo del DOM (estable, no animado
+      // en el regreso). offsetHeight no depende de la posición animada.
+      var _topRowH   = Math.max(_puH, (_pSim && _pSim.offsetHeight) || _puH);
+      // topPad estable = GAP (mismo valor que usa la rama normal en topY).
+      var _topPadEstable = GAP;
+      // Si el top reportado es sano (fila pegada arriba), usarlo tal cual.
+      // Si es anómalo (>200px → media animación de warp), reconstruir desde
+      // la geometría estable. Umbral 200px: la fila top jamás baja tanto.
+      var topRowBottom;
+      if(_puTopRaw >= 0 && _puTopRaw <= 200){
+        topRowBottom = _puTopRaw + _puH + GAP*2;
+      } else {
+        topRowBottom = _topPadEstable + _topRowH + GAP*2;
+      }
       var botYAvail = vH - 90 - GAP;
       var dialMiniReserva = 80 + GAP*2;
       var zonaH = Math.max(280, botYAvail - dialMiniReserva - topRowBottom);
