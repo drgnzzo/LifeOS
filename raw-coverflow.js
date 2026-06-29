@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.115 (marcos altos pese a centro aplastado)
+/* RAW Entry — Cover Flow Nivel 1 v.7.118 (fix cards fantasma + limpieza en warp)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -282,7 +282,19 @@
     if(_muerto) return;
     try {
       var h = document.documentElement;
-      if(h.classList.contains('niv-warp')) return;
+      if(h.classList.contains('niv-warp')){
+        // v7.118 — FIX cards del coverflow colgadas sobre niv-2.
+        // Durante un warp, si el destino YA no es niv-1 (vamos a niv-0 o
+        // niv-2), limpiar el coverflow de inmediato. Antes solo hacíamos
+        // `return`, dejando cf-on activo y las cards montadas visibles
+        // durante todo el warp ("se quedan unos segundos sobre el nivel 2").
+        // Si el warp sí va a niv-1 (regreso), no limpiamos: dejamos que el
+        // warp termine y aplicar() remonte con la geometría ya estable.
+        if(!h.classList.contains('niv-1') && h.classList.contains('cf-on')){
+          limpiar();
+        }
+        return;
+      }
       var centro = window._hudExpanded || null;
       var activo = h.classList.contains('niv-1') && centro && esLateral(centro);
 
@@ -302,6 +314,18 @@
         if(el === centro){ el.removeAttribute('data-cf-ring'); el.setAttribute('data-cf-center','1'); }
         else { el.removeAttribute('data-cf-center'); el.setAttribute('data-cf-ring','1'); }
       });
+
+      // v7.118 — FIX cards laterales fantasma al regresar a niv-1.
+      // cf-on debe encenderse AQUÍ, en cuanto las cards reciben data-cf-ring,
+      // NO al final de aplicar(). Razón: si la geometría aún no está estable
+      // (regreso de niv-2, resize), abajo hay un `return` que reintenta en
+      // 120ms. Si cf-on se activara solo al final, durante esos reintentos
+      // las cards tendrían data-cf-ring PERO sin cf-on → la regla CSS
+      // `html.cf-on .hud-pnl[data-cf-ring]{opacity:0}` no las ocultaría →
+      // 6 cards laterales sueltas visibles (el bug del auditor: 28 paneles).
+      // Encendiendo cf-on antes del return, las cards quedan ocultas de
+      // inmediato y permanecen así mientras se estabiliza la geometría.
+      h.classList.add('cf-on');
 
       var r = centro.getBoundingClientRect();
       if(r.width < 300) return;

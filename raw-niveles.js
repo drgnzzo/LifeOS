@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.117  (reposicionar tras warp)
+/* RAW Entry — Sistema de Niveles v.7.118  (reset duro + grid invalidado al 1→0)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -498,6 +498,28 @@
       if(window._hudExpanded && typeof window._hudCollapse === 'function'){
         window._hudCollapse();
       }
+      // v7.118 — FIX nivel 0 roto al regresar (dial a la izquierda, cards
+      // aplastadas a media pantalla). Al colapsar 1→0, el panel que estaba
+      // expandido conservaba dimensiones residuales (financiero 163px) y el
+      // _reposicionarHUD post-warp lo capturaba a medio colapsar. Solución:
+      // (1) invalidar el grid para que remida la fila top con pantalla
+      // quieta; (2) reset duro de width/height/top/transform en TODOS los
+      // paneles, para que el reposicionamiento los recalcule desde cero.
+      if(window._GRID) window._GRID.medido = false;
+      (window._hudPanels || []).forEach(function(hp){
+        if(!hp || !hp.el) return;
+        if(hp.el.classList.contains('hud-expanded')) return;
+        hp.el.style.width     = '';
+        hp.el.style.height    = '';
+        hp.el.style.minHeight = '';
+        hp.el.style.maxHeight = '';
+        hp.el.style.transform = '';
+        hp.el.style.clipPath  = '';
+        hp.el._zonaY = undefined;
+        hp.el._zonaH = undefined;
+        var inner = hp.el.querySelector(':scope > [id$="-inner"]');
+        if(inner){ inner.style.minHeight = ''; inner.style.maxHeight = ''; }
+      });
       if(typeof window._dispararWarp === 'function'){
         setTimeout(function(){ window._dispararWarp(-1); }, 120);
       }
@@ -519,6 +541,20 @@
     // reposicionar y podría dejar un overflow residual.
     if(_nivel === 0){
       sanearCards();
+      // v7.118 — tras sanear, forzar un reposicionamiento limpio con el
+      // grid invalidado, para que las cards vuelvan a sus celdas correctas
+      // (no a media pantalla). Se hace escalonado para cubrir el momento
+      // en que la animación de colapso/warp termina.
+      [60, 480, 780].forEach(function(ms){
+        setTimeout(function(){
+          if(_nivel !== 0) return;             // si ya cambió de nivel, abortar
+          if(window._hudExpanded) return;      // si hay algo expandido, no tocar
+          if(window._GRID) window._GRID.medido = false;
+          if(typeof window._reposicionarHUD === 'function'){
+            try { window._reposicionarHUD(); } catch(e){}
+          }
+        }, ms);
+      });
       setTimeout(sanearCards, 480);
       setTimeout(sanearCards, 780);
     }
