@@ -602,14 +602,6 @@
       sanearCards();
       setTimeout(sanearCards, 480);
       setTimeout(sanearCards, 780);
-      // v7.118 — SANADOR DETERMINISTA DE NIVEL 0.
-      // El log de la trampa probó que _reposicionarHUD deja el layout BIEN
-      // (user.top 46, patrim 134), pero algo rezagado (cascada/warp/timing)
-      // mueve las cards a Y=822 DESPUÉS. En vez de cazar al culpable, nos
-      // aseguramos de tener la última palabra: tras cerrar la ventana del
-      // warp (1150ms), forzamos reset duro + reposicionamiento limpio, y lo
-      // repetimos un par de veces para ganarle a cualquier código tardío.
-      _sanarNivel0Determinista();
     }
     // Lock generoso: cubre la animación de v6 (~600ms) para que no se
     // encadenen transiciones por inercia del scroll.

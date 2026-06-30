@@ -1,20 +1,4 @@
-/* RAW Entry — Overlay v.7.118
-   ╔══════════════════════════════════════════════════════════════════╗
-   ║ v7.118 — GRID ESTABLE (fin del bug "cards aplastadas").           ║
-   ║                                                                    ║
-   ║ CAUSA RAÍZ (semanas de parches): el modo expandido calculaba la   ║
-   ║ altura de la zona central leyendo _pUser.style.top/offsetHeight   ║
-   ║ EN VIVO. Durante los warps entre niveles esas medidas estaban a   ║
-   ║ media animación (top ~293px en vez de ~22) → zona 352px →         ║
-   ║ aplastada. Cada parche tapaba un frame y abría otro.              ║
-   ║                                                                    ║
-   ║ SOLUCIÓN (grid declarativo): la fila superior es geométricamente  ║
-   ║ invariable. Se mide UNA vez con la pantalla quieta (_medirFilaTop)║
-   ║ y se cachea en _GRID.topRowBottom. El modo expandido usa SIEMPRE  ║
-   ║ esa constante, nunca medidas en movimiento → top/height del panel ║
-   ║ central son celdas de grid fijas. minHeight = zonaH real (no 280) ║
-   ║ mata el colapso transitorio. Remide solo en resize real.          ║
-   ╚══════════════════════════════════════════════════════════════════╝
+/* RAW Entry — Overlay v.7.118b (shift idempotente: fin de cards que se hunden)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -4279,25 +4263,10 @@ function _crearDialOverlay(){
     //  MODO EXPANDIDO — un panel ocupa el centro, dial achicado abajo
     // ══════════════════════════════════════════════════════════════════════
     if(expandedEl){
-      // ── v7.118 GRID ESTABLE ──────────────────────────────────────────
-      // topRowBottom sale de la constante de grid medida con pantalla
-      // quieta, NUNCA de _pUser.style.top en vivo (que durante warps está
-      // a media animación → daba 418 → zona 352 → aplastada). Si por
-      // alguna razón el grid no está medido aún, lo medimos ahora; y como
-      // último recurso, fallback a la fórmula clásica acotada.
-      var _g = _medirFilaTop(false);
-      var topRowBottom;
-      if(_g.medido && _g.topRowBottom != null){
-        topRowBottom = _g.topRowBottom;
-      } else {
-        // Fallback defensivo: acotar el style.top a un rango sano (la fila
-        // top jamás baja de 200px). Si es anómalo, usar topPad estable.
-        var _puTop = parseFloat(_pUser.style.top || 0);
-        var _puH   = _pUser.offsetHeight || 100;
-        topRowBottom = (_puTop >= 0 && _puTop <= 200)
-          ? _puTop + _puH + GAP*2
-          : GAP + _puH + GAP*2;
-      }
+      // Zona disponible verticalmente: entre la fila top (USER/Sim/Stats)
+      // y la fila bottom (Misión/Logro/Nivel). El panel se centra ahí.
+      var topRowBottom = parseFloat(_pUser.style.top || 0) +
+                         (_pUser.offsetHeight || 100) + GAP*2;
       var botYAvail = vH - 90 - GAP;
       var dialMiniReserva = 80 + GAP*2;
       var zonaH = Math.max(280, botYAvail - dialMiniReserva - topRowBottom);
@@ -4347,11 +4316,7 @@ function _crearDialOverlay(){
       expandedEl.style.width     = centerW + 'px';
       expandedEl.style.top       = topRowBottom + 'px';
       expandedEl.style.height    = zonaH + 'px';
-      // v7.118 — minHeight = zonaH real (no 280px). El placeholder 280
-      // dejaba colapsar el panel durante la transición CSS de height (.42s)
-      // si el contenido aún no llenaba → parpadeo "aplastada 280px". Anclado
-      // a la zona real, el panel nunca cae por debajo de su altura objetivo.
-      expandedEl.style.minHeight = zonaH + 'px';
+      expandedEl.style.minHeight = '280px';
       expandedEl.style.clipPath  = chamferRect;
       // Guardar la zona disponible para el ajuste post-hydrate
       expandedEl._zonaY = topRowBottom;
@@ -4722,13 +4687,6 @@ function _crearDialOverlay(){
       pStats.el.style.clipPath = chamferRect;
     }
 
-    // ── v7.118 GRID ESTABLE: sembrar la medición de la fila top ──────────
-    // Estamos en modo normal con la fila top recién posicionada y la
-    // pantalla en su estado base (hSim/hUser ya medidos arriba). Este es el
-    // momento limpio para cachear topRowBottom, que el modo expandido usará
-    // como ancla fija. _medirFilaTop se auto-protege si hay warp/cascada.
-    if(!window._hudExpanded){ _medirFilaTop(false); }
-
     // ══════════════════════════════════════════
     //  ZONA INFERIOR — 4 cards en UNA SOLA fila
     //  Misión (col-A) | Nivel Actual (col-B) | Logro (col-C) | Siguiente (col-D)
@@ -4966,15 +4924,34 @@ function _crearDialOverlay(){
       var _heroEl = document.getElementById('hero');
       if(_heroEl){ _heroH = _heroEl.getBoundingClientRect().height || 58; }
       var _shift = Math.round(_heroH / 2);
+      // ── v7.118 — FIX cards que se hunden al reposicionar repetidamente ──
+      // CAUSA RAÍZ (cazada con datos): este bloque SUMABA _shift al style.top
+      // en CADA llamada a _reposicionarHUD. Los paneles cuya rama no reescribe
+      // el top fresco conservaban el top ya shifteado y recibían el shift OTRA
+      // VEZ → acumulación 133→822→1046 (29px por pasada). Cualquier doble
+      // reposicionamiento (warp/resize) las hundía.
+      // SOLUCIÓN: idempotencia real. Recordamos cuánto shift le aplicamos a
+      // cada elemento (_shiftAplicado). Antes de aplicar el nuevo, DESCONTAMOS
+      // el anterior, dejando el top en su base limpio, y luego sumamos el
+      // shift actual. Reposicionar N veces da el mismo resultado.
+      function _aplicarShift(el){
+        if(!el || !el.style.top || el.style.top === '-9999px') return;
+        var actual = parseFloat(el.style.top);
+        // Si el top actual NO coincide con el último valor que dejamos
+        // (base+shift), significa que getTop/positionCol lo reescribió FRESCO
+        // en esta pasada → su shift previo ya no aplica; partimos de 0.
+        var prev = (el._shiftFinal != null && Math.abs(actual - el._shiftFinal) < 0.5)
+                   ? (el._shiftAplicado || 0)   // sigue siendo nuestro valor
+                   : 0;                          // top fresco: sin shift previo
+        var base = actual - prev;
+        var fin  = base + _shift;
+        el.style.top = fin + 'px';
+        el._shiftAplicado = _shift;
+        el._shiftFinal = fin;   // recordar lo que dejamos, para la próxima
+      }
       if(_shift > 0){
-        if(_dialCanvas && _dialCanvas.style.top){
-          _dialCanvas.style.top = (parseFloat(_dialCanvas.style.top) + _shift) + 'px';
-        }
-        window._hudPanels.forEach(function(hp){
-          if(hp.el && hp.el.style.top && hp.el.style.top !== '-9999px'){
-            hp.el.style.top = (parseFloat(hp.el.style.top) + _shift) + 'px';
-          }
-        });
+        _aplicarShift(_dialCanvas);
+        window._hudPanels.forEach(function(hp){ _aplicarShift(hp.el); });
       }
     }
 
@@ -5021,69 +4998,6 @@ function _crearDialOverlay(){
   //  click en uno nuevo (intercambio directo).
   // ══════════════════════════════════════════════════════════════════════
   window._hudExpanded = null; // panel actualmente expandido (DOM element) o null
-
-  // ════════════════════════════════════════════════════════════════════════
-  //  GRID ESTABLE v7.118 — ANCLA GEOMÉTRICA DE LA FILA SUPERIOR
-  //  ─────────────────────────────────────────────────────────────────────
-  //  CAUSA RAÍZ del bug "cards aplastadas" (semanas de parches): el modo
-  //  expandido calculaba la altura de la zona central leyendo _pUser.style.top
-  //  y offsetHeight EN VIVO. Durante los warps entre niveles, esas medidas
-  //  están a media animación (top ~293px en vez de ~22px) → zona corrupta
-  //  (352px) → card aplastada. Cada parche tapaba un frame y abría otro.
-  //
-  //  SOLUCIÓN (grid declarativo): la fila superior es geométricamente
-  //  INVARIABLE — siempre empieza en topPad(GAP) y su altura es la del Sim
-  //  banda, que NO cambia entre niveles. La medimos UNA vez con la pantalla
-  //  quieta y la guardamos como constante. El modo expandido usa SIEMPRE
-  //  esta constante, nunca medidas en movimiento. Resultado: el "top" y la
-  //  "height" del panel central son celdas de grid fijas, no cálculos
-  //  volátiles. Se recalcula solo en resize real (pantalla quieta).
-  // ════════════════════════════════════════════════════════════════════════
-  var _GRID = {
-    topRowBottom: null,   // Y donde termina la fila superior (estable)
-    topRowH:      null,   // altura de la fila superior (Sim banda)
-    GAP:          22,
-    medido:       false
-  };
-
-  // Mide la fila superior con la pantalla QUIETA y cachea el resultado.
-  // Llamar solo cuando no hay warp ni cascada en curso. offsetHeight no
-  // depende de la posición animada, pero sí del contenido, así que medimos
-  // tras hidratar. force=true remide aunque ya esté cacheado (resize).
-  function _medirFilaTop(force){
-    if(_GRID.medido && !force) return _GRID;
-    // No medir con la pantalla en movimiento: durante un warp entre niveles
-    // o la cascada de aparición, las cards están animándose y offsetHeight
-    // podría leerse en un estado intermedio. Si hay movimiento, devolvemos
-    // el grid como está (no medido → el caller usa fallback) y reintentamos
-    // en la siguiente reposición, cuando todo esté quieto.
-    try {
-      var _h = document.documentElement;
-      if(_h.classList.contains('niv-warp') || window._hudCascadaEnCurso){
-        return _GRID;
-      }
-    } catch(_e){}
-    var pUser = null, pSim = null;
-    if(window._hudPanels){
-      window._hudPanels.forEach(function(hp){
-        if(hp.el && hp.el._side === 'top-left')   pUser = hp.el;
-        if(hp.el && hp.el._side === 'top-center') pSim  = hp.el;
-      });
-    }
-    if(!pUser || !pSim) return _GRID;  // aún no construido
-    var GAP = _GRID.GAP;
-    // Altura de la fila = la mayor entre USER y Sim (el Sim banda es el alto).
-    // offsetHeight es estable (no lo afecta el transform de animación).
-    var hUser = pUser.offsetHeight || 50;
-    var hSim  = pSim.offsetHeight  || hUser;
-    var topRowH = Math.max(hUser, hSim, 50);
-    _GRID.topRowH      = topRowH;
-    _GRID.topRowBottom = GAP /*topPad*/ + topRowH + GAP*2;
-    _GRID.medido       = true;
-    return _GRID;
-  }
-  window._medirFilaTop = _medirFilaTop;
-  window._GRID = _GRID;
 
   function _animarSuave(el, props){
     // Aplica un set de propiedades CSS con transición suave.
@@ -6127,9 +6041,6 @@ function _crearDialOverlay(){
     intentos = intentos || 0;
     var panel = window._hudExpanded;
     if(!panel) return;
-    // v7.118 — zonaY/zonaH provienen del GRID ESTABLE (medido con pantalla
-    // quieta en _reposicionarHUD). Esta función solo confirma/ajusta usando
-    // esos valores fijos; ya no introduce medidas en vivo que se corrompan.
     var zonaY = panel._zonaY;
     var zonaH = panel._zonaH;
     if(zonaY === undefined || zonaH === undefined) return;
@@ -8441,7 +8352,6 @@ window.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('resize', function(){
     if(!_viewportCambioReal()) return;       // v6.073: ignora micro-cambios
     if(_dialVisible && typeof _reposicionarHUD==='function'){
-      if(window._GRID) window._GRID.medido = false;  // v7.118: remedir fila top con nuevo tamaño
       _resetDuroLayout();
       _reposicionarHUD();
     }
@@ -8458,7 +8368,6 @@ window.addEventListener('DOMContentLoaded',()=>{
         // verdad, no por una scrollbar que aparece/desaparece.
         if(!_viewportCambioReal()) return;
         if(_dialVisible && typeof _reposicionarHUD==='function'){
-          if(window._GRID) window._GRID.medido = false;  // v7.118: remedir fila top
           _resetDuroLayout();
           _reposicionarHUD();
         }
