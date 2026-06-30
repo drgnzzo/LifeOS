@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.21 (hyperdrive + parallax cursor reducido a 15px)
+/* RAW Entry — Overlay v.8.22 (DIAGNÓSTICO: parallax/vértigo OFF para aislar bug coverflow)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -2755,6 +2755,9 @@ function _crearDialOverlay(){
       galaxyRotation += 0.01 * dt;
 
       // v8.19 — CÁMARA: el valor actual persigue suave al target (mouse/giro).
+      // v8.22 — parallax DESACTIVADO temporalmente para diagnóstico (forzamos
+      // cámara en 0,0 = sin desplazamiento). Reactivar quitando estas 2 líneas.
+      _camTX = 0; _camTY = 0;
       // Frame-rate independiente: el factor se escala con dt para que la
       // suavidad sea igual a 30 o 60 fps. Resultado en px listo para usar.
       var _lerpF = 1 - Math.pow(1 - _CAM_LERP, dt * 60);

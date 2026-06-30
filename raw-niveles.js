@@ -1,4 +1,4 @@
-/* RAW Entry — Niveles v.8.16 (fade entre secciones + vértigo 0→1 con GSAP)
+/* RAW Entry — Niveles v.8.22 (DIAGNÓSTICO: vértigo OFF)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -489,11 +489,11 @@
     if(typeof window._dispararWarp === 'function') window._dispararWarp(1);
 
     // v8.16 — VÉRTIGO: push-in del fondo cósmico sincronizado con el warp.
-    // Escalamos el canvas de partículas (NO el overlay completo, para no
-    // pelear con la expansión de la card ni con cerrarDial): las estrellas,
-    // además de correr al centro (warp), se acercan → sensación de
-    // sumergirse hacia adentro. Capa visual extra, no toca lógica.
-    if(window.RawAnim && typeof window.RawAnim.vertigo === 'function'){
+    // v8.22 — DESACTIVADO TEMPORALMENTE para diagnosticar el bug del coverflow
+    // (cards congeladas / dial ausente en niv-1). Si con esto desactivado el
+    // coverflow revive, el vértigo era el culpable y se reimplementa distinto.
+    // Para reactivar: cambiar el if(false) por if(true).
+    if(false && window.RawAnim && typeof window.RawAnim.vertigo === 'function'){
       var _bg = document.getElementById('dial-particles');
       if(_bg) window.RawAnim.vertigo(_bg, 1, { dur: 0.5, scale: 1.10 });
     }
@@ -531,6 +531,14 @@
 
     // v7.030 — FASE 4A: warp hacia AFUERA al emerger.
     if(typeof window._dispararWarp === 'function') window._dispararWarp(-1);
+
+    // v8.19 — VÉRTIGO inverso: al emerger, el fondo cósmico parte de cerca
+    // (scale 1.10) y se aleja a 1, sincronizado con el warp hacia afuera.
+    // Da la sensación de "salir hacia la superficie", espejo del sumergirse.
+    if(window.RawAnim && typeof window.RawAnim.vertigo === 'function'){
+      var _bgUp = document.getElementById('dial-particles');
+      if(_bgUp) window.RawAnim.vertigo(_bgUp, -1, { dur: 0.5, scale: 1.10 });
+    }
 
     if(_nivel === 2){
       // 2 → 1 : ocultar la sección y volver a la card expandida.
