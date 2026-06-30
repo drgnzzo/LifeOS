@@ -1,4 +1,13 @@
-/* RAW Entry — Overlay v.7.118b (shift idempotente: fin de cards que se hunden)
+/* RAW Entry — Overlay v.7.119 (ANCLA DE REJILLA ESTABLE _GRID — fin del nivel 0 roto al 1→0)
+   ───────────────────────────────────────────────────────────────────
+   v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
+   NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
+   Aquí se implementa DE VERDAD: colTopY y el topRowBottom del expandido
+   salen de un ancla medida con pantalla quieta y CONGELADA mientras
+   medido=true. El reset duro de 1→0 (sin reflow) ya no puede inyectar el
+   inner residual de 384px → colTopY deja de dispararse → cards no saltan a
+   Y~832. Solo resize/zoom real (con reflow) remide. Ver bloque _GRID.
+   ───────────────────────────────────────────────────────────────────
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -4125,6 +4134,81 @@ function _crearDialOverlay(){
   }
   window._calcDialSize = _calcDialSize;
 
+  // ════════════════════════════════════════════════════════════════════
+  //  v7.119 — ANCLA DE REJILLA ESTABLE (_GRID)
+  //  ───────────────────────────────────────────────────────────────────
+  //  CAUSA RAÍZ del "nivel 0 roto al volver de 1→0" (cazada leyendo la
+  //  función entera + el camino de raw-niveles):
+  //  El alto de la fila superior (topMaxH) y el colTopY derivado se medían
+  //  EN VIVO con scrollHeight en CADA _reposicionarHUD. El reset duro de
+  //  marcarWarp (t=1150ms) borra width/height de los paneles y, en el MISMO
+  //  frame y SIN el ciclo display:none→reflow→display:'' que sí tiene
+  //  _hudCollapse, llama _reposicionarHUD. Ahí scrollHeight devuelve basura
+  //  residual del modo expandido (financiero inner aún 384px) → topMaxH se
+  //  infla → colTopY se dispara → las cards caen a Y~832. Esto casaba EXACTO
+  //  con los datos del auditor (financiero 173/384, patrim 832).
+  //
+  //  El sistema _GRID que el handoff daba por implementado NUNCA llegó a
+  //  este archivo: raw-niveles solo tenía `if(window._GRID)…` muertos. Aquí
+  //  se define DE VERDAD.
+  //
+  //  CONTRATO:
+  //   · _GRID cachea topMaxH y colTopY medidos UNA vez con pantalla quieta.
+  //   · _medirFilaTop() solo RE-MIDE y cachea cuando la pantalla está quieta
+  //     (sin niv-warp, sin expandido, sin cascada de entrada, sin regreso de
+  //     expandido). Si la llamada cae en un momento sucio, DEVUELVE EL CACHÉ
+  //     anterior — jamás commitea una medición contaminada.
+  //   · raw-niveles invalida _GRID.medido antes de reposicionar; eso fuerza
+  //     una RE-medición, pero solo se concreta si el momento es quieto.
+  //  Un solo dueño de la geometría de la fila top. No más mediciones en vivo
+  //  durante animaciones (regla de oro del proyecto).
+  // ════════════════════════════════════════════════════════════════════
+  window._GRID = { medido:false, topMaxH:0, colTopY:0, topY:0 };
+
+  function _pantallaQuieta(){
+    var h = document.documentElement;
+    if(h.classList.contains('niv-warp')) return false;
+    if(window._hudExpanded) return false;
+    if(window._hudReturningFromExpand) return false;
+    if(window._hudPanels && window._hudPanels.some(function(hp){
+      return hp.el && hp.el._animatingEntry;
+    })) return false;
+    return true;
+  }
+
+  // Mide (o recupera del caché) la geometría de la fila superior.
+  // Recibe topY base y la altura natural ya medida por el flujo normal.
+  // Devuelve { topMaxH, colTopY } — el flujo normal los usa para las columnas.
+  // hMedido = max(hUser,hSim,hStats,50) recién calculado en esta pasada.
+  //
+  // POLÍTICA (clave del fix): el caché solo se (re)escribe cuando está
+  // INVALIDADO (medido=false) Y la pantalla está quieta. Mientras medido=true
+  // NUNCA se sobreescribe, aunque la pantalla parezca quieta — porque un
+  // reposicionamiento "quieto por clase" puede correr sobre un DOM recién
+  // reseteado SIN reflow (scrollHeight basura). Refrescar ahí era la fuga que
+  // dejaba pasar los 384px. La invalidación solo ocurre en momentos REALMENTE
+  // asentados: primer paint quieto y resize/zoom legítimo.
+  function _medirFilaTop(topY, hMedido){
+    var G = window._GRID;
+    if(!G.medido){
+      if(_pantallaQuieta()){
+        // Momento asentado: commit del ancla.
+        G.topY    = topY;
+        G.topMaxH = hMedido;
+        G.colTopY = topY + hMedido + 8;
+        G.medido  = true;
+        return { topMaxH:G.topMaxH, colTopY:G.colTopY };
+      }
+      // Invalidado pero pantalla sucia (cascada/warp): usar el valor vivo como
+      // fallback SIN commitear, para no fijar basura. Se commiteará en el
+      // primer reposicionamiento quieto posterior.
+      return { topMaxH:hMedido, colTopY:topY + hMedido + 8 };
+    }
+    // medido=true: ancla congelada. Devolver SIEMPRE el caché, pase lo que pase.
+    return { topMaxH:G.topMaxH, colTopY:G.colTopY };
+  }
+  window._medirFilaTop = _medirFilaTop;
+
   // ── Reposicionar HUD ──
   // ─── FIX v5.197: lock de reentrada GLOBAL ───
   // v5.196 puso el lock en variables locales (closure). Pero el DnD
@@ -4265,8 +4349,18 @@ function _crearDialOverlay(){
     if(expandedEl){
       // Zona disponible verticalmente: entre la fila top (USER/Sim/Stats)
       // y la fila bottom (Misión/Logro/Nivel). El panel se centra ahí.
-      var topRowBottom = parseFloat(_pUser.style.top || 0) +
-                         (_pUser.offsetHeight || 100) + GAP*2;
+      // v7.119 — preferir el ancla ESTABLE de la fila top (medida con
+      // pantalla quieta antes de expandir) sobre la lectura en vivo de
+      // _pUser, que durante la transición de expansión puede estar a media
+      // animación y dar un topRowBottom equivocado (causa de la card central
+      // aplastada a 352px al regresar 2→1).
+      var topRowBottom;
+      if(window._GRID && window._GRID.medido){
+        topRowBottom = window._GRID.topY + window._GRID.topMaxH + GAP*2;
+      } else {
+        topRowBottom = parseFloat(_pUser.style.top || 0) +
+                       (_pUser.offsetHeight || 100) + GAP*2;
+      }
       var botYAvail = vH - 90 - GAP;
       var dialMiniReserva = 80 + GAP*2;
       var zonaH = Math.max(280, botYAvail - dialMiniReserva - topRowBottom);
@@ -4659,7 +4753,10 @@ function _crearDialOverlay(){
       }
     });
     // topMaxH = altura del Sim (la mayor) — usada para calcular colTopY.
-    var topMaxH = Math.max(hUser, hSim, hStats, 50);
+    // _topMaxHVivo es la medición fresca de ESTA pasada; puede estar
+    // contaminada si caemos en mitad de un warp/reset. El valor ESTABLE
+    // que alimenta colTopY sale de _medirFilaTop (caché de pantalla quieta).
+    var _topMaxHVivo = Math.max(hUser, hSim, hStats, 50);
     // USER y Stats NO se estiran. Solo se centran verticalmente con Sim:
     // aplicamos un transform translateY a sus inline top.
 
@@ -4769,7 +4866,13 @@ function _crearDialOverlay(){
     //  IMPORTANTE: las columnas NUNCA invaden zona inferior (botY o trackY)
     //  NOTA: leftX/rightX/leftW/rightW ya fueron calculados arriba (zona top los necesitaba).
     // ══════════════════════════════════════════
-    var colTopY    = topY + topMaxH + 8;
+    // v7.119 — colTopY sale del ANCLA ESTABLE, no de la medición en vivo.
+    // En pantalla quieta _medirFilaTop refresca el caché con la medición
+    // fresca; en mitad de un warp/reset devuelve el último valor bueno, así
+    // que el inner residual de 384px del modo expandido JAMÁS infla colTopY.
+    var _grid     = _medirFilaTop(topY, _topMaxHVivo);
+    var topMaxH   = _grid.topMaxH;
+    var colTopY    = _grid.colTopY;
     var colBotY    = botY - 8;  // antes restaba trackY; v5.116: track eliminado
     var colVAvail  = Math.max(200, colBotY - colTopY);
 
@@ -8352,6 +8455,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('resize', function(){
     if(!_viewportCambioReal()) return;       // v6.073: ignora micro-cambios
     if(_dialVisible && typeof _reposicionarHUD==='function'){
+      if(window._GRID) window._GRID.medido = false;  // v7.119 remedir fila top
       _resetDuroLayout();
       _reposicionarHUD();
     }
@@ -8368,6 +8472,7 @@ window.addEventListener('DOMContentLoaded',()=>{
         // verdad, no por una scrollbar que aparece/desaparece.
         if(!_viewportCambioReal()) return;
         if(_dialVisible && typeof _reposicionarHUD==='function'){
+          if(window._GRID) window._GRID.medido = false;  // v7.119 remedir fila top
           _resetDuroLayout();
           _reposicionarHUD();
         }

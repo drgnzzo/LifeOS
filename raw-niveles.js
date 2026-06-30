@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.118  (reset duro + grid invalidado al 1→0)
+/* RAW Entry — Sistema de Niveles v.7.119  (1→0 ya NO invalida _GRID: el ancla estable manda)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -172,7 +172,13 @@
       // paneles no-expandidos e invalidamos el grid, justo antes de
       // reposicionar, para que se recalculen desde cero en sus celdas.
       if(_enNivel0SinExpand){
-        if(window._GRID) window._GRID.medido = false;
+        // v7.119 — NO invalidar _GRID aquí. La fila top NO cambió de tamaño
+        // al volver 1→0; solo quedó sucia con dimensiones residuales del modo
+        // expandido. Si invalidáramos, _medirFilaTop remediría AHORA — con la
+        // pantalla ya quieta (niv-warp recién quitado) pero scrollHeight aún
+        // SIN reflow tras este reset → commitearía 384px basura → colTopY 414
+        // → cards a Y~832. El ancla estable debe CONSERVAR el último valor
+        // bueno medido en pantalla quieta. (Era el origen real del BUG A.)
         (window._hudPanels || []).forEach(function(hp){
           if(!hp || !hp.el) return;
           if(hp.el.classList.contains('hud-expanded')) return;
@@ -535,11 +541,11 @@
       if(window._hudExpanded && typeof window._hudCollapse === 'function'){
         window._hudCollapse();
       }
-      // v7.118 — invalidar el grid para que el reposicionamiento post-warp
-      // (a los 1150ms, ya con pantalla quieta) remida la fila top limpia.
-      // El reset duro de paneles se hace ALLÁ, no aquí, para no contaminar
-      // durante la ventana del warp.
-      if(window._GRID) window._GRID.medido = false;
+      // v7.119 — NO invalidar _GRID al volver 1→0. La fila top conserva su
+      // tamaño; el ancla estable debe mantener el último valor medido en
+      // pantalla quieta. Invalidar aquí forzaba una remedición sobre un DOM
+      // aún sin reflow tras el reset → colTopY corrupto (BUG A). El grid se
+      // refresca solo en pantalla quieta (_medirFilaTop) o en resize real.
       if(typeof window._dispararWarp === 'function'){
         setTimeout(function(){ window._dispararWarp(-1); }, 120);
       }
@@ -578,8 +584,10 @@
           var inner = el.querySelector(':scope > [id$="-inner"]');
           if(inner){ inner.style.minHeight = ''; inner.style.maxHeight = ''; inner.style.transform = ''; }
         });
-        // Invalidar el grid para que remida la fila top con pantalla quieta.
-        if(window._GRID) window._GRID.medido = false;
+        // v7.119 — (función huérfana, no se llama) NO invalidar _GRID: si
+        // alguien la reconectara, invalidar aquí reintroduciría el BUG A
+        // (remedición sobre DOM sin reflow → colTopY corrupto). El ancla
+        // estable se refresca solo en pantalla quieta o resize real.
         // Reposicionar limpio.
         if(typeof window._reposicionarHUD === 'function'){
           try { window._reposicionarHUD(); } catch(e){}
