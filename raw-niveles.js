@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.8.0 (flechas ←/→ recorren pestañas del panel superior; HOME=dial)
+/* RAW Entry — Sistema de Niveles v.8.3 (flechas ←/→ recorren pestañas incl. RAW; HOME=dial)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1247,16 +1247,23 @@
   // Orden visual de las pestañas y la función que activa cada una.
   // (SOS se omite del recorrido: es una acción modal, no una sección
   //  navegable; se sigue activando con su botón.)
+  // v8.3 — RAW agregada al recorrido (faltaba: con teclas nunca se abría).
+  // RAW se invoca con argumento ('raw'), por eso se modela con `arg`.
   var _TABS = [
     { id:'btn-home',      fn:'volverAlAnverso' },
     { id:'btn-logros',    fn:'irALogros'       },
     { id:'btn-maslow',    fn:'irABitacora'     },
     { id:'btn-activity',  fn:'irAActivity'     },
     { id:'btn-nutricion', fn:'irANutricion'    },
-    { id:'btn-notas',     fn:'irANotas'        }
+    { id:'btn-notas',     fn:'irANotas'        },
+    { id:'btn-sheets',    fn:'irASheets', arg:'raw' }
   ];
   function _tabActivaIdx(){
     // La sección activa la marca window._osSeccion ('home','logros',...).
+    // RAW no usa _osSeccion sino _pantalla ('sheets_raw'); se detecta aparte.
+    if(typeof window._pantalla === 'string' && window._pantalla.indexOf('sheets_') === 0){
+      for(var k=0;k<_TABS.length;k++){ if(_TABS[k].id==='btn-sheets') return k; }
+    }
     var sec = window._osSeccion || 'home';
     var mapa = { home:'btn-home', logros:'btn-logros', bitacora:'btn-maslow',
                  activity:'btn-activity', nutricion:'btn-nutricion', notas:'btn-notas' };
@@ -1268,8 +1275,9 @@
     // Envolver con módulo para recorrer circularmente.
     var n = _TABS.length;
     idx = ((idx % n) + n) % n;
-    var fn = window[_TABS[idx].fn];
-    if(typeof fn === 'function') fn();
+    var t = _TABS[idx];
+    var fn = window[t.fn];
+    if(typeof fn === 'function'){ t.arg !== undefined ? fn(t.arg) : fn(); }
   }
   document.addEventListener('keydown', function(e){
     if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
