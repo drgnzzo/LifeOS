@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.1 (USER ancho legible + barra inferior fusionada + HOME fuerza niv-0 + fix laterales remanentes)
+/* RAW Entry — Overlay v.8.2 (laterales niv-0 ocultas por CSS a prueba de timing + barra inferior una pieza)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -981,6 +981,28 @@ function _crearDialOverlay(){
       // o en niv-2 (donde el overlay es puro fondo y no centra nada).
       'html:not(.niv-2) #dial-overlay:not([style*="display:none"]):not([style*="display: none"]){' +
         'display:flex !important;align-items:center !important;justify-content:center !important;}',
+      // ── v8.2 — LATERALES NUNCA EN NIVEL 0 (regla de raíz, a prueba de timing) ──
+      // El display:none inline que pone _reposicionarHUD lo borraban el reset y
+      // la cascada de animación de abrirDial (al volver de una sección via
+      // flechas) → las laterales reaparecían (confirmado con auditor:
+      // disp pasaba de none a block vis:visible). Una REGLA CSS con !important
+      // las mantiene ocultas en niv-0 pase lo que pase con los inline. En niv-1
+      // el coverflow las muestra (no aplica esta regla porque ya no es niv-0).
+      'html.niv-0 #hud-patrimonio, html.niv-0 #hud-bitacora, html.niv-0 #hud-necesidades,' +
+      'html.niv-0 #hud-fijos, html.niv-0 #hud-financiero, html.niv-0 #hud-variables,' +
+      'html.niv-0 #hud-activity{display:none !important;}',
+      // ── v8.2 — BARRA INFERIOR COMO UNA SOLA PIEZA ──
+      // Las 4 cards (track/misión/logro/nivel) ya quedan pegadas a nivel de
+      // geometría (bordes contiguos, confirmado por auditor). Lo que las hacía
+      // ver como 4 piezas eran sus bordes/sombras individuales. Aquí: las
+      // intermedias pierden el borde de los lados que se tocan y solo conservan
+      // un divisor fino a la derecha; las puntas redondean solo su lado externo.
+      // Resultado: una barra continua dividida en 4 celdas. Orden visual:
+      // track(izq) · misión · logro · nivel(der).
+      '#hud-track,#hud-mision,#hud-logro,#hud-nivel{' +
+        'border-radius:0 !important;border-left:none !important;border-right:none !important;' +
+        'box-shadow:none !important;}',
+      '#hud-track,#hud-mision,#hud-logro{border-right:1px solid rgba(167,139,250,0.18) !important;}',
     ].join('');
     document.head.appendChild(ks);
   }

@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.6.073
+/* RAW Entry — Core v.8.2 (HOME fuerza niv-0 + reposiciona siempre: purga laterales al volver de sección)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -713,6 +713,17 @@ function _osMostrar(seccion){
     // Mostrar el overlay (sin reconstrucción — v6.000).
     if(typeof abrirDial === 'function' && !window._dialVisible){
       abrirDial();
+    }
+    // v8.2 — HOME ES SIEMPRE NIVEL 0. Forzar la clase niv-0 y reposicionar
+    // AQUÍ, pase lo que pase con abrirDial (que solo corre si el dial no
+    // estaba visible). Cuando se llega a HOME desde una sección vía flechas,
+    // abrirDial NO se ejecuta → la clase podía seguir en niv-2 → las cards
+    // laterales NO se purgaban y reaparecían. Forzar niv-0 + reposicionar
+    // garantiza que _reposicionarHUD oculte las laterales en HOME.
+    document.documentElement.classList.remove('niv-1','niv-2','niv-warp');
+    document.documentElement.classList.add('niv-0');
+    if(typeof window._reposicionarHUD === 'function'){
+      requestAnimationFrame(function(){ window._reposicionarHUD(); });
     }
     // v6.030: en móvil, HOME hace snap al slide del dial del carrusel.
     if(window._osCarouselHome) window._osCarouselHome();
