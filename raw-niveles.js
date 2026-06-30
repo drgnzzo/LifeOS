@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.8.5 (recorrido de flechas incluye Timers)
+/* RAW Entry — Niveles v.8.16 (fade entre secciones + vértigo 0→1 con GSAP)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -487,6 +487,16 @@
 
     // v7.030 — FASE 4A: warp hacia el CENTRO al sumergirse.
     if(typeof window._dispararWarp === 'function') window._dispararWarp(1);
+
+    // v8.16 — VÉRTIGO: push-in del fondo cósmico sincronizado con el warp.
+    // Escalamos el canvas de partículas (NO el overlay completo, para no
+    // pelear con la expansión de la card ni con cerrarDial): las estrellas,
+    // además de correr al centro (warp), se acercan → sensación de
+    // sumergirse hacia adentro. Capa visual extra, no toca lógica.
+    if(window.RawAnim && typeof window.RawAnim.vertigo === 'function'){
+      var _bg = document.getElementById('dial-particles');
+      if(_bg) window.RawAnim.vertigo(_bg, 1, { dur: 0.5, scale: 1.10 });
+    }
 
     if(_nivel === 0){
       // 0 → 1 : expandir la card de entrada

@@ -1,4 +1,4 @@
-/* RAW Entry — Anim v.8.15 (sistema central de fade con GSAP)
+/* RAW Entry — Anim v.8.16 (fade central + vértigo push-in en transición de nivel)
    ════════════════════════════════════════════════════════════════════
    Motor de animación central de LifeOS. Construido sobre GSAP (local).
 
@@ -129,4 +129,37 @@
     fadeReemplazo: fadeReemplazo,
     hayGsap: HAY_GSAP
   };
+
+  // ════════════════════════════════════════════════════════════════
+  // VÉRTIGO: push-in al sumergirse de nivel. El plano que dejas atrás
+  // (el dial/overlay) se ACERCA (scale) y se desvanece levemente, como
+  // si la cámara avanzara hacia adentro. Se sincroniza con el warp de
+  // partículas (que corre por su cuenta en el canvas). No reemplaza nada:
+  // es una capa visual extra sobre la transición existente.
+  //   dir = +1  → sumergirse (0→1, 1→2): acercar y entrar
+  //   dir = -1  → emerger (regresar): alejar y volver
+  // ════════════════════════════════════════════════════════════════
+  function vertigo(el, dir, opts){
+    if(!el || !HAY_GSAP || REDUCE) return;
+    opts = opts || {};
+    var entrando = (dir >= 0);
+    var dur = (typeof opts.dur === 'number') ? opts.dur : 0.55;
+    // Escala objetivo: al sumergirse, el plano crece (lo atraviesas);
+    // al emerger, parte de algo más grande y vuelve a 1.
+    var scaleFin = entrando ? (opts.scale || 1.12) : 1;
+    var scaleIni = entrando ? 1 : (opts.scale || 1.12);
+    window.gsap.killTweensOf(el);
+    window.gsap.fromTo(el,
+      { transformOrigin: '50% 50%', scale: scaleIni },
+      { scale: scaleFin,
+        duration: dur,
+        ease: entrando ? 'power2.in' : 'power2.out',
+        onComplete: function(){
+          // Limpiar el transform para no dejar el plano escalado.
+          window.gsap.set(el, { clearProps: 'scale,transform' });
+          if(opts.onDone) opts.onDone();
+        }
+      });
+  }
+  window.RawAnim.vertigo = vertigo;
 })();

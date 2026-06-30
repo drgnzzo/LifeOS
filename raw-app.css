@@ -1365,6 +1365,24 @@ html.mob .hero-right{display:none !important}
    .panel-body — no la board-face entera. Solo panel-sheets (RAW) deja
    scroll porque es el iframe embebido de Google Sheets.
 ═══════════════════════════════════════════ */
+/* v8.16 — FADE suave entre secciones de nivel 2. Todas las panel-* ya
+   alternan opacity 0↔1 con .active, pero les faltaba transition → el
+   cambio era de golpe. Esta regla global les da el fade a todas de una vez
+   (incluye un sutil movimiento vertical para sensación de profundidad). */
+.board-face.panel-sheets,
+.board-face.panel-bitacora,
+.board-face.panel-activity,
+.board-face.panel-nutricion,
+.board-face.panel-notas{
+  transition:opacity .3s ease,transform .3s ease;
+}
+.board-face.panel-sheets:not(.active),
+.board-face.panel-bitacora:not(.active),
+.board-face.panel-activity:not(.active),
+.board-face.panel-nutricion:not(.active),
+.board-face.panel-notas:not(.active){
+  transform:translateY(8px);
+}
 .board-face.panel-sheets{transform:none;opacity:0;pointer-events:none;padding:0;display:flex;flex-direction:column;height:100%;overflow:hidden}
 .board-face.panel-sheets.active{transform:none;opacity:1;pointer-events:all}
 .board-face.panel-sheets .reverso-header{flex-shrink:0}
