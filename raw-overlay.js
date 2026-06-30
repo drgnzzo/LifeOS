@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.5 (intercepta gajo Timer: ver sección / abrir form, sin form RAW)
+/* RAW Entry — Overlay v.8.6 (gajo Timer + oculta hud-pnl en secciones nivel 2)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1010,6 +1010,12 @@ function _crearDialOverlay(){
         'border-radius:0 !important;border-left:none !important;border-right:none !important;' +
         'box-shadow:none !important;}',
       '#hud-track,#hud-mision,#hud-logro{border-right:1px solid rgba(167,139,250,0.18) !important;}',
+      // ── v8.6 — EN SECCIÓN (nivel 2): NINGÚN hud-pnl visible ──
+      // Las cards del overlay (USER, barra Sim, laterales, barra inferior)
+      // pertenecen al HOME/dial. En una board-face de nivel 2 (Timers,
+      // Activity, etc.) NO deben verse. cerrarDial solo bajaba su opacity y
+      // reaparecían encima de la sección. Esta regla las saca de tajo.
+      'html.os-seccion .hud-pnl{display:none !important;}',
     ].join('');
     document.head.appendChild(ks);
   }

@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.5 (api timers + gajo Timer en dial + sección timers + sync web↔Sheet)
+/* RAW Entry — Core v.8.6 (timers + marca os-seccion para limpiar cards en nivel 2)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -696,6 +696,17 @@ function _osMostrar(seccion){
   if(!_OS_SECCIONES[seccion]) seccion = 'home';
   window._osSeccion = seccion;
   _panelActual = (seccion==='home') ? 'anverso' : _OS_SECCIONES[seccion].board;
+
+  // v8.6 — Marca en <html> si estamos en una sección de nivel 2 (no-home).
+  // Una regla CSS usa 'os-seccion' para ocultar TODOS los hud-pnl (USER,
+  // barra Sim, cards, barra inferior) mientras una board-face está activa.
+  // Antes cerrarDial solo les ponía opacity:0 (no display) → reaparecían
+  // encima de la sección (p.ej. USER sobre Timers, empujando el contenido).
+  if(seccion === 'home'){
+    document.documentElement.classList.remove('os-seccion');
+  } else {
+    document.documentElement.classList.add('os-seccion');
+  }
 
   var board = document.getElementById('board-anverso');
 

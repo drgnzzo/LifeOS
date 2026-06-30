@@ -1,4 +1,4 @@
-/* RAW Entry — Timers v.8.5
+/* RAW Entry — Timers v.8.6 (fix dial regresa + cronómetro corre desde timestamp + sin mensajes + rediseño terminal)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ MÓDULO TIMERS — cronómetros que cuentan HACIA ARRIBA               ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -39,14 +39,16 @@
     if(s instanceof Date) return s.getTime();
     s = String(s).trim();
     if(!s) return null;
-    // Intento directo
-    var t = Date.parse(s);
-    if(!isNaN(t)) return t;
-    // dd/MM/yyyy [HH:mm[:ss]]
+    // Formato del backend GAS: 'd/M/yyyy HH:mm:ss' (o d/M/yyyy). Se prueba
+    // PRIMERO porque Date.parse interpreta dd/mm como mm/dd (formato US) y
+    // daría una fecha equivocada. Acepta 1-2 dígitos en día y mes.
     var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if(m){
       return new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0), +(m[6]||0)).getTime();
     }
+    // ISO u otros formatos que Date.parse entiende bien (yyyy-MM-dd...).
+    var t = Date.parse(s);
+    if(!isNaN(t)) return t;
     return null;
   }
 
@@ -182,9 +184,7 @@
       cont.innerHTML =
         '<div class="tm-empty">'+
           '<div class="tm-empty-ico">⏱</div>'+
-          '<div class="tm-empty-t">Aún no hay cronómetros</div>'+
-          '<div class="tm-empty-s">Crea uno desde el gajo <b>Timer</b> del dial. '+
-          'Después actualiza con ↻ y aparecerá aquí.</div>'+
+          '<div class="tm-empty-t">Sin cronómetros</div>'+
         '</div>';
       return;
     }
@@ -199,44 +199,52 @@
       var estado = (t.estado||'Inactivo').toLowerCase();
       var activo = estado === 'activo';
       var superando = msMejor(t) > 0 && ms > msMejor(t);
+      // Progreso hacia el récord (0-100). Si no hay récord, va por el día actual.
+      var prog;
+      if(msMejor(t) > 0){ prog = Math.min(100, (ms / msMejor(t)) * 100); }
+      else { prog = Math.min(100, (d.seg + d.min*60 + d.hora*3600) / 86400 * 100); }
+      var dash = 100; // circunferencia base para el anillo (r≈15.9)
 
       html +=
-        '<div class="tm-card" data-clave="'+escAttr(t.clave)+'" style="--tm-acc:'+acc+'">'+
+        '<div class="tm-card'+(activo?' tm-card-on':'')+'" data-clave="'+escAttr(t.clave)+'" style="--tm-acc:'+acc+'">'+
+          // Cabecera: tipo · nombre + anillo de progreso
           '<div class="tm-card-head">'+
             '<div class="tm-card-titles">'+
-              '<span class="tm-card-tipo">'+esc(t.tipo)+'</span>'+
+              '<span class="tm-card-tipo"><i class="tm-dot"></i>'+esc(String(t.tipo).toUpperCase())+'</span>'+
               '<span class="tm-card-name">'+esc(t.timer)+'</span>'+
             '</div>'+
-            '<span class="tm-badge tm-badge-'+estado+'">'+
-              (activo?'En curso':estado==='pausado'?'Pausado':'Detenido')+
-            '</span>'+
+            '<div class="tm-ring" title="Progreso hacia tu récord">'+
+              '<svg viewBox="0 0 36 36">'+
+                '<circle class="tm-ring-bg" cx="18" cy="18" r="15.9"></circle>'+
+                '<circle class="tm-ring-fg" cx="18" cy="18" r="15.9" '+
+                  'stroke-dasharray="'+dash+'" stroke-dashoffset="'+(dash - dash*prog/100).toFixed(1)+'" data-f="ring"></circle>'+
+              '</svg>'+
+              '<span class="tm-ring-state '+estado+'" data-f="ringstate">'+
+                (activo?'●':estado==='pausado'?'❚❚':'■')+'</span>'+
+            '</div>'+
           '</div>'+
 
-          // Cronómetro grande DÍAS : HH : MM : SS
-          '<div class="tm-clock'+(superando?' tm-clock-record':'')+'">'+
-            '<div class="tm-unit tm-unit-d"><span class="tm-v" data-f="dias">'+d.dias+'</span><span class="tm-l">días</span></div>'+
-            '<span class="tm-colon">:</span>'+
-            '<div class="tm-unit"><span class="tm-v" data-f="hora">'+pad(d.hora)+'</span><span class="tm-l">hrs</span></div>'+
-            '<span class="tm-colon">:</span>'+
-            '<div class="tm-unit"><span class="tm-v" data-f="min">'+pad(d.min)+'</span><span class="tm-l">min</span></div>'+
-            '<span class="tm-colon">:</span>'+
-            '<div class="tm-unit"><span class="tm-v" data-f="seg">'+pad(d.seg)+'</span><span class="tm-l">seg</span></div>'+
+          // Cronómetro LED grande: DÍAS : HH : MM : SS
+          '<div class="tm-clock'+(superando?' tm-clock-record':'')+'" data-f="clockwrap">'+
+            '<span class="tm-seg tm-seg-d" data-f="dias">'+d.dias+'</span>'+
+            '<span class="tm-sep">:</span>'+
+            '<span class="tm-seg" data-f="hora">'+pad(d.hora)+'</span>'+
+            '<span class="tm-sep">:</span>'+
+            '<span class="tm-seg" data-f="min">'+pad(d.min)+'</span>'+
+            '<span class="tm-sep">:</span>'+
+            '<span class="tm-seg" data-f="seg">'+pad(d.seg)+'</span>'+
           '</div>'+
+          '<div class="tm-clock-labels"><span>días</span><span>hrs</span><span>min</span><span>seg</span></div>'+
 
-          // Desglose meses / años / horas totales
-          '<div class="tm-breakdown">'+
-            '<div class="tm-bd"><span class="tm-bd-v" data-f="meses">'+dg.meses+'</span><span class="tm-bd-l">meses</span></div>'+
-            '<div class="tm-bd"><span class="tm-bd-v" data-f="anios">'+dg.anios+'</span><span class="tm-bd-l">años</span></div>'+
-            '<div class="tm-bd"><span class="tm-bd-v" data-f="horas">'+dg.horas+'</span><span class="tm-bd-l">horas tot.</span></div>'+
-          '</div>'+
-
-          // Récord
-          '<div class="tm-record">'+
-            '<span class="tm-record-l">Mejor tiempo</span>'+
-            '<span class="tm-record-v">'+
-              (msMejor(t)>0 ? (rec.dias+'d '+pad(rec.hora)+'h') : '—')+
-            '</span>'+
-            (superando ? '<span class="tm-record-flag">¡superándolo!</span>' : '')+
+          // Tira de datos: meses · años · horas + récord
+          '<div class="tm-data">'+
+            '<div class="tm-data-cell"><span class="tm-data-v" data-f="meses">'+dg.meses+'</span><span class="tm-data-l">meses</span></div>'+
+            '<div class="tm-data-cell"><span class="tm-data-v" data-f="anios">'+dg.anios+'</span><span class="tm-data-l">años</span></div>'+
+            '<div class="tm-data-cell"><span class="tm-data-v" data-f="horas">'+dg.horas+'</span><span class="tm-data-l">horas</span></div>'+
+            '<div class="tm-data-cell tm-data-rec">'+
+              '<span class="tm-data-v'+(superando?' tm-rec-beat':'')+'">'+(msMejor(t)>0 ? (rec.dias+'d') : '—')+'</span>'+
+              '<span class="tm-data-l">'+(superando?'¡récord!':'récord')+'</span>'+
+            '</div>'+
           '</div>'+
 
           // Acciones
@@ -247,6 +255,7 @@
             '<button class="tm-btn tm-btn-stop" data-act="finalizar">Finalizar</button>'+
           '</div>'+
         '</div>';
+
     });
     cont.innerHTML = html;
 
@@ -292,6 +301,14 @@
       setF(card, 'meses', dg.meses);
       setF(card, 'anios', dg.anios);
       setF(card, 'horas', dg.horas);
+      // Anillo de progreso (hacia récord, o día actual si no hay récord).
+      var ringEl = card.querySelector('[data-f="ring"]');
+      if(ringEl){
+        var prog;
+        if(msMejor(t) > 0){ prog = Math.min(100, (ms / msMejor(t)) * 100); }
+        else { prog = Math.min(100, (d.seg + d.min*60 + d.hora*3600) / 86400 * 100); }
+        ringEl.setAttribute('stroke-dashoffset', (100 - 100*prog/100).toFixed(1));
+      }
       // Marca récord
       var clock = card.querySelector('.tm-clock');
       if(clock){
@@ -343,8 +360,6 @@
           '<button class="tm-refresh" id="tm-refresh-btn" title="Actualizar timers">↻</button>'+
         '</div>'+
         '<div class="tm-grid" id="timers-grid"></div>'+
-        '<div class="tm-foot">Para crear un cronómetro nuevo, usa el gajo '+
-          '<b>Timer</b> del dial. Aquí solo los ves y controlas.</div>'+
       '</div>';
     _seccionMontada = true;
 
@@ -370,7 +385,7 @@
   // ── FORMULARIO (gajo del dial) ───────────────────────────────────
   // Modal independiente para crear un timer. NO usa el form RAW genérico.
   function abrirFormTimer(presetTipo){
-    cerrarFormTimer();
+    _limpiarFormDOM();
     var ov = document.createElement('div');
     ov.id = 'tm-form-ov';
     ov.className = 'tm-form-ov';
@@ -447,9 +462,20 @@
       });
     });
   }
-  function cerrarFormTimer(){
+  function _limpiarFormDOM(){
     var ov = document.getElementById('tm-form-ov');
     if(ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+  function cerrarFormTimer(){
+    _limpiarFormDOM();
+    // v8.6 — Al cerrar el form, regresar al dial (HOME). Antes el form se
+    // abría tras cerrarDial() y al cerrarlo quedaba la pantalla en negro sin
+    // dial. Volver a HOME reabre el overlay.
+    if(typeof window.volverAlAnverso === 'function'){
+      try { window.volverAlAnverso(); } catch(e){}
+    } else if(typeof window.abrirDial === 'function'){
+      try { window.abrirDial(); } catch(e){}
+    }
   }
   // Expuesto para el gajo del dial.
   window._abrirFormTimer = abrirFormTimer;
@@ -480,39 +506,57 @@
       // Grid de tarjetas medianas: responsive
       '.tm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;align-content:start}',
       // Tarjeta
-      '.tm-card{position:relative;border:1px solid rgba(167,139,250,0.22);background:rgba(12,10,24,0.6);'+
-        'padding:16px 18px;display:flex;flex-direction:column;gap:13px;'+
-        'box-shadow:0 4px 24px rgba(0,0,0,0.4),inset 0 0 0 1px rgba(255,255,255,0.02);'+
-        'border-top:2px solid var(--tm-acc)}',
+      // ── TARJETA estilo terminal/instrumento (inspirada en el análogo) ──
+      '.tm-card{position:relative;border:1px solid rgba(167,139,250,0.18);'+
+        'background:linear-gradient(160deg,rgba(16,14,30,0.92),rgba(8,7,16,0.92));'+
+        'border-radius:10px;padding:15px 16px 14px;display:flex;flex-direction:column;gap:11px;'+
+        'box-shadow:0 6px 28px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.03);overflow:hidden}',
+      // halo superior con el color del tipo
+      '.tm-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;'+
+        'background:linear-gradient(90deg,transparent,var(--tm-acc),transparent);opacity:.7}',
+      '.tm-card-on{border-color:color-mix(in srgb,var(--tm-acc) 40%,transparent)}',
+      // Cabecera
       '.tm-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}',
-      '.tm-card-titles{display:flex;flex-direction:column;gap:2px;min-width:0}',
-      '.tm-card-tipo{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--tm-acc);opacity:.85}',
-      '.tm-card-name{font-size:15px;font-weight:800;color:#f0f4f8;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-      '.tm-badge{font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:0;white-space:nowrap;flex-shrink:0}',
-      '.tm-badge-activo{background:rgba(74,222,128,0.14);color:#4ade80;border:1px solid rgba(74,222,128,0.4)}',
-      '.tm-badge-pausado{background:rgba(245,158,11,0.14);color:#f59e0b;border:1px solid rgba(245,158,11,0.4)}',
-      '.tm-badge-inactivo{background:rgba(148,163,184,0.12);color:rgba(220,224,235,0.5);border:1px solid rgba(148,163,184,0.3)}',
-      // Cronómetro grande
-      '.tm-clock{display:flex;align-items:flex-end;justify-content:center;gap:4px;padding:6px 0 2px;'+
-        'font-family:"JetBrains Mono",monospace}',
-      '.tm-clock-record .tm-v{color:#facc15;text-shadow:0 0 12px rgba(250,204,21,0.5)}',
-      '.tm-unit{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}',
-      '.tm-v{font-size:30px;font-weight:800;line-height:1;color:var(--tm-acc);text-shadow:0 0 14px var(--tm-acc);'+
-        'font-variant-numeric:tabular-nums;transition:color .3s}',
-      '.tm-unit-d .tm-v{font-size:34px}',
-      '.tm-l{font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(220,224,235,0.4)}',
-      '.tm-colon{font-size:24px;font-weight:700;color:rgba(220,224,235,0.25);align-self:flex-start;margin-top:2px;line-height:1}',
-      // Desglose
-      '.tm-breakdown{display:flex;justify-content:space-around;gap:8px;padding:9px 0;'+
-        'border-top:1px solid rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.05)}',
-      '.tm-bd{display:flex;flex-direction:column;align-items:center;gap:1px}',
-      '.tm-bd-v{font-size:14px;font-weight:800;color:#e8ecf4;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}',
-      '.tm-bd-l{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.38)}',
-      // Récord
-      '.tm-record{display:flex;align-items:center;gap:8px}',
-      '.tm-record-l{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(220,224,235,0.4)}',
-      '.tm-record-v{font-size:12px;font-weight:800;color:#facc15;font-family:"JetBrains Mono",monospace}',
-      '.tm-record-flag{font-size:9px;font-weight:800;color:#4ade80;margin-left:auto;letter-spacing:.04em}',
+      '.tm-card-titles{display:flex;flex-direction:column;gap:3px;min-width:0}',
+      '.tm-card-tipo{display:flex;align-items:center;gap:5px;font-size:9px;font-weight:800;'+
+        'letter-spacing:.16em;color:var(--tm-acc)}',
+      '.tm-dot{width:5px;height:5px;border-radius:50%;background:var(--tm-acc);box-shadow:0 0 6px var(--tm-acc);flex-shrink:0}',
+      '.tm-card-name{font-size:15px;font-weight:800;color:#f4f6fb;letter-spacing:.01em;'+
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      // Anillo de progreso
+      '.tm-ring{position:relative;width:38px;height:38px;flex-shrink:0}',
+      '.tm-ring svg{width:100%;height:100%;transform:rotate(-90deg)}',
+      '.tm-ring-bg{fill:none;stroke:rgba(255,255,255,0.07);stroke-width:2.4}',
+      '.tm-ring-fg{fill:none;stroke:var(--tm-acc);stroke-width:2.4;stroke-linecap:round;'+
+        'transition:stroke-dashoffset .6s ease;filter:drop-shadow(0 0 3px var(--tm-acc))}',
+      '.tm-ring-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;'+
+        'font-size:9px;color:var(--tm-acc)}',
+      '.tm-ring-state.activo{animation:tmPulse 1.6s ease-in-out infinite}',
+      '@keyframes tmPulse{0%,100%{opacity:1}50%{opacity:.35}}',
+      // Cronómetro LED
+      '.tm-clock{display:flex;align-items:center;justify-content:center;gap:2px;padding:8px 0 1px;'+
+        'font-family:"JetBrains Mono",monospace;line-height:1}',
+      '.tm-seg{font-size:34px;font-weight:700;color:var(--tm-acc);'+
+        'text-shadow:0 0 16px color-mix(in srgb,var(--tm-acc) 60%,transparent);'+
+        'font-variant-numeric:tabular-nums;letter-spacing:-.01em;min-width:1.2ch;text-align:center}',
+      '.tm-seg-d{min-width:1.4ch}',
+      '.tm-sep{font-size:26px;font-weight:700;color:rgba(255,255,255,0.18);margin:0 1px}',
+      '.tm-clock-record .tm-seg{color:#facc15;text-shadow:0 0 16px rgba(250,204,21,0.55)}',
+      // Etiquetas bajo el reloj, alineadas con cada segmento
+      '.tm-clock-labels{display:flex;justify-content:center;gap:2px;padding-bottom:4px}',
+      '.tm-clock-labels span{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;'+
+        'color:rgba(220,224,235,0.32);width:calc(1.2ch + 14px);text-align:center}',
+      '.tm-clock-labels span:first-child{width:calc(1.4ch + 14px)}',
+      // Tira de datos
+      '.tm-data{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;'+
+        'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.05);border-radius:6px;overflow:hidden}',
+      '.tm-data-cell{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;'+
+        'background:rgba(10,9,18,0.6)}',
+      '.tm-data-v{font-size:13px;font-weight:800;color:#e8ecf4;font-family:"JetBrains Mono",monospace;'+
+        'font-variant-numeric:tabular-nums}',
+      '.tm-data-l{font-size:7.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.36)}',
+      '.tm-data-rec .tm-data-v{color:#facc15}',
+      '.tm-rec-beat{color:#4ade80 !important;text-shadow:0 0 8px rgba(74,222,128,0.4)}',
       // Acciones
       '.tm-actions{display:flex;gap:8px;margin-top:2px}',
       '.tm-btn{flex:1;padding:8px 10px;border-radius:0;font-size:11px;font-weight:800;letter-spacing:.06em;'+
