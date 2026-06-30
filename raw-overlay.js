@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.11 (Patrimonio/Financiero/Necesidades: distribución y radios tokenizados)
+/* RAW Entry — Overlay v.8.12 (interceptor genérico de navegación por subanillo .irA)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -6981,6 +6981,18 @@ function _crearDialOverlay(){
             } else {
               if(typeof window.irATimers === 'function') window.irATimers();
             }
+            return;
+          }
+          // v8.12 — SUBANILLO "VER SECCIÓN": cualquier sub cuyo preset defina
+          // _dialPreset.irA = 'nombreFuncionGlobal' (p.ej. 'irAActivity')
+          // navega a esa sección en vez de abrir el form RAW. Mecanismo
+          // genérico: con esto el dial es un hub de navegación. Los subs de
+          // crear/registrar (sin .irA) siguen abriendo su formulario normal.
+          if(window._dialPreset && window._dialPreset.irA){
+            var _fn = window._dialPreset.irA;
+            window._dialPreset = {};
+            cerrarDial();
+            if(typeof window[_fn] === 'function') window[_fn]();
             return;
           }
           cerrarDial();

@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.6 (timers + marca os-seccion para limpiar cards en nivel 2)
+/* RAW Entry — Core v.8.12 (subanillos Ver sección: dial como hub de navegación)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -230,6 +230,8 @@ var _DIAL_ITEMS = [
   { id:'activity', label:'Activity', accent:'#22d3c8',
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x-8*k,y+4*k);ctx.lineTo(x-2*k,y-2*k);ctx.lineTo(x+3*k,y+3*k);ctx.lineTo(x+9*k,y-7*k);ctx.strokeStyle=c;ctx.lineWidth=2.4;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();},
     subs:[
+      {id:'activity', label:'Ver sección', accent:'#22d3c8', draw:_icoTexto('👁'),
+       preset:function(){ window._dialPreset={irA:'irAActivity'}; }},
       {id:'libro',   label:'Libros',     accent:'#ec4899', draw:_icoLibro,
        preset:function(){ window._dialPreset={tab:'libro'}; }},
       {id:'movie',   label:'Movies',     accent:'#f59e0b', draw:_icoMovie,
@@ -258,6 +260,8 @@ var _DIAL_ITEMS = [
   { id:'entrenamiento', label:'Entrena', accent:'#fb923c',
     draw:function(ctx,x,y,s,c){var k=s/22;[[-9,0,3.5],[9,0,3.5]].forEach(function(p){ctx.beginPath();ctx.arc(x+p[0]*k,y+p[1]*k,p[2]*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2.2;ctx.stroke();});ctx.beginPath();ctx.moveTo(x-5*k,y);ctx.lineTo(x+5*k,y);ctx.strokeStyle=c;ctx.lineWidth=3;ctx.lineCap='round';ctx.stroke();},
     subs:[
+      {id:'entrenamiento', label:'Ver sección', accent:'#fb923c', draw:_icoTexto('👁'),
+       preset:function(){ window._dialPreset={irA:'irABitacora'}; }},
       {id:'entrenamiento', label:'Fuerza',      accent:'#fb923c', draw:_icoTexto('💪'),
        preset:function(){ window._dialPreset={tab:'entrenamiento',tipo:'Fuerza'}; }},
       {id:'entrenamiento', label:'Cardio',       accent:'#f87171', draw:_icoTexto('🏃'),
@@ -274,6 +278,8 @@ var _DIAL_ITEMS = [
   { id:'nutricion', label:'Nutrición', accent:'#86efac',
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y+2*k,7*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x,y-5*k);ctx.bezierCurveTo(x,y-12*k,x+7*k,y-11*k,x+6*k,y-5*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();},
     subs:[
+      {id:'nutricion', label:'Ver sección', accent:'#86efac', draw:_icoTexto('👁'),
+       preset:function(){ window._dialPreset={irA:'irANutricion'}; }},
       {id:'nutricion', label:'Desayuno', accent:'#fbbf24', draw:_icoTexto('☀️'),
        preset:function(){ window._dialPreset={tab:'nutricion',momento:'Desayuno'}; }},
       {id:'nutricion', label:'Comida',   accent:'#86efac', draw:_icoTexto('🍽'),
@@ -300,6 +306,8 @@ var _DIAL_ITEMS = [
   { id:'pensamiento', label:'Pensa', accent:'#f0abfc',
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x-1*k,y-2*k,8*k,Math.PI*.3,Math.PI*2.2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x+5*k,y+8*k,2.5*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x+9*k,y+13*k,1.5*k,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();},
     subs:[
+      {id:'pensamiento', label:'Ver sección', accent:'#f0abfc', draw:_icoTexto('👁'),
+       preset:function(){ window._dialPreset={irA:'irABitacora'}; }},
       {id:'pensamiento', label:'Emoción',   accent:'#ec4899', draw:_icoTexto('💗'),
        preset:function(){ window._dialPreset={tab:'pensamiento',categoria:'Emoción'}; }},
       {id:'pensamiento', label:'Idea',       accent:'#fbbf24', draw:_icoTexto('💡'),
@@ -343,6 +351,8 @@ var _DIAL_ITEMS = [
   { id:'salud', label:'Salud', accent:'#fca5a5',
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x,y+9*k);ctx.bezierCurveTo(x-12*k,y,x-12*k,y-9*k,x,y-4*k);ctx.bezierCurveTo(x+12*k,y-9*k,x+12*k,y,x,y+9*k);ctx.strokeStyle=c;ctx.lineWidth=2.2;ctx.lineJoin='round';ctx.stroke();},
     subs:[
+      {id:'salud', label:'Ver sección', accent:'#fca5a5', draw:_icoTexto('👁'),
+       preset:function(){ window._dialPreset={irA:'irABitacora'}; }},
       {id:'salud', label:'Cita',        accent:'#67e8f9', draw:_icoTexto('📅'),
        preset:function(){ window._dialPreset={tab:'salud',tipo:'Cita'}; }},
       {id:'salud', label:'Síntoma',     accent:'#f87171', draw:_icoTexto('🤒'),
