@@ -286,12 +286,17 @@ html:not(.mob) #pts{display:none}
 
 .prog-wrap{height:2px;background:rgba(255,255,255,0.05);overflow:hidden}
 .prog-bar{
-  height:100%;width:0%;background:rgba(255,255,255,0.8);transition:width .3s;
-  box-shadow:0 0 6px rgba(255,255,255,0.4);
-  animation:hudBarGlow 2s ease-in-out infinite;
+  height:100%;width:0%;
+  background:linear-gradient(90deg, transparent, var(--acc-violet), transparent);
+  transition:width .3s, opacity .3s;
+  opacity:.85;
 }
-.prog-bar.ind{width:35%;animation:progInd 1.1s ease-in-out infinite, hudBarGlow 2s ease-in-out infinite}
-@keyframes progInd{0%{transform:translateX(-100%)}100%{transform:translateX(380%)}}
+/* v8.1 — Estado "cargando": SIN la banda blanca que cruzaba de lado a lado
+   (progInd). El usuario la pidió fuera. En su lugar, un latido suave violeta
+   acorde a la paleta del dial: la barra ocupa el ancho y respira en opacidad,
+   sin desplazamiento horizontal. Discreto, no chillón. */
+.prog-bar.ind{width:100%;background:linear-gradient(90deg, transparent, var(--acc-violet), transparent);animation:progPulse 1.3s ease-in-out infinite}
+@keyframes progPulse{0%,100%{opacity:.25}50%{opacity:.85}}
 
 /* ═══════════════════════════════════════════
    SECTIONS — núcleo del rediseño v5.072

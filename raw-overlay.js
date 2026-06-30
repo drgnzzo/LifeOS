@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.0 (barra USER+SIM fija + niv-1 solo coverflow + _GRID estable)
+/* RAW Entry — Overlay v.8.1 (USER ancho legible + barra inferior fusionada + HOME fuerza niv-0 + fix laterales remanentes)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -4775,10 +4775,17 @@ function _crearDialOverlay(){
       wUser  = leftW;
       wStats = 0;
     }
+    // v8.1 — USER necesita ancho suficiente para su fila de stats (Energía /
+    // Racha / Créditos / Sheet). Con el ancho de una columna lateral (~340)
+    // esos 4 elementos se AMONTONABAN (se encimaban los valores). Se le da un
+    // ancho mínimo generoso, sin robarle demasiado a la banda Sim.
+    var _USER_MIN = 460;
+    wUser = Math.max(wUser, _USER_MIN);
     var wSim = topBarTotalW - wUser;
-    // Salvaguarda: Sim banda nunca demasiado estrecho
+    // Salvaguarda: Sim banda nunca demasiado estrecho. Si por ello hay que
+    // recortar USER, no bajar de un ancho donde las stats siguen legibles.
     if(wSim < 400){
-      wUser = Math.min(180, wUser);
+      wUser = Math.max(420, topBarTotalW - 400);
       wSim = topBarTotalW - wUser;
     }
 
@@ -4874,49 +4881,28 @@ function _crearDialOverlay(){
     var botPad  = GAP;
     var botGap  = GAP;  // mismo gap entre cards bottom que entre cards laterales
 
-    // Alinear cada card con su columna respectiva.
-    if(fourCols){
-      // Misión = col-A
-      if(pMision){
-        pMision.el.style.width = COL_W+'px';
-        pMision.el.style.left  = colA_X+'px';
-      }
-      // Nivel Actual (track reusado) = col-B
-      if(pTrack){
-        pTrack.el.style.width = COL_W+'px';
-        pTrack.el.style.left  = colB_X+'px';
-      }
-      // Logro = col-C
-      if(pLogro){
-        pLogro.el.style.width = COL_W+'px';
-        pLogro.el.style.left  = colC_X+'px';
-      }
-      // Nivel Siguiente = col-D
-      if(pNivel){
-        pNivel.el.style.width = COL_W+'px';
-        pNivel.el.style.left  = colD_X+'px';
-      }
-    } else {
-      // Modo compacto (2 cols): 2 cards por lado
-      var halfL = Math.floor((leftW - botGap)/2);
-      var halfR = Math.floor((rightW - botGap)/2);
-      if(pMision){
-        pMision.el.style.width = halfL+'px';
-        pMision.el.style.left  = leftX+'px';
-      }
-      if(pTrack){
-        pTrack.el.style.width = halfL+'px';
-        pTrack.el.style.left  = (leftX + halfL + botGap)+'px';
-      }
-      if(pLogro){
-        pLogro.el.style.width = halfR+'px';
-        pLogro.el.style.left  = rightX+'px';
-      }
-      if(pNivel){
-        pNivel.el.style.width = halfR+'px';
-        pNivel.el.style.left  = (rightX + halfR + botGap)+'px';
-      }
-    }
+    // ══════════════════════════════════════════════════════════════════
+    //  v8.1 — BARRA INFERIOR FUSIONADA (una sola barra, no 4 cards sueltas)
+    //  ─────────────────────────────────────────────────────────────────
+    //  El usuario pidió que Misión, Nivel Actual, Logro y Nivel Siguiente
+    //  dejen de ser 4 cards independientes con huecos y se vean como UNA
+    //  barra continua, pegada abajo. Se reparte el ANCHO TOTAL de la barra
+    //  superior (mismo span: de topBarStartX por topBarTotalW) en 4 segmentos
+    //  CONTIGUOS sin gaps. Visualmente: una sola barra dividida en 4 celdas.
+    //  (No se reconstruye el DOM: cada card sigue siendo su propio panel,
+    //  solo se posicionan pegadas y a la misma altura/borde.)
+    // ══════════════════════════════════════════════════════════════════
+    var _barX = topBarStartX;
+    var _barW = topBarTotalW;
+    var _segW = Math.floor(_barW / 4);
+    var _barOrden = [pMision, pTrack, pLogro, pNivel];  // izq → der
+    _barOrden.forEach(function(hp, i){
+      if(!hp || !hp.el) return;
+      // El último segmento absorbe el redondeo para llegar exacto al borde.
+      var w = (i === 3) ? (_barW - _segW*3) : _segW;
+      hp.el.style.width = w + 'px';
+      hp.el.style.left  = (_barX + _segW*i) + 'px';
+    });
 
     // Medir altura natural de las 4 cards
     var botH = 0;
@@ -4946,10 +4932,15 @@ function _crearDialOverlay(){
 
     var botY = vH - botPad - botH;
 
-    [pMision,pTrack,pLogro,pNivel].forEach(function(hp){
+    // v8.1 — Las 4 cards van pegadas como UNA barra: misma altura, mismo top,
+    // sin chamfer individual (el chamfer recortaba esquinas y rompía la
+    // continuidad visual). Bordes rectos para que se lean como una sola pieza.
+    _barOrden.forEach(function(hp, i){
       if(hp && hp.el){
         hp.el.style.top      = botY + 'px';
-        hp.el.style.clipPath = chamferRect;
+        hp.el.style.height   = botH + 'px';
+        hp.el.style.clipPath = 'none';
+        hp.el.style.borderRadius = '0';
       }
     });
 
@@ -7736,6 +7727,17 @@ function abrirDial(){
     window._hudCascadaEnCurso = false;
     _dialOverlay.style.display = 'flex';
     _dialOverlay.style.pointerEvents = 'none';
+
+    // v8.1 — HOME ES SIEMPRE NIVEL 0. Al reabrir el dial desde una sección
+    // (board-face de "nivel 2"), la clase del <html> podía seguir en niv-2,
+    // lo que hacía que _reposicionarHUD creyera que NO está en nivel 0 y
+    // RESTAURARA las cards laterales (que deben permanecer ocultas en niv-0).
+    // Resultado: al ir de nivel 2 → HOME reaparecían las laterales remanentes.
+    // Forzar niv-0 aquí garantiza que la purga de laterales se aplique. El
+    // sistema de niveles (raw-niveles.sync) se re-sincroniza solo: sin
+    // _hudExpanded, nivelReal() devuelve 0.
+    document.documentElement.classList.remove('niv-1','niv-2','niv-warp');
+    document.documentElement.classList.add('niv-0');
 
     // ════════════════════════════════════════════════════════════════
     // v6.062 — REAPERTURA CON FADE REAL (igual al regreso de una card
