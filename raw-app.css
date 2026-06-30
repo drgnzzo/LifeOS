@@ -623,7 +623,8 @@ html:not(.mob) #pts{display:none}
 .btn-sm.suc:hover,.btn-sm.lnk:hover{background:rgba(255,255,255,.12);color:#fff}
 .spin-sm{width:14px;height:14px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:spin .65s linear infinite;display:none}
 
-.save-res{margin:0 var(--pad) 10px;padding:10px 14px;border-radius:0;font-size:13px;font-weight:500;display:none;align-items:center;gap:8px;letter-spacing:-.01em}
+.save-res{margin:0 var(--pad);padding:0 14px;border-radius:0;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;letter-spacing:-.01em;opacity:0;visibility:hidden;max-height:0;overflow:hidden;transition:opacity .26s ease,visibility .26s ease,max-height .26s ease,padding .26s ease,margin-bottom .26s ease}
+.save-res.ok,.save-res.err{opacity:1;visibility:visible;max-height:60px;padding:10px 14px;margin-bottom:10px}
 .save-res.ok {display:flex;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.15);color:var(--hud-ok)}
 .save-res.err{display:flex;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.15);color:var(--hud-err)}
 
