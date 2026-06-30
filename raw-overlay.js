@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.20 (hyperdrive: estiramiento con profundidad Z + punch del salto, nativo 2D)
+/* RAW Entry — Overlay v.8.21 (hyperdrive + parallax cursor reducido a 15px)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1130,8 +1130,8 @@ function _crearDialOverlay(){
        Aditivo: con cámara en 0,0 el fondo se ve EXACTAMENTE como antes. */
     var _camTX = 0, _camTY = 0;   // target (-1..1)
     var _camX  = 0, _camY  = 0;   // current (suavizado)
-    var _CAM_AMP = 26;            // amplitud en px del desplazamiento (notable pero suave)
-    var _CAM_LERP = 0.045;        // qué tan rápido persigue (bajo = más suave/flotante)
+    var _CAM_AMP = 15;            // amplitud en px del desplazamiento (sutil)
+    var _CAM_LERP = 0.04;         // qué tan rápido persigue (bajo = más suave/flotante)
 
     // Mouse (escritorio): normaliza la posición a [-1,1] desde el centro.
     function _camOnMouse(e){
