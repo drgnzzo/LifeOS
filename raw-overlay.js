@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.13 (interceptor cf: navegación a card del coverflow sin cerrar dial)
+/* RAW Entry — Overlay v.8.19 (parallax cósmico: cámara virtual mouse+giroscopio, smooth camera movement)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1119,6 +1119,51 @@ function _crearDialOverlay(){
     window._dispararWarp = function(dir){
       _warpDir = (dir < 0) ? -1 : 1;
       _warpEnergia = 1;
+    };
+
+    /* v8.19 — CÁMARA VIRTUAL · smooth parallax / camera movement.
+       Una "cámara" con dos ejes (camX, camY) en rango ~[-1,1]. El TARGET lo
+       fija el mouse (escritorio) o el giroscopio (móvil); el valor CURRENT
+       persigue al target con un lerp suave cada frame (nunca brusco). Al
+       dibujar, cada capa se desplaza por camX/Y × su profundidad: estrellas
+       grandes (cerca) se mueven más, pequeñas (lejos) menos → parallax 3D.
+       Aditivo: con cámara en 0,0 el fondo se ve EXACTAMENTE como antes. */
+    var _camTX = 0, _camTY = 0;   // target (-1..1)
+    var _camX  = 0, _camY  = 0;   // current (suavizado)
+    var _CAM_AMP = 26;            // amplitud en px del desplazamiento (notable pero suave)
+    var _CAM_LERP = 0.045;        // qué tan rápido persigue (bajo = más suave/flotante)
+
+    // Mouse (escritorio): normaliza la posición a [-1,1] desde el centro.
+    function _camOnMouse(e){
+      var w = window.innerWidth || 1, h = window.innerHeight || 1;
+      _camTX = (e.clientX / w) * 2 - 1;
+      _camTY = (e.clientY / h) * 2 - 1;
+    }
+    // Giroscopio (móvil): gamma = inclinación izq/der, beta = adelante/atrás.
+    function _camOnTilt(e){
+      if(e.gamma == null || e.beta == null) return;
+      // gamma ∈ [-90,90], beta ∈ [-180,180]; acotamos a un rango cómodo.
+      _camTX = Math.max(-1, Math.min(1, e.gamma / 35));
+      _camTY = Math.max(-1, Math.min(1, (e.beta - 45) / 35));
+    }
+    window.addEventListener('mousemove', _camOnMouse, { passive: true });
+    // El giroscopio en iOS requiere permiso explícito; si está disponible sin
+    // permiso (Android y otros), se engancha directo. No forzamos el prompt
+    // de iOS aquí para no ser intrusivos; se puede activar con un gesto luego.
+    if(typeof window.DeviceOrientationEvent !== 'undefined' &&
+       typeof window.DeviceOrientationEvent.requestPermission !== 'function'){
+      window.addEventListener('deviceorientation', _camOnTilt, { passive: true });
+    }
+    // Exponer un activador de giroscopio para iOS (que pide permiso con gesto).
+    window._activarParallaxGiro = function(){
+      try {
+        if(typeof window.DeviceOrientationEvent !== 'undefined' &&
+           typeof window.DeviceOrientationEvent.requestPermission === 'function'){
+          window.DeviceOrientationEvent.requestPermission().then(function(st){
+            if(st === 'granted') window.addEventListener('deviceorientation', _camOnTilt, { passive: true });
+          }).catch(function(){});
+        }
+      } catch(e){}
     };
 
     function resize(){
@@ -2697,6 +2742,15 @@ function _crearDialOverlay(){
       globalT += dt;
       galaxyRotation += 0.01 * dt;
 
+      // v8.19 — CÁMARA: el valor actual persigue suave al target (mouse/giro).
+      // Frame-rate independiente: el factor se escala con dt para que la
+      // suavidad sea igual a 30 o 60 fps. Resultado en px listo para usar.
+      var _lerpF = 1 - Math.pow(1 - _CAM_LERP, dt * 60);
+      _camX += (_camTX - _camX) * _lerpF;
+      _camY += (_camTY - _camY) * _lerpF;
+      var _camPxX = _camX * _CAM_AMP;   // desplazamiento base en px
+      var _camPxY = _camY * _CAM_AMP;
+
       // v7.031 — FASE 4A: decaer la energía del warp. Dura ~1.5s en
       // apagarse (subido desde 0.9s) — el destello se siente más.
       if(_warpEnergia > 0){
@@ -2707,6 +2761,14 @@ function _crearDialOverlay(){
       // 1) Actualizar nebulosa (modulador de estrellas — sin cambios)
       updateNebula(dt);
 
+      // v8.19 — PARALLAX POR CAPAS: cada grupo se desplaza por la cámara
+      // según su profundidad. Lejos (nebulosa) se mueve poco; cerca
+      // (estrellas/hubs) se mueve más. Usamos translate del canvas (save/
+      // restore) para NO tocar ningún cálculo de coordenadas existente.
+      // Capa LEJANA (nebulosa + polvo): parallax suave 0.35.
+      pctx.save();
+      pctx.translate(_camPxX * 0.35, _camPxY * 0.35);
+
       // 1b) v5.201: NEBULOSA VISIBLE — capa offscreen al fondo de todo.
       // (v7.067 intentó pintar cada 2 frames para ahorrar costo, pero
       // como el canvas se limpia cada frame, esto causaba parpadeo
@@ -2716,6 +2778,12 @@ function _crearDialOverlay(){
 
       // 2) Polvo cósmico (capa más al fondo)
       drawDust(dt);
+      pctx.restore();
+
+      // Capa MEDIA/CERCANA (resto: estrellas, constelaciones, etc.):
+      // parallax más marcado 0.85 → sensación de profundidad real.
+      pctx.save();
+      pctx.translate(_camPxX * 0.85, _camPxY * 0.85);
 
       // 3) Anillos orbitales sutiles
       // v5.187: drawOrbitRings desactivado (aros mecánicos poco orgánicos)
@@ -2828,6 +2896,10 @@ function _crearDialOverlay(){
       } catch(e){}
 
       drawPulses();
+
+      // v8.19 — cerrar el parallax de la capa cercana. La viñeta (abajo) es
+      // el marco fijo del viewport: NO debe moverse con la cámara.
+      pctx.restore();
 
       // v5.171: Vignette suave en los bordes — todo se desvanece al
       // acercarse a los límites del viewport, así nada termina "cortado"
