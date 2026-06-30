@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.10 (Bitácora/Activity: grid llena el alto, menos hueco desperdiciado)
+/* RAW Entry — Overlay v.8.11 (Patrimonio/Financiero/Necesidades: distribución y radios tokenizados)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -5429,20 +5429,20 @@ function _crearDialOverlay(){
     'hud-patrimonio': {
       html: function(){
         return ''+
-        '<div style="display:flex;flex-direction:column;gap:14px;padding:0">'+
+        '<div style="display:flex;flex-direction:column;gap:14px;padding:0;height:100%">'+
           // ── HEADER unificado (v8.9) ──
           _expHeader('CENTRO PATRIMONIAL', '', 'fas fa-landmark', '#22C55E')+
           // ── 5 cards top con sparkline + delta ──
-          '<div id="pat-cards-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.1fr;gap:10px"></div>'+
+          '<div id="pat-cards-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.1fr;gap:10px;flex-shrink:0"></div>'+
           // ── Banda Bruto = Disponible + Apartados ──
-          '<div id="pat-banda" style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;padding:14px 16px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03)"></div>'+
+          '<div id="pat-banda" style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;padding:14px 16px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03);flex-shrink:0"></div>'+
           // ── Saldos y Cuentas + Distribución de Fondos ──
-          '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px">'+
-            '<div id="pat-saldos" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03)"></div>'+
-            '<div id="pat-distribucion" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03);display:flex;flex-direction:column"></div>'+
+          '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px;flex-shrink:0">'+
+            '<div id="pat-saldos" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03)"></div>'+
+            '<div id="pat-distribucion" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03);display:flex;flex-direction:column"></div>'+
           '</div>'+
-          // ── Apartados (full width, todos los apartados activos) ──
-          '<div id="pat-apartados" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03)"></div>'+
+          // ── Apartados (crece para llenar el alto restante; scroll si es largo) ──
+          '<div id="pat-apartados" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03);flex:1;min-height:0;overflow-y:auto"></div>'+
         '</div>';
       },
       hydrate: function(){
@@ -5730,27 +5730,27 @@ function _crearDialOverlay(){
     'hud-financiero': {
       html: function(){
         return ''+
-        '<div style="display:flex;flex-direction:column;gap:14px;padding:0">'+
+        '<div style="display:flex;flex-direction:column;gap:14px;padding:0;min-height:100%">'+
           // Header unificado (v8.9)
           _expHeader('FINANCIERO', 'Resumen del mes', 'fas fa-chart-line', '#22D3EE')+
           // 5 cards top
           '<div id="fin-cards-row" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px"></div>'+
           // Mid: Visión General + Gasto promedio (proyección eliminada — datos sintéticos)
           '<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">'+
-            '<div id="fin-vision" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
-            '<div id="fin-gasto" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
+            '<div id="fin-vision" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:var(--rad-lg);background:rgba(34,211,238,0.03)"></div>'+
+            '<div id="fin-gasto" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:var(--rad-lg);background:rgba(34,211,238,0.03)"></div>'+
           '</div>'+
           // Bottom: Análisis mensual + Tendencia
           '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px">'+
-            '<div id="fin-analisis" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px"></div>'+
-            '<div id="fin-tendencia" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;display:flex;flex-direction:column"></div>'+
+            '<div id="fin-analisis" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:var(--rad-lg)"></div>'+
+            '<div id="fin-tendencia" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:var(--rad-lg);display:flex;flex-direction:column"></div>'+
           '</div>'+
           // v5.149: Proyección REAL (de mes.proyeccion del backend, no sintética)
-          '<div id="fin-proyeccion-real" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px"></div>'+
+          '<div id="fin-proyeccion-real" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:var(--rad-lg)"></div>'+
           // v5.149: Identidad (scoreInversionista/scoreConsumidor) — viene de _revData del backend
-          '<div id="fin-identidad" style="padding:12px;border:1px solid rgba(196,181,253,0.18);border-radius:10px;background:rgba(196,181,253,0.03)"></div>'+
+          '<div id="fin-identidad" style="padding:12px;border:1px solid rgba(196,181,253,0.18);border-radius:var(--rad-lg);background:rgba(196,181,253,0.03)"></div>'+
           // v5.149: Insights del backend
-          '<div id="fin-insights" style="padding:12px;border:1px solid rgba(255,255,255,0.06);border-radius:10px"></div>'+
+          '<div id="fin-insights" style="padding:12px;border:1px solid rgba(255,255,255,0.06);border-radius:var(--rad-lg)"></div>'+
         '</div>';
       },
       hydrate: function(){
@@ -6200,8 +6200,8 @@ function _crearDialOverlay(){
             '</div>'+
             // Radar + Pirámide lado a lado
             '<div style="display:flex;gap:14px;min-height:240px;flex-shrink:0">'+
-              '<div id="nec-inline-radar-wrap-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:10px;background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
-              '<div id="nec-inline-piramide-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:10px;background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
+              '<div id="nec-inline-radar-wrap-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:var(--rad-lg);background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
+              '<div id="nec-inline-piramide-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:var(--rad-lg);background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
             '</div>'+
             // v5.144: contenedor inferior SIN scroll interno — el modo
             // expansión ya hace que el panel crezca para mostrar todo el
