@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.119 (ANCLA DE REJILLA ESTABLE _GRID — fin del nivel 0 roto al 1→0)
+/* RAW Entry — Overlay v.7.120 (purga visual de laterales en niv-0 + fix dial volador + _GRID estable)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -967,6 +967,20 @@ function _crearDialOverlay(){
       '@keyframes dialBreath{0%,100%{opacity:.75;transform:scale(1);}50%{opacity:1;transform:scale(1.10);}}',
       '@keyframes dialGlowPulse{0%,100%{box-shadow:0 0 0 1px rgba(120,80,200,0.08),0 4px 32px rgba(0,0,0,0.5);}50%{box-shadow:0 0 0 1px rgba(140,100,220,0.20),0 4px 48px rgba(80,40,140,0.3),0 0 60px rgba(120,80,200,0.08);}}',
       '.hud-panel-glow{animation:dialGlowPulse 4s ease-in-out infinite;}',
+      // ── v7.120 — FIX DIAL VOLADOR (arriba-izquierda al volver de niv-2) ──
+      // CAUSA (cazada con el auditor de consola): el centrado del dial vivía
+      // SOLO en el inline `display:flex;align-items:center;justify-content:center`
+      // del overlay. _dialReanudar (al subir de niv-2) hace
+      // `_dialOverlay.style.display = ''`, lo que BORRA el flex inline → el div
+      // cae a `display:block` → el canvas (position:relative) deja de centrarse
+      // y se va a la esquina superior-izquierda. El snapshot lo confirmó:
+      // overlay _disp pasó de "flex" a "block".
+      // SOLUCIÓN DE RAÍZ: el centrado vive en una REGLA CSS. Aunque se borre el
+      // display inline, el overlay vuelve a flex centrado por la regla. Solo se
+      // exceptúa cuando está explícitamente oculto (display:none inline inicial)
+      // o en niv-2 (donde el overlay es puro fondo y no centra nada).
+      'html:not(.niv-2) #dial-overlay:not([style*="display:none"]):not([style*="display: none"]){' +
+        'display:flex !important;align-items:center !important;justify-content:center !important;}',
     ].join('');
     document.head.appendChild(ks);
   }
@@ -4188,24 +4202,43 @@ function _crearDialOverlay(){
   // reseteado SIN reflow (scrollHeight basura). Refrescar ahí era la fuga que
   // dejaba pasar los 384px. La invalidación solo ocurre en momentos REALMENTE
   // asentados: primer paint quieto y resize/zoom legítimo.
+  // CAP de seguridad (v7.120): la fila top (USER ribbon + Sim banda) NUNCA
+  // mide más de ~200px sana. Un valor mayor SIEMPRE es contaminación (el inner
+  // del panel expandido, 384px; o un scrollHeight residual de 774px que cazó
+  // el auditor). Si hMedido excede el tope, es basura → NO commitear; usar el
+  // último caché bueno (o un fallback sensato), y dejar medido=false para que
+  // el siguiente reposicionamiento limpio sí mida bien.
+  var _TOPROW_CAP = 260;
   function _medirFilaTop(topY, hMedido){
     var G = window._GRID;
+    var _sano = (hMedido > 0 && hMedido <= _TOPROW_CAP);
     if(!G.medido){
-      if(_pantallaQuieta()){
-        // Momento asentado: commit del ancla.
+      if(_pantallaQuieta() && _sano){
+        // Momento asentado Y medición creíble: commit del ancla.
         G.topY    = topY;
         G.topMaxH = hMedido;
         G.colTopY = topY + hMedido + 8;
         G.medido  = true;
         return { topMaxH:G.topMaxH, colTopY:G.colTopY };
       }
-      // Invalidado pero pantalla sucia (cascada/warp): usar el valor vivo como
-      // fallback SIN commitear, para no fijar basura. Se commiteará en el
-      // primer reposicionamiento quieto posterior.
-      return { topMaxH:hMedido, colTopY:topY + hMedido + 8 };
+      // Pantalla sucia O medición increíble (>260px): NO commitear.
+      // Si ya hubo un caché bueno antes (topMaxH sano), reusarlo; si no,
+      // usar el valor vivo acotado al cap como fallback.
+      if(G.topMaxH > 0 && G.topMaxH <= _TOPROW_CAP){
+        return { topMaxH:G.topMaxH, colTopY:G.topY + G.topMaxH + 8 };
+      }
+      var _h = _sano ? hMedido : Math.min(hMedido, _TOPROW_CAP);
+      return { topMaxH:_h, colTopY:topY + _h + 8 };
     }
-    // medido=true: ancla congelada. Devolver SIEMPRE el caché, pase lo que pase.
-    return { topMaxH:G.topMaxH, colTopY:G.colTopY };
+    // medido=true: ancla congelada. PERO si el caché está corrupto (topMaxH
+    // fuera de rango sano — p.ej. quedó en 774 por un commit viejo previo a
+    // este cap), lo descartamos y re-medimos en esta misma pasada.
+    if(G.topMaxH > 0 && G.topMaxH <= _TOPROW_CAP){
+      return { topMaxH:G.topMaxH, colTopY:G.colTopY };
+    }
+    // Caché corrupto → invalidar y recalcular vía la rama de arriba.
+    G.medido = false;
+    return _medirFilaTop(topY, hMedido);
   }
   window._medirFilaTop = _medirFilaTop;
 
@@ -4613,6 +4646,45 @@ function _crearDialOverlay(){
       if(inner){ inner.style.minHeight = ''; }
     });
 
+    // ══════════════════════════════════════════════════════════════════
+    //  v7.120 — PURGA DE CARDS LATERALES EN NIVEL 0
+    //  ─────────────────────────────────────────────────────────────────
+    //  En nivel 0 las 7 cards laterales (left-1/left-2/right-1/right-2:
+    //  Patrimonio, Bitácora, Necesidades, Fijos, Financiero, Variables,
+    //  Activity+Logros) YA NO se muestran ni se posicionan. Solo viven en
+    //  el coverflow de nivel 1.
+    //  IMPORTANTE: NO se borran del DOM ni de _hudPanels. Siguen creadas e
+    //  hidratadas con datos del Sheet (su -inner conserva el innerHTML); el
+    //  coverflow (raw-coverflow.anillo()) las sigue tomando por _side. Aquí
+    //  solo se les pone display:none para que no floten, no empujen, ni se
+    //  midan en nivel 0. El coverflow les quita el display:none al entrar a
+    //  niv-1 (ver gancho en raw-coverflow / raw-niveles).
+    //  Efecto colateral DESEADO: sin laterales, colTopY/positionCol dejan de
+    //  intervenir → muere el bug de cards empujadas a Y~832.
+    // ══════════════════════════════════════════════════════════════════
+    var _ES_NIVEL0 = document.documentElement.classList.contains('niv-0') ||
+                     (!document.documentElement.classList.contains('niv-1') &&
+                      !document.documentElement.classList.contains('niv-2'));
+    function _esLateralPanel(side){
+      return side==='left-1'||side==='left-2'||side==='right-1'||side==='right-2'||side==='left'||side==='right';
+    }
+    if(_ES_NIVEL0){
+      window._hudPanels.forEach(function(hp){
+        if(hp.el && _esLateralPanel(hp.el._side)){
+          // Ocultar de tajo. No tocar su contenido ni su -inner (datos intactos).
+          hp.el.style.display = 'none';
+        }
+      });
+    } else {
+      // Fuera de niv-0 (por seguridad si se reposiciona en otro nivel),
+      // restaurar el display para que el coverflow las pueda mostrar.
+      window._hudPanels.forEach(function(hp){
+        if(hp.el && _esLateralPanel(hp.el._side) && hp.el.style.display === 'none'){
+          hp.el.style.display = '';
+        }
+      });
+    }
+
     // ══════════════════════════════════════════
     //  CÁLCULO DE 4 COLUMNAS LATERALES (2 izq + 2 der)
     //  Se hace primero porque la zona top necesita conocer X y W para alinearse.
@@ -4972,14 +5044,19 @@ function _crearDialOverlay(){
     }
 
     // Posicionar las 4 columnas con su ancho fijo (o las 2 del fallback)
-    if(fourCols){
-      positionCol(pColA, colA_X, COL_W, true);
-      positionCol(pColB, colB_X, COL_W, true);
-      positionCol(pColC, colC_X, COL_W, false);
-      positionCol(pColD, colD_X, COL_W, false);
-    } else {
-      positionCol(pColA, leftX,  leftW,  true);
-      positionCol(pColC, rightX, rightW, false);
+    // v7.120 — En NIVEL 0 las laterales están en display:none (purgadas).
+    // No las posicionamos: medirían scrollHeight=0 y descuadrarían. El
+    // coverflow de nivel 1 las acomoda por su cuenta cuando se entra a niv-1.
+    if(!_ES_NIVEL0){
+      if(fourCols){
+        positionCol(pColA, colA_X, COL_W, true);
+        positionCol(pColB, colB_X, COL_W, true);
+        positionCol(pColC, colC_X, COL_W, false);
+        positionCol(pColD, colD_X, COL_W, false);
+      } else {
+        positionCol(pColA, leftX,  leftW,  true);
+        positionCol(pColC, rightX, rightW, false);
+      }
     }
 
     // ══════════════════════════════════════════
@@ -6178,6 +6255,9 @@ function _crearDialOverlay(){
 
   function _hudExpand(panelEl){
     if(!panelEl) return;
+    // v7.120 — Si la card viene de nivel 0 con display:none (purga visual de
+    // laterales), restaurarla ANTES de expandir para que se vea al bajar 0→1.
+    if(panelEl.style.display === 'none') panelEl.style.display = '';
     if(window._hudExpanded === panelEl){
       _hudCollapse();
       return;
@@ -8036,7 +8116,14 @@ window._dialReanudar = function(){
     if(window._hudCascadaEnCurso) return;   // jamás pisar una cascada viva
     if(_dialOverlay){
       _dialOverlay.style.transition = 'none';
-      _dialOverlay.style.display = '';
+      // v7.120 — FIX dial volado a la esquina al pasar por nivel 2.
+      // Antes: style.display=''  →  borraba el flex inline de fábrica y el
+      // overlay caía a `block` (la regla base CSS no tiene flex), así que
+      // align/justify:center dejaban de centrar y el dial saltaba a 0,0.
+      // El overlay SIEMPRE debe ser flex centrado (igual que abrirDial, que
+      // pone display:'flex' en 7534/7683). Datos del auditor: overlay roto
+      // _disp:block / canvas _box:0,0; bueno _disp:flex / canvas centrado.
+      _dialOverlay.style.display = 'flex';
       _dialOverlay.style.opacity = '1';
       _dialOverlay.style.pointerEvents = 'none';   // como lo deja abrirDial
       requestAnimationFrame(function(){ _dialOverlay.style.transition = ''; });

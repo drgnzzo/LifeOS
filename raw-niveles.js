@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.119  (1→0 ya NO invalida _GRID: el ancla estable manda)
+/* RAW Entry — Sistema de Niveles v.7.120 (laterales solo en coverflow niv-1; niv-0 sin cards laterales)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝

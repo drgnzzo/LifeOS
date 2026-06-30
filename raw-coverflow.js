@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.118 (fix cards fantasma + limpieza en warp)
+/* RAW Entry — Cover Flow Nivel 1 v.7.120 (re-muestra laterales purgadas de niv-0 al montar el aro)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -310,6 +310,10 @@
       if(idx < 0){ limpiar(); return; }
 
       asegurarFlechas();
+      // v7.120 — Nivel 0 dejó las laterales en display:none (purga visual).
+      // Al entrar a niv-1 el coverflow las RE-MUESTRA para poder montar el
+      // aro. Quitar el inline display:none de todas las del aro.
+      aro.forEach(function(el){ if(el.style.display === 'none') el.style.display = ''; });
       aro.forEach(function(el){
         if(el === centro){ el.removeAttribute('data-cf-ring'); el.setAttribute('data-cf-center','1'); }
         else { el.removeAttribute('data-cf-center'); el.setAttribute('data-cf-ring','1'); }
