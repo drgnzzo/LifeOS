@@ -1,4 +1,4 @@
-/* RAW Entry — Timers v.8.7 (CSS tokenizado: consume el sistema de design tokens unificado)
+/* RAW Entry — Timers v.8.14 (botón + Nuevo en la sección + empty-state que invita a crear)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ MÓDULO TIMERS — cronómetros que cuentan HACIA ARRIBA               ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -185,6 +185,7 @@
         '<div class="tm-empty">'+
           '<div class="tm-empty-ico">⏱</div>'+
           '<div class="tm-empty-t">Sin cronómetros</div>'+
+          '<button class="tm-new" onclick="if(window._abrirFormTimer)window._abrirFormTimer(\'\')" style="margin-top:4px"><i class="fas fa-plus"></i> Crear el primero</button>'+
         '</div>';
       return;
     }
@@ -357,7 +358,10 @@
               '<div class="tm-header-s">Tiempo desde tu último evento</div>'+
             '</div>'+
           '</div>'+
-          '<button class="tm-refresh" id="tm-refresh-btn" title="Actualizar timers">↻</button>'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+            '<button class="tm-new" id="tm-new-btn" title="Nuevo cronómetro"><i class="fas fa-plus"></i> Nuevo</button>'+
+            '<button class="tm-refresh" id="tm-refresh-btn" title="Actualizar timers">↻</button>'+
+          '</div>'+
         '</div>'+
         '<div class="tm-grid" id="timers-grid"></div>'+
       '</div>';
@@ -367,6 +371,10 @@
     if(rb) rb.addEventListener('click', function(){
       rb.classList.add('tm-spin');
       cargarTimers(function(){ setTimeout(function(){ rb.classList.remove('tm-spin'); }, 400); });
+    });
+    var nb = document.getElementById('tm-new-btn');
+    if(nb) nb.addEventListener('click', function(){
+      if(typeof window._abrirFormTimer === 'function') window._abrirFormTimer('');
     });
 
     render();
@@ -501,6 +509,11 @@
         'color:var(--hud-text-dim);font-size:var(--fs-base);cursor:pointer;border-radius:var(--rad-chip);transition:all .15s;'+
         'display:flex;align-items:center;justify-content:center}',
       '.tm-refresh:hover{color:var(--hud-text);border-color:var(--hud-border-hov);background:var(--hud-panel-bg-hov)}',
+      '.tm-new{display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border:1px solid color-mix(in srgb,var(--acc-cyan) 40%,transparent);'+
+        'background:color-mix(in srgb,var(--acc-cyan) 12%,transparent);color:var(--acc-cyan);'+
+        'font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:var(--ls-title);text-transform:uppercase;'+
+        'cursor:pointer;border-radius:var(--rad-chip);font-family:var(--font-ui);transition:all .15s}',
+      '.tm-new:hover{background:color-mix(in srgb,var(--acc-cyan) 22%,transparent)}',
       '.tm-spin{animation:tmSpin .7s linear infinite}',
       '@keyframes tmSpin{to{transform:rotate(360deg)}}',
       '.tm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--sp-4);align-content:start}',
