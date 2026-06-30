@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.2 (laterales niv-0 ocultas por CSS a prueba de timing + barra inferior una pieza)
+/* RAW Entry — Overlay v.8.4 (laterales ocultas por defecto salvo en coverflow: sin fantasma en transiciones)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -981,16 +981,23 @@ function _crearDialOverlay(){
       // o en niv-2 (donde el overlay es puro fondo y no centra nada).
       'html:not(.niv-2) #dial-overlay:not([style*="display:none"]):not([style*="display: none"]){' +
         'display:flex !important;align-items:center !important;justify-content:center !important;}',
-      // ── v8.2 — LATERALES NUNCA EN NIVEL 0 (regla de raíz, a prueba de timing) ──
-      // El display:none inline que pone _reposicionarHUD lo borraban el reset y
-      // la cascada de animación de abrirDial (al volver de una sección via
-      // flechas) → las laterales reaparecían (confirmado con auditor:
-      // disp pasaba de none a block vis:visible). Una REGLA CSS con !important
-      // las mantiene ocultas en niv-0 pase lo que pase con los inline. En niv-1
-      // el coverflow las muestra (no aplica esta regla porque ya no es niv-0).
-      'html.niv-0 #hud-patrimonio, html.niv-0 #hud-bitacora, html.niv-0 #hud-necesidades,' +
-      'html.niv-0 #hud-fijos, html.niv-0 #hud-financiero, html.niv-0 #hud-variables,' +
-      'html.niv-0 #hud-activity{display:none !important;}',
+      // ── v8.4 — LATERALES SOLO EN COVERFLOW (sin fantasma) ──
+      // ANTES (v8.2): se ocultaban con html.niv-0. Pero en los instantes de
+      // transición (warp, cambio de pestaña) la clase niv-0 no está puesta un
+      // momento → la regla no aplicaba → las cards PARPADEABAN visibles antes
+      // de ocultarse. El usuario lo ve como "fantasma que aparece y se quita".
+      // LÓGICA INVERTIDA Y DEFINITIVA: las 7 laterales están OCULTAS SIEMPRE
+      // por defecto. SOLO se muestran cuando el coverflow (nivel 1) las marca
+      // con data-cf-ring o data-cf-center. Como por defecto están display:none,
+      // NO pueden parpadear en ningún momento intermedio. El único lugar donde
+      // existen visualmente es el coverflow.
+      '#hud-patrimonio:not([data-cf-ring]):not([data-cf-center]),' +
+      '#hud-bitacora:not([data-cf-ring]):not([data-cf-center]),' +
+      '#hud-necesidades:not([data-cf-ring]):not([data-cf-center]),' +
+      '#hud-fijos:not([data-cf-ring]):not([data-cf-center]),' +
+      '#hud-financiero:not([data-cf-ring]):not([data-cf-center]),' +
+      '#hud-variables:not([data-cf-ring]):not([data-cf-center]),' +
+      '#hud-activity:not([data-cf-ring]):not([data-cf-center]){display:none !important;}',
       // ── v8.2 — BARRA INFERIOR COMO UNA SOLA PIEZA ──
       // Las 4 cards (track/misión/logro/nivel) ya quedan pegadas a nivel de
       // geometría (bordes contiguos, confirmado por auditor). Lo que las hacía
@@ -4675,14 +4682,13 @@ function _crearDialOverlay(){
     //  Patrimonio, Bitácora, Necesidades, Fijos, Financiero, Variables,
     //  Activity+Logros) YA NO se muestran ni se posicionan. Solo viven en
     //  el coverflow de nivel 1.
+    //  v8.4 — La OCULTACIÓN ya NO se hace con display:none inline aquí, sino
+    //  con una REGLA CSS de raíz (ver bloque de estilos: las laterales sin
+    //  data-cf-* están display:none SIEMPRE). Así se elimina el parpadeo
+    //  fantasma en transiciones (la clase niv-0 no siempre está puesta en los
+    //  instantes intermedios). Aquí solo se evita posicionarlas/medirlas.
     //  IMPORTANTE: NO se borran del DOM ni de _hudPanels. Siguen creadas e
-    //  hidratadas con datos del Sheet (su -inner conserva el innerHTML); el
-    //  coverflow (raw-coverflow.anillo()) las sigue tomando por _side. Aquí
-    //  solo se les pone display:none para que no floten, no empujen, ni se
-    //  midan en nivel 0. El coverflow les quita el display:none al entrar a
-    //  niv-1 (ver gancho en raw-coverflow / raw-niveles).
-    //  Efecto colateral DESEADO: sin laterales, colTopY/positionCol dejan de
-    //  intervenir → muere el bug de cards empujadas a Y~832.
+    //  hidratadas con datos del Sheet; el coverflow las toma por _side.
     // ══════════════════════════════════════════════════════════════════
     var _ES_NIVEL0 = document.documentElement.classList.contains('niv-0') ||
                      (!document.documentElement.classList.contains('niv-1') &&
@@ -4690,22 +4696,9 @@ function _crearDialOverlay(){
     function _esLateralPanel(side){
       return side==='left-1'||side==='left-2'||side==='right-1'||side==='right-2'||side==='left'||side==='right';
     }
-    if(_ES_NIVEL0){
-      window._hudPanels.forEach(function(hp){
-        if(hp.el && _esLateralPanel(hp.el._side)){
-          // Ocultar de tajo. No tocar su contenido ni su -inner (datos intactos).
-          hp.el.style.display = 'none';
-        }
-      });
-    } else {
-      // Fuera de niv-0 (por seguridad si se reposiciona en otro nivel),
-      // restaurar el display para que el coverflow las pueda mostrar.
-      window._hudPanels.forEach(function(hp){
-        if(hp.el && _esLateralPanel(hp.el._side) && hp.el.style.display === 'none'){
-          hp.el.style.display = '';
-        }
-      });
-    }
+    // (v8.4) Sin manipulación de display inline: el CSS gobierna la
+    // visibilidad de las laterales. _ES_NIVEL0 se conserva porque más abajo
+    // decide si se posicionan las columnas o no.
 
     // ══════════════════════════════════════════
     //  CÁLCULO DE 4 COLUMNAS LATERALES (2 izq + 2 der)
