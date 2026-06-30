@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.120 (purga visual de laterales en niv-0 + fix dial volador + _GRID estable)
+/* RAW Entry — Overlay v.7.121 (barra USER+SIM arriba fija + fix vuelo USER/inferiores + niv-1 solo coverflow)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -4832,13 +4832,16 @@ function _crearDialOverlay(){
     // USER y Stats NO se estiran. Solo se centran verticalmente con Sim:
     // aplicamos un transform translateY a sus inline top.
 
-    var topY = topPad;
-    // Sim banda toma su altura natural. USER y Stats se centran verticalmente
-    // contra el Sim banda calculando un top ajustado:
-    //   top_user = topY + (hSim - hUser)/2
-    // así sus centros verticales coinciden.
-    var topYUser  = topY + Math.max(0, Math.round((hSim - hUser) / 2));
-    var topYStats = topY + Math.max(0, Math.round((hSim - hStats) / 2));
+    // v7.121 — USER y Estado-del-SIM forman UNA barra superior PEGADA ARRIBA.
+    // USER va a la izquierda, SIM pegado a su derecha, ambos anclados a topY.
+    // ANTES: USER se centraba verticalmente contra hSim con
+    //   topYUser = topY + (hSim - hUser)/2
+    // Pero hSim se mide CONTAMINADO al regresar de niv-1/2 (scrollHeight
+    // residual ~700px sin reflow) → USER saltaba a top≈348 (dato del auditor).
+    // Al anclar AMBOS a topY, USER ya no depende de ninguna altura medida →
+    // no puede volar. La barra queda siempre arriba.
+    var topYUser  = topY;
+    var topYStats = topY;
     // PEGADAS sin gaps entre ellas, comenzando en topBarStartX
     if(pUser && wUser>0){
       pUser.el.style.left = topBarStartX + 'px';
@@ -4923,6 +4926,22 @@ function _crearDialOverlay(){
       }
     });
     if(botH===0) botH = 80;
+    // v7.121 — CAP/ANCLA de la fila inferior. Las 4 cards bottom (Misión,
+    // Track, Logro, Nivel) NUNCA miden más de ~110px sanas. Al regresar de
+    // niv-1/2 el scrollHeight se contamina (dato del auditor: botY saltó de
+    // 1300 a 1180, o sea botH se midió 120px de más) → las cards subían.
+    // Si botH excede el tope, es basura → usar el último valor bueno cacheado
+    // (o el tope). Cuando la pantalla está quieta y la medición es creíble,
+    // refrescar el caché.
+    var _BOT_CAP = 130;
+    if(!window._GRID.botH) window._GRID.botH = 0;
+    if(botH > 0 && botH <= _BOT_CAP && _pantallaQuieta()){
+      window._GRID.botH = botH;            // medición creíble y quieta: cachear
+    } else if(window._GRID.botH > 0){
+      botH = window._GRID.botH;            // usar ancla buena
+    } else {
+      botH = Math.min(botH, _BOT_CAP);     // sin ancla aún: acotar al tope
+    }
 
     var botY = vH - botPad - botH;
 

@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.120 (re-muestra laterales purgadas de niv-0 al montar el aro)
+/* RAW Entry — Cover Flow Nivel 1 v.7.121 (niv-1 oculta TODO lo no-coverflow; re-muestra laterales)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -52,8 +52,14 @@
   css.textContent =
     'html.cf-on .hud-pnl[data-cf-ring]{opacity:0 !important;visibility:hidden !important;'+
       'pointer-events:none !important;transition:opacity .3s ease,visibility 0s linear .3s}'+
-    'html.cf-on .hud-pnl:not([data-cf-center]):not([data-cf-ring]){opacity:.3;'+
-      'transition:opacity .35s ease}'+
+    /* v7.121 — En nivel 1 SOLO se ve el coverflow + el nav superior. Las
+       cards que NO son del aro (USER, Sim, Estado del SIM, Misión, Logro,
+       Nivel, Track) se ocultan POR COMPLETO (antes quedaban a opacity:.3,
+       lo que dejaba Sim+Estado encimados de fondo). El nav superior NO es
+       .hud-pnl, así que se queda visible. */
+    'html.cf-on .hud-pnl:not([data-cf-center]):not([data-cf-ring]){'+
+      'opacity:0 !important;visibility:hidden !important;pointer-events:none !important;'+
+      'transition:opacity .3s ease,visibility 0s linear .3s}'+
     /* vela del dial durante el giro: adiós parpadeo de esquina */
     'html.cf-nav #dial-overlay{opacity:0 !important;transition:opacity .15s ease !important}'+
     '.cf7-ghost{position:fixed;overflow:hidden;cursor:pointer;'+
