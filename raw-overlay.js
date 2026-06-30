@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.19 (parallax cósmico: cámara virtual mouse+giroscopio, smooth camera movement)
+/* RAW Entry — Overlay v.8.20 (hyperdrive: estiramiento con profundidad Z + punch del salto, nativo 2D)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1906,7 +1906,12 @@ function _crearDialOverlay(){
     function drawStars(dt){
       // v7.030 — FASE 4A: factor warp suavizado (curva, no lineal) para
       // que el destello golpee fuerte y se desvanezca con gracia.
-      var warp = _warpEnergia > 0 ? (_warpEnergia * _warpEnergia) : 0;
+      // v8.20 — HYPERDRIVE: curva más explosiva. Antes era energía² (suave);
+      // ahora un arranque con "punch": sqrt al inicio hace que el estiramiento
+      // golpee fuerte de inmediato, luego decae. Da el latigazo del salto.
+      var warp = _warpEnergia > 0
+        ? (Math.pow(_warpEnergia, 1.4) * (0.7 + 0.3 * Math.sqrt(_warpEnergia)))
+        : 0;
       for(var i = 0; i < stars.length; i++){
         var s = stars[i];
         s.theta += s.omega * dt;
@@ -1949,15 +1954,22 @@ function _crearDialOverlay(){
         var colHex = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
 
         if(warp > 0.04){
-          // ── Estrella ESTIRADA: línea radial (efecto velocidad-luz) ──
-          // El largo del trazo crece con la energía warp. La línea va
-          // del centro hacia afuera, alineada con el radio de la estrella.
-          var largo = warp * (s.isHub ? 140 : 90) * (0.6 + twinkle*0.5);
+          // ── HYPERDRIVE (v8.20) — estrella estirada con sensación de
+          // profundidad Z (efecto túnel). Antes el largo era uniforme; ahora
+          // depende de baseSize: las estrellas grandes ("cercanas") se
+          // estiran MUCHO más que las pequeñas ("lejanas") → da el efecto de
+          // venir desde el fondo del túnel hacia ti. Además el factor de
+          // profundidad crece con el radio (las de afuera vienen más lejos).
+          var profZ = 0.45 + (s.baseSize / 1.9) * 0.85;   // 0.45..1.3 según "cercanía"
+          var radioFrac = Math.min(1, s.r / MAX_R);        // las externas vienen de más lejos
+          var depthBoost = 0.7 + radioFrac * 0.9;          // 0.7..1.6
+          var largo = warp * (s.isHub ? 170 : 110) * profZ * depthBoost * (0.6 + twinkle*0.4);
           var ang = s.theta;
           var x2 = CX + Math.cos(ang) * (s.r - largo);
           var y2 = CY + Math.sin(ang) * (s.r - largo);
           pctx.strokeStyle = colHex;
-          pctx.lineWidth = rad * 1.2;
+          // Las estrellas "cercanas" (grandes) también más gruesas al estirar.
+          pctx.lineWidth = rad * (1.0 + profZ * 0.6);
           pctx.lineCap = 'round';
           if(s.isHub || s.baseSize > 1.4){
             pctx.shadowColor = s.color;
