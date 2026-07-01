@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.22 (DIAGNÓSTICO: parallax/vértigo OFF para aislar bug coverflow)
+/* RAW Entry — Overlay v.8.25 (diagnóstico instrumentado: por qué card 0x0 en 2→1)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -4394,7 +4394,8 @@ function _crearDialOverlay(){
     }
   }
   function _reposicionarHUD_impl(){
-    if(!_dialCanvas||!window._hudPanels) return;
+    if(!_dialCanvas||!window._hudPanels){ if(window.__diagCF) console.log('[reposicionar] ABORTA: sin dialCanvas o hudPanels'); return; }
+    if(window.__diagCF) console.log('[reposicionar] INICIA | _hudExpanded='+(window._hudExpanded?window._hudExpanded.id:'null'));
     // v7.103 — ANCLA DURA DEL DIAL: en nivel 0 sin expandido y sin warp,
     // garantizar que el canvas vive en `relative` con left/top vacios. Si
     // quedo en otra posicion tras volver de nivel 1/2 (lo que el log de
@@ -4502,6 +4503,9 @@ function _crearDialOverlay(){
     //  MODO EXPANDIDO — un panel ocupa el centro, dial achicado abajo
     // ══════════════════════════════════════════════════════════════════════
     if(expandedEl){
+      if(window.__diagCF) console.log('[reposicionar] ENTRA a bloque expandedEl='+expandedEl.id+
+        ' | _GRID.medido='+(window._GRID && window._GRID.medido)+
+        ' | niv='+(document.documentElement.className.match(/niv-\d|niv-warp/g)||[]).join(','));
       // Zona disponible verticalmente: entre la fila top (USER/Sim/Stats)
       // y la fila bottom (Misión/Logro/Nivel). El panel se centra ahí.
       // v7.119 — preferir el ancla ESTABLE de la fila top (medida con
@@ -6358,15 +6362,18 @@ function _crearDialOverlay(){
   function _hudAjustarTamañoExpandido(intentos){
     intentos = intentos || 0;
     var panel = window._hudExpanded;
-    if(!panel) return;
+    if(!panel){ if(window.__diagCF) console.log('[ajustar] ABORTA: sin panel expandido'); return; }
     var zonaY = panel._zonaY;
     var zonaH = panel._zonaH;
-    if(zonaY === undefined || zonaH === undefined) return;
+    if(window.__diagCF) console.log('[ajustar] zonaY='+zonaY+' zonaH='+zonaH+
+      ' | width actual='+panel.style.width+' left='+panel.style.left+
+      ' | rect='+Math.round(panel.getBoundingClientRect().width)+'x'+Math.round(panel.getBoundingClientRect().height));
+    if(zonaY === undefined || zonaH === undefined){ if(window.__diagCF) console.log('[ajustar] ABORTA: zona undefined → la card no fue posicionada por _reposicionarHUD'); return; }
 
     var inner = panel.querySelector(':scope > [id$="-inner"]');
-    if(!inner) return;
+    if(!inner){ if(window.__diagCF) console.log('[ajustar] ABORTA: sin -inner'); return; }
     var expContent = inner.querySelector(':scope > .hud-expanded-content');
-    if(!expContent) return;
+    if(!expContent){ if(window.__diagCF) console.log('[ajustar] ABORTA: sin .hud-expanded-content'); return; }
 
     // Altura fija = la zona disponible, acotada para no tapar el
     // mini-dial inferior. Misma fórmula en cualquier monitor.
