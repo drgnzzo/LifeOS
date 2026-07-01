@@ -1,4 +1,4 @@
-/* RAW Entry — Niveles v.8.24 (FIX 0x0 real: reajustar card tras terminar el warp, DOM quieto)
+/* RAW Entry — Niveles v.8.26 (FIX RAÍZ: remove os-seccion en ocultarSeccionN2 + efectos reactivados)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -377,6 +377,14 @@
     var faces = document.querySelectorAll('.board-face:not(.anverso)');
     faces.forEach(function(f){ f.classList.remove('active'); });
     window._osSeccion = 'home';
+    // v8.26 — FIX RAÍZ del bug "card central 0x0 al volver de 2→1". La clase
+    // html.os-seccion tiene una regla `.hud-pnl{display:none !important}` que
+    // oculta TODAS las cards mientras hay una sección abierta. _osMostrar('home')
+    // la quita, pero esta inversión "a mano" (que NO llama a _osMostrar) jamás
+    // la quitaba → la card central quedaba con display:none !important, midiendo
+    // 0x0 aunque tuviera width/left correctos. El !important no lo vence el JS
+    // con style.display. Quitando la clase, la card recupera sus dimensiones.
+    document.documentElement.classList.remove('os-seccion');
     if(typeof window._osMarcarTabs === 'function'){
       try{ window._osMarcarTabs('home'); }catch(e){}
     }
@@ -523,11 +531,9 @@
     if(typeof window._dispararWarp === 'function') window._dispararWarp(1);
 
     // v8.16 — VÉRTIGO: push-in del fondo cósmico sincronizado con el warp.
-    // v8.22 — DESACTIVADO TEMPORALMENTE para diagnosticar el bug del coverflow
-    // (cards congeladas / dial ausente en niv-1). Si con esto desactivado el
-    // coverflow revive, el vértigo era el culpable y se reimplementa distinto.
-    // Para reactivar: cambiar el if(false) por if(true).
-    if(false && window.RawAnim && typeof window.RawAnim.vertigo === 'function'){
+    // v8.26 — REACTIVADO: el diagnóstico confirmó que el bug 0x0 era la clase
+    // os-seccion sin quitar, no el vértigo. Se restaura el efecto.
+    if(window.RawAnim && typeof window.RawAnim.vertigo === 'function'){
       var _bg = document.getElementById('dial-particles');
       if(_bg) window.RawAnim.vertigo(_bg, 1, { dur: 0.5, scale: 1.10 });
     }

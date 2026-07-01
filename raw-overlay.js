@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.25 (diagnóstico instrumentado: por qué card 0x0 en 2→1)
+/* RAW Entry — Overlay v.8.26 (FIX RAÍZ 0x0: quita os-seccion al volver 2→1 + parallax/vértigo reactivados)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -2755,11 +2755,7 @@ function _crearDialOverlay(){
       galaxyRotation += 0.01 * dt;
 
       // v8.19 — CÁMARA: el valor actual persigue suave al target (mouse/giro).
-      // v8.22 — parallax DESACTIVADO temporalmente para diagnóstico (forzamos
-      // cámara en 0,0 = sin desplazamiento). Reactivar quitando estas 2 líneas.
-      _camTX = 0; _camTY = 0;
-      // Frame-rate independiente: el factor se escala con dt para que la
-      // suavidad sea igual a 30 o 60 fps. Resultado en px listo para usar.
+      // v8.26 — REACTIVADO (el bug 0x0 no era esto). Frame-rate independiente.
       var _lerpF = 1 - Math.pow(1 - _CAM_LERP, dt * 60);
       _camX += (_camTX - _camX) * _lerpF;
       _camY += (_camTY - _camY) * _lerpF;
@@ -4394,8 +4390,7 @@ function _crearDialOverlay(){
     }
   }
   function _reposicionarHUD_impl(){
-    if(!_dialCanvas||!window._hudPanels){ if(window.__diagCF) console.log('[reposicionar] ABORTA: sin dialCanvas o hudPanels'); return; }
-    if(window.__diagCF) console.log('[reposicionar] INICIA | _hudExpanded='+(window._hudExpanded?window._hudExpanded.id:'null'));
+    if(!_dialCanvas||!window._hudPanels) return;
     // v7.103 — ANCLA DURA DEL DIAL: en nivel 0 sin expandido y sin warp,
     // garantizar que el canvas vive en `relative` con left/top vacios. Si
     // quedo en otra posicion tras volver de nivel 1/2 (lo que el log de
@@ -4503,9 +4498,6 @@ function _crearDialOverlay(){
     //  MODO EXPANDIDO — un panel ocupa el centro, dial achicado abajo
     // ══════════════════════════════════════════════════════════════════════
     if(expandedEl){
-      if(window.__diagCF) console.log('[reposicionar] ENTRA a bloque expandedEl='+expandedEl.id+
-        ' | _GRID.medido='+(window._GRID && window._GRID.medido)+
-        ' | niv='+(document.documentElement.className.match(/niv-\d|niv-warp/g)||[]).join(','));
       // Zona disponible verticalmente: entre la fila top (USER/Sim/Stats)
       // y la fila bottom (Misión/Logro/Nivel). El panel se centra ahí.
       // v7.119 — preferir el ancla ESTABLE de la fila top (medida con
@@ -6362,18 +6354,23 @@ function _crearDialOverlay(){
   function _hudAjustarTamañoExpandido(intentos){
     intentos = intentos || 0;
     var panel = window._hudExpanded;
-    if(!panel){ if(window.__diagCF) console.log('[ajustar] ABORTA: sin panel expandido'); return; }
+    if(!panel) return;
     var zonaY = panel._zonaY;
     var zonaH = panel._zonaH;
-    if(window.__diagCF) console.log('[ajustar] zonaY='+zonaY+' zonaH='+zonaH+
-      ' | width actual='+panel.style.width+' left='+panel.style.left+
-      ' | rect='+Math.round(panel.getBoundingClientRect().width)+'x'+Math.round(panel.getBoundingClientRect().height));
-    if(zonaY === undefined || zonaH === undefined){ if(window.__diagCF) console.log('[ajustar] ABORTA: zona undefined → la card no fue posicionada por _reposicionarHUD'); return; }
+    if(zonaY === undefined || zonaH === undefined) return;
 
     var inner = panel.querySelector(':scope > [id$="-inner"]');
-    if(!inner){ if(window.__diagCF) console.log('[ajustar] ABORTA: sin -inner'); return; }
+    if(!inner) return;
     var expContent = inner.querySelector(':scope > .hud-expanded-content');
-    if(!expContent){ if(window.__diagCF) console.log('[ajustar] ABORTA: sin .hud-expanded-content'); return; }
+    if(!expContent) return;
+
+    // v8.26 — Respaldo del fix 0x0: asegurar que la card y su contenido no
+    // estén con display:none (que los haría medir 0x0 pese a tener width).
+    // El fix raíz está en raw-niveles (quitar html.os-seccion al volver 2→1),
+    // esto es defensa en profundidad por si otro flujo deja display:none inline.
+    if(panel.style.display === 'none') panel.style.display = '';
+    if(inner.style.display === 'none') inner.style.display = '';
+    if(expContent.style.display === 'none') expContent.style.display = 'flex';
 
     // Altura fija = la zona disponible, acotada para no tapar el
     // mini-dial inferior. Misma fórmula en cualquier monitor.
