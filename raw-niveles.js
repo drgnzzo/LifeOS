@@ -1,4 +1,4 @@
-/* RAW Entry — Niveles v.8.23 (FIX 2→1: re-ajustar tamaño card con overlay visible + re-aplicar coverflow)
+/* RAW Entry — Niveles v.8.24 (FIX 0x0 real: reajustar card tras terminar el warp, DOM quieto)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -403,18 +403,13 @@
       if(window._coverflow && typeof window._coverflow.marcarAro === 'function'){
         try { window._coverflow.marcarAro(); } catch(e){}
       }
-      // v8.23 — FIX 0x0: la card se expandió arriba mientras el overlay aún
-      // estaba oculto → midió 0x0 (elemento oculto no tiene dimensiones). Ya
-      // encendido el overlay, forzamos un re-ajuste de tamaño con el DOM
-      // visible para que la card central recupere sus dimensiones reales.
-      requestAnimationFrame(function(){
-        if(window._hudExpanded && typeof window._hudAjustarTamañoExpandido === 'function'){
-          try { window._hudAjustarTamañoExpandido(); } catch(e){}
-        }
-        if(window._coverflow && typeof window._coverflow.aplicar === 'function'){
-          try { window._coverflow.aplicar(); } catch(e){}
-        }
-      });
+      // v8.24 — FIX 0x0 (correcto): el espía reveló que la card se re-expande
+      // DURANTE niv-warp, y _reposicionarHUD no calcula bien la zona con el DOM
+      // en plena animación (regla de oro: no medir durante animaciones). Por
+      // eso _zonaY/_zonaH quedaban sin valor útil → card 0x0. Solución: esperar
+      // a que el warp TERMINE (se quite la clase niv-warp y el DOM esté quieto)
+      // y ENTONCES reposicionar + ajustar el tamaño de la card central.
+      _reajustarCardTrasWarp();
     }, 50);
     // Plan B: si por timing la card no quedó expandida, reexpandirla.
     setTimeout(function(){
@@ -426,14 +421,34 @@
       if(window._coverflow && typeof window._coverflow.marcarAro === 'function'){
         try { window._coverflow.marcarAro(); } catch(e){}
       }
-      // v8.23 — re-ajuste final de tamaño con overlay ya visible (fix 0x0).
-      if(window._hudExpanded && typeof window._hudAjustarTamañoExpandido === 'function'){
-        try { window._hudAjustarTamañoExpandido(); } catch(e){}
-      }
-      if(window._coverflow && typeof window._coverflow.aplicar === 'function'){
-        try { window._coverflow.aplicar(); } catch(e){}
-      }
     }, 300);
+  }
+
+  // v8.24 — Espera a que el warp termine (DOM quieto) y ENTONCES reposiciona
+  // y ajusta el tamaño de la card central. Sondea la clase niv-warp: mientras
+  // esté, el DOM está en animación y medir da valores contaminados. Cuando se
+  // quita (o tras un tope de intentos), reposiciona limpio.
+  function _reajustarCardTrasWarp(){
+    var intentos = 0;
+    (function esperar(){
+      intentos++;
+      var h = document.documentElement;
+      var enWarp = h.classList.contains('niv-warp');
+      if(!enWarp || intentos > 25){
+        // DOM quieto: reposicionar (recalcula _zonaY/_zonaH) y ajustar tamaño.
+        if(typeof window._reposicionarHUD === 'function'){
+          try { window._reposicionarHUD(); } catch(e){}
+        }
+        if(window._hudExpanded && typeof window._hudAjustarTamañoExpandido === 'function'){
+          try { window._hudAjustarTamañoExpandido(); } catch(e){}
+        }
+        if(window._coverflow && typeof window._coverflow.aplicar === 'function'){
+          try { window._coverflow.aplicar(); } catch(e){}
+        }
+      } else {
+        setTimeout(esperar, 60);
+      }
+    })();
   }
 
   // Render de Activity Check sin pasar por irAActivity (que cierra el
