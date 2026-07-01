@@ -1,5 +1,7 @@
-/* RAW Entry — Agente 007 v.1.2 (autoarranque ligero)
+/* RAW Entry — Agente 007 v.1.3 (autoarranque ligero + integración auditor)
    ═══════════════════════════════════════════════════════════════════
+   v1.3 — actualizado para app v8.27. Añadido el comando unificado
+     diag() que corre el 007 + el auditor de layout de un solo golpe.
    v1.2 — AUTOARRANQUE LIGERO desde el segundo cero:
      · El espia arranca solo a los 800ms del DOMContentLoaded.
      · Tick a 250ms (vs 150ms antes) — menor presion sobre el hilo.
@@ -7,6 +9,7 @@
      · SILENCIOSO al inicio: no imprime Q ni nada. Solo registra
        cambios reales en su buffer interno (window._007log).
    USO:
+     diag()        → ★ COMANDO UNIFICADO: corre 007 + auditor de layout
      q007()        → enciende verbose: imprime Q completo + cambios en vivo
      q007.stop()   → retira por completo (apaga buffer y verbose)
      q007.fps()    → activa el medidor de FPS (rAF) bajo demanda
@@ -15,7 +18,7 @@
    ═══════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
-  var VER = '007 v1.2 · esperado app v7.103';
+  var VER = '007 v1.3 · esperado app v8.27';
   var _id = null;
   var _verbose = false;
   var _buffer = [];           // historial circular de cambios
@@ -128,7 +131,7 @@
     Q();
     // Subir ritmo cuando se enciende verbose (vigilancia activa)
     arrancarTick(150);
-    console.log('▶ 007 v1.2 verbose ACTIVO. Retirar: q007.stop()');
+    console.log('▶ 007 v1.3 verbose ACTIVO. Retirar: q007.stop()');
     console.log('  Buffer previo (' + _buffer.length + ' eventos) en q007.log');
     return VER;
   }
@@ -151,6 +154,46 @@
     }
   });
   window.q007 = q007;
+
+  // ════════════════════════════════════════════════════════════════
+  // COMANDO UNIFICADO diag() — corre el 007 + el auditor de layout de
+  // un solo golpe. Es lo único que necesitas escribir para un chequeo
+  // completo: estado general (007) + problemas de layout (auditor).
+  //   diag()        → chequeo único completo (007 Q + auditoría)
+  //   diag('watch') → además activa la vigilancia de layout en vivo
+  //   diag('full')  → auditoría exhaustiva (incluye texto cortado)
+  // ════════════════════════════════════════════════════════════════
+  window.diag = function(modo){
+    console.log('%c╔══════════════════════════════════════════╗','color:#8b5cf6;font-weight:bold');
+    console.log('%c║   DIAG UNIFICADO · LifeOS                 ║','color:#8b5cf6;font-weight:bold');
+    console.log('%c╚══════════════════════════════════════════╝','color:#8b5cf6;font-weight:bold');
+
+    // 1) Estado general vía 007 (imprime el Q completo una vez).
+    console.log('%c▼ ESTADO GENERAL (007)','color:#67e8f9;font-weight:bold');
+    try {
+      if(typeof q007 === 'function') q007();
+    } catch(e){ console.log('  (007 no disponible:', e.message, ')'); }
+
+    // 2) Auditoría de layout (el inspector visual).
+    console.log('%c▼ AUDITORÍA DE LAYOUT','color:#22d3ee;font-weight:bold');
+    try {
+      if(typeof window.auditar === 'function'){
+        window.auditar(modo === 'full' ? 'full' : undefined);
+      } else {
+        console.log('  (auditor no cargado — revisa que raw-auditor.js esté incluido)');
+      }
+    } catch(e){ console.log('  (auditor error:', e.message, ')'); }
+
+    // 3) Vigilancia en vivo opcional.
+    if(modo === 'watch'){
+      if(typeof window.auditarLoop === 'function') window.auditarLoop(true);
+    }
+
+    console.log('%c══════════ fin diag ══════════','color:#8b5cf6');
+    return '✓ diag completo';
+  };
+
+  console.log('%c🛠 Escribe diag() para un chequeo completo (007 + auditor de layout).','color:#8b5cf6;font-weight:bold');
 
   // ── AUTOARRANQUE LIGERO ──
   // Tras DOMContentLoaded + 800ms, arrancar el tick silencioso a 250ms.
