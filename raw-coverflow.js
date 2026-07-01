@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.8.0 (niv-1 oculta todo lo no-coverflow)
+/* RAW Entry — Coverflow v.8.23 (expone aplicar() para re-render externo)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -499,6 +499,7 @@
       };
     },
     navegar: navegar,
-    marcarAro: marcarAroInstant
+    marcarAro: marcarAroInstant,
+    aplicar: aplicar
   };
 })();

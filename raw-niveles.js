@@ -1,4 +1,4 @@
-/* RAW Entry — Niveles v.8.22 (DIAGNÓSTICO: vértigo OFF)
+/* RAW Entry — Niveles v.8.23 (FIX 2→1: re-ajustar tamaño card con overlay visible + re-aplicar coverflow)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -403,6 +403,18 @@
       if(window._coverflow && typeof window._coverflow.marcarAro === 'function'){
         try { window._coverflow.marcarAro(); } catch(e){}
       }
+      // v8.23 — FIX 0x0: la card se expandió arriba mientras el overlay aún
+      // estaba oculto → midió 0x0 (elemento oculto no tiene dimensiones). Ya
+      // encendido el overlay, forzamos un re-ajuste de tamaño con el DOM
+      // visible para que la card central recupere sus dimensiones reales.
+      requestAnimationFrame(function(){
+        if(window._hudExpanded && typeof window._hudAjustarTamañoExpandido === 'function'){
+          try { window._hudAjustarTamañoExpandido(); } catch(e){}
+        }
+        if(window._coverflow && typeof window._coverflow.aplicar === 'function'){
+          try { window._coverflow.aplicar(); } catch(e){}
+        }
+      });
     }, 50);
     // Plan B: si por timing la card no quedó expandida, reexpandirla.
     setTimeout(function(){
@@ -413,6 +425,13 @@
       window._hudCascadaEnCurso = false;
       if(window._coverflow && typeof window._coverflow.marcarAro === 'function'){
         try { window._coverflow.marcarAro(); } catch(e){}
+      }
+      // v8.23 — re-ajuste final de tamaño con overlay ya visible (fix 0x0).
+      if(window._hudExpanded && typeof window._hudAjustarTamañoExpandido === 'function'){
+        try { window._hudAjustarTamañoExpandido(); } catch(e){}
+      }
+      if(window._coverflow && typeof window._coverflow.aplicar === 'function'){
+        try { window._coverflow.aplicar(); } catch(e){}
       }
     }, 300);
   }
