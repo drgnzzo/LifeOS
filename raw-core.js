@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.30 (sección SOS carrusel + SOS en el ciclo de teclas)
+/* RAW Entry — Core v.8.31 (SOS como tablero, no carrusel)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -945,7 +945,6 @@ window._sosIdx = 0;
 window._montarSOS = function(){
   var board = document.getElementById('board-sos');
   if(!board) return;
-  var tipos = window._SOS_TIPOS;
   board.innerHTML =
     '<div class="sos-wrap">'+
       '<div class="sos-header">'+
@@ -953,12 +952,11 @@ window._montarSOS = function(){
           '<i class="fas fa-tower-broadcast sos-header-ico"></i>'+
           '<div>'+
             '<div class="sos-header-t">CENTRO SOS</div>'+
-            '<div class="sos-header-s">Elige el tipo de alerta · ←/→ para cambiar</div>'+
+            '<div class="sos-header-s">Elige el tipo de alerta que necesitas enviar</div>'+
           '</div>'+
         '</div>'+
       '</div>'+
-      '<div class="sos-carrusel" id="sos-carrusel"></div>'+
-      '<div class="sos-dots" id="sos-dots"></div>'+
+      '<div class="sos-grid" id="sos-grid"></div>'+
       '<div class="sos-msg" id="sos-msg"></div>'+
     '</div>';
   _sosInyectarCSS();
@@ -967,43 +965,25 @@ window._montarSOS = function(){
 
 window._sosRender = function(){
   var tipos = window._SOS_TIPOS;
-  var idx = window._sosIdx;
-  var cont = document.getElementById('sos-carrusel');
-  var dots = document.getElementById('sos-dots');
-  if(!cont) return;
-  var t = tipos[idx];
-  cont.innerHTML =
-    '<div class="sos-card" style="--sos-acc:'+t.color+'">'+
-      '<div class="sos-card-ico"><i class="fas '+t.icono+'"></i></div>'+
-      '<div class="sos-card-label">'+t.label+'</div>'+
-      '<div class="sos-card-msg">'+t.mensaje+'</div>'+
-      '<button class="sos-card-btn" onclick="window._sosEnviar()">'+
-        '<i class="fas fa-paper-plane"></i> Enviar alerta'+
-      '</button>'+
-      '<div class="sos-card-nav">'+
-        '<button class="sos-arrow" onclick="window._sosMover(-1)" title="Anterior">‹</button>'+
-        '<span class="sos-count">'+(idx+1)+' / '+tipos.length+'</span>'+
-        '<button class="sos-arrow" onclick="window._sosMover(1)" title="Siguiente">›</button>'+
-      '</div>'+
-    '</div>';
-  if(dots){
-    dots.innerHTML = tipos.map(function(_,i){
-      return '<span class="sos-dot'+(i===idx?' on':'')+'" onclick="window._sosIr('+i+')"></span>';
-    }).join('');
-  }
+  var grid = document.getElementById('sos-grid');
+  if(!grid) return;
+  // TABLERO: todas las tarjetas visibles a la vez. Cada una envía su alerta.
+  grid.innerHTML = tipos.map(function(t, i){
+    return ''+
+      '<button class="sos-card" style="--sos-acc:'+t.color+'" onclick="window._sosEnviar('+i+')">'+
+        '<div class="sos-card-ico"><i class="fas '+t.icono+'"></i></div>'+
+        '<div class="sos-card-label">'+t.label+'</div>'+
+        '<div class="sos-card-msg">'+t.mensaje+'</div>'+
+        '<div class="sos-card-cta"><i class="fas fa-paper-plane"></i> Enviar</div>'+
+      '</button>';
+  }).join('');
 };
 
-window._sosMover = function(dir){
-  var n = window._SOS_TIPOS.length;
-  window._sosIdx = ((window._sosIdx + dir) % n + n) % n;
-  window._sosRender();
-};
-window._sosIr = function(i){ window._sosIdx = i; window._sosRender(); };
-
-window._sosEnviar = function(){
-  var t = window._SOS_TIPOS[window._sosIdx];
+window._sosEnviar = function(idx){
+  var t = window._SOS_TIPOS[idx];
+  if(!t) return;
   var msgEl = document.getElementById('sos-msg');
-  if(msgEl){ msgEl.textContent = 'Enviando…'; msgEl.className = 'sos-msg activa'; }
+  if(msgEl){ msgEl.textContent = 'Enviando '+t.label+'…'; msgEl.className = 'sos-msg activa'; }
   function done(ubicacion){
     if(typeof api !== 'undefined' && api.enviarSOS){
       api.enviarSOS({mensaje:t.mensaje, ubicacion:ubicacion}).then(function(r){
@@ -1037,31 +1017,24 @@ function _sosInyectarCSS(){
     '.sos-header-t{font-size:var(--fs-lg);font-weight:var(--fw-bold);letter-spacing:.18em;color:var(--hud-text)}',
     '.sos-header-s{font-size:var(--fs-xs);color:var(--hud-text-dim);letter-spacing:var(--ls-title);margin-top:2px}',
     '.sos-carrusel{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}',
-    '.sos-card{width:min(420px,90%);border:1px solid color-mix(in srgb,var(--sos-acc) 45%,transparent);'+
+    '.sos-grid{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--sp-4);'+
+      'align-content:start;overflow-y:auto;min-height:0;padding:2px}',
+    '.sos-card{border:1px solid color-mix(in srgb,var(--sos-acc) 45%,transparent);'+
       'background:radial-gradient(circle at 50% 0%,color-mix(in srgb,var(--sos-acc) 10%,transparent),var(--hud-panel-bg));'+
-      'border-radius:var(--rad-lg);padding:var(--sp-6) var(--sp-5);display:flex;flex-direction:column;'+
-      'align-items:center;gap:var(--sp-4);box-shadow:0 0 40px color-mix(in srgb,var(--sos-acc) 20%,transparent),var(--hud-shadow)}',
-    '.sos-card-ico{width:70px;height:70px;border-radius:var(--rad-pill);display:flex;align-items:center;justify-content:center;'+
+      'border-radius:var(--rad-lg);padding:var(--sp-5) var(--sp-4);display:flex;flex-direction:column;'+
+      'align-items:center;gap:var(--sp-3);box-shadow:var(--hud-shadow);cursor:pointer;'+
+      'font-family:var(--font-ui);text-align:center;transition:transform .12s,box-shadow .12s,border-color .12s}',
+    '.sos-card:hover{transform:translateY(-2px);border-color:var(--sos-acc);'+
+      'box-shadow:0 0 32px color-mix(in srgb,var(--sos-acc) 30%,transparent),var(--hud-shadow)}',
+    '.sos-card:active{transform:translateY(0)}',
+    '.sos-card-ico{width:56px;height:56px;border-radius:var(--rad-pill);display:flex;align-items:center;justify-content:center;'+
       'background:color-mix(in srgb,var(--sos-acc) 15%,transparent);border:2px solid var(--sos-acc);'+
-      'font-size:30px;color:var(--sos-acc);box-shadow:0 0 24px color-mix(in srgb,var(--sos-acc) 40%,transparent);'+
-      'animation:sosPulse 2s ease-in-out infinite}',
-    '@keyframes sosPulse{0%,100%{box-shadow:0 0 24px color-mix(in srgb,var(--sos-acc) 40%,transparent)}50%{box-shadow:0 0 40px color-mix(in srgb,var(--sos-acc) 70%,transparent)}}',
-    '.sos-card-label{font-size:var(--fs-lg);font-weight:var(--fw-bold);color:var(--hud-text);letter-spacing:.04em}',
-    '.sos-card-msg{font-size:var(--fs-sm);color:var(--hud-text-mid);text-align:center;line-height:1.4}',
-    '.sos-card-btn{margin-top:var(--sp-2);padding:12px 28px;border-radius:var(--rad-card);border:none;cursor:pointer;'+
-      'background:var(--sos-acc);color:#0a0a12;font-size:var(--fs-sm);font-weight:var(--fw-bold);letter-spacing:.06em;'+
-      'text-transform:uppercase;display:flex;align-items:center;gap:8px;transition:transform .12s,filter .12s}',
-    '.sos-card-btn:hover{transform:translateY(-1px);filter:brightness(1.1)}',
-    '.sos-card-btn:active{transform:translateY(0)}',
-    '.sos-card-nav{display:flex;align-items:center;gap:var(--sp-4);margin-top:var(--sp-2)}',
-    '.sos-arrow{width:36px;height:36px;border-radius:var(--rad-pill);border:1px solid var(--hud-border);'+
-      'background:var(--hud-panel-bg);color:var(--hud-text);font-size:20px;cursor:pointer;line-height:1;'+
-      'display:flex;align-items:center;justify-content:center;transition:all .15s}',
-    '.sos-arrow:hover{border-color:var(--sos-acc);color:var(--sos-acc)}',
-    '.sos-count{font-size:var(--fs-xs);color:var(--hud-text-dim);font-family:var(--font-mono);min-width:44px;text-align:center}',
-    '.sos-dots{display:flex;justify-content:center;gap:8px;flex-shrink:0}',
-    '.sos-dot{width:8px;height:8px;border-radius:var(--rad-pill);background:var(--hud-text-faint);cursor:pointer;transition:all .15s}',
-    '.sos-dot.on{background:#EF4444;box-shadow:0 0 8px rgba(239,68,68,.6);transform:scale(1.2)}',
+      'font-size:24px;color:var(--sos-acc);box-shadow:0 0 20px color-mix(in srgb,var(--sos-acc) 35%,transparent)}',
+    '.sos-card-label{font-size:var(--fs-base);font-weight:var(--fw-bold);color:var(--hud-text);letter-spacing:.03em}',
+    '.sos-card-msg{font-size:var(--fs-xs);color:var(--hud-text-mid);line-height:1.35}',
+    '.sos-card-cta{margin-top:var(--sp-2);padding:8px 18px;border-radius:var(--rad-card);'+
+      'background:var(--sos-acc);color:#0a0a12;font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:.06em;'+
+      'text-transform:uppercase;display:flex;align-items:center;gap:6px}',
     '.sos-msg{text-align:center;font-size:var(--fs-sm);min-height:18px;flex-shrink:0;transition:color .2s}',
     '.sos-msg.activa{color:var(--hud-text-dim)}',
     '.sos-msg.ok{color:var(--hud-ok)}',

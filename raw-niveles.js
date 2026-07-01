@@ -1,4 +1,4 @@
-/* RAW Entry — Niveles v.8.30 (ciclo de teclas con orden REAL incluyendo SOS + carrusel SOS)
+/* RAW Entry — Niveles v.8.31 (flechas ya no se atrapan en SOS)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1364,13 +1364,6 @@
     if(dd && dd.classList.contains('show')) return;
     var pc = document.getElementById('popup-concepto');
     if(pc && pc.classList.contains('show')) return;
-    // v8.30 — dentro de la sección SOS, las flechas mueven el CARRUSEL de
-    // tipos (no cambian de pestaña). Se sale de SOS con las pestañas de arriba.
-    if(window._osSeccion === 'sos' && typeof window._sosMover === 'function'){
-      e.preventDefault();
-      window._sosMover(e.key === 'ArrowRight' ? 1 : -1);
-      return;
-    }
     e.preventDefault();
     var idx = _tabActivaIdx();
     _irATab(idx + (e.key === 'ArrowRight' ? 1 : -1));
