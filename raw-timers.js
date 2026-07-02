@@ -1,4 +1,4 @@
-/* RAW Entry — Timers v.8.14 (botón + Nuevo en la sección + empty-state que invita a crear)
+/* RAW Entry — Timers v.9.6 (actualización optimista: botones responden al instante)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ MÓDULO TIMERS — cronómetros que cuentan HACIA ARRIBA               ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -118,13 +118,27 @@
     });
   }
 
+  var _pendientes = {};   // v9.6: anti doble-click por timer
   function actualizar(clave, campos, cb){
     if(!window.api || !window.api.actualizarTimer){ if(cb)cb(false); return; }
+    if(_pendientes[clave]) return;          // ya hay una acción en vuelo
+    _pendientes[clave] = true;
+    // ═ v9.6 ACTUALIZACIÓN OPTIMISTA ═ el servidor GAS tarda 1-4s; antes la
+    // UI no cambiaba hasta el round-trip COMPLETO + recarga (otro round-trip)
+    // → botones que "no hacían nada". Ahora: aplicar los campos al timer
+    // LOCAL de inmediato, re-render al instante, y sincronizar detrás.
+    var t = (window._timersData || []).find(function(x){ return x.clave === clave; });
+    if(t){ Object.keys(campos).forEach(function(k){ t[k] = campos[k]; }); render(); }
     window.api.actualizarTimer(clave, campos).then(function(r){
+      delete _pendientes[clave];
       if(cb) cb(true, r);
-      // refrescar tras escribir
-      cargarTimers();
-    }).catch(function(){ if(cb) cb(false); });
+      cargarTimers();                       // reconciliar con el servidor
+    }).catch(function(){
+      delete _pendientes[clave];
+      if(cb) cb(false);
+      cargarTimers();                       // revertir a la verdad del servidor
+      if(typeof window._toast === 'function') window._toast('No se pudo sincronizar el timer');
+    });
   }
 
   function crear(datos, cb){

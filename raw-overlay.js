@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.9.4 (texto en arco del dial estilo batcloud)
+/* RAW Entry — Overlay v.9.6 (FIX: _textoEnArco al scope correcto — el dial vuelve)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -7544,43 +7544,6 @@ function _animarSubRing(targetSub){
 
 function _iniciarPulsoCentro(){
   if(_dialRAF) return;
-  /* v9.4 — Texto curvado sobre un arco (batcloud). Cada carácter se coloca
-     y rota siguiendo la tangente del círculo. En la mitad inferior el texto
-     se voltea (radio interior + orden invertido) para legibilidad. Los
-     anchos de carácter se CACHEAN por fuente+texto (measureText solo la
-     primera vez, no por frame). */
-  var _arcoCache = {};
-  function _textoEnArco(ctx, txt, cx, cy, radio, angCentro){
-    var clave = ctx.font + '|' + txt;
-    var anchos = _arcoCache[clave];
-    if(!anchos){
-      anchos = { w: [], total: 0 };
-      for(var i = 0; i < txt.length; i++){
-        var w = ctx.measureText(txt[i]).width;
-        anchos.w.push(w); anchos.total += w;
-      }
-      _arcoCache[clave] = anchos;
-    }
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    // ¿Mitad inferior? (en canvas, sin>0 es abajo) → voltear
-    var abajo = Math.sin(angCentro) > 0;
-    var espacio = 1.5;                       // px extra entre letras
-    var angTotal = (anchos.total + espacio * (txt.length - 1)) / radio;
-    var a = angCentro + (abajo ? angTotal / 2 : -angTotal / 2);
-    for(var i = 0; i < txt.length; i++){
-      var da = (anchos.w[i] / 2 + (i ? espacio / 2 : 0)) / radio;
-      a += abajo ? -da : da;
-      var x = cx + Math.cos(a) * radio;
-      var y = cy + Math.sin(a) * radio;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(a + (abajo ? -Math.PI / 2 : Math.PI / 2));
-      ctx.fillText(txt[i], 0, 0);
-      ctx.restore();
-      a += abajo ? -da : da;
-    }
-  }
 
   function loop(ts){
     // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
@@ -7606,6 +7569,44 @@ function _iniciarPulsoCentro(){
 function _detenerPulsoCentro(){
   if(_dialRAF){ cancelAnimationFrame(_dialRAF); _dialRAF=null; }
   _dialPulseT = 0;
+}
+
+  /* v9.4 — Texto curvado sobre un arco (batcloud). Cada carácter se coloca
+   y rota siguiendo la tangente del círculo. En la mitad inferior el texto
+   se voltea (radio interior + orden invertido) para legibilidad. Los
+   anchos de carácter se CACHEAN por fuente+texto (measureText solo la
+   primera vez, no por frame). */
+var _arcoCache = {};
+function _textoEnArco(ctx, txt, cx, cy, radio, angCentro){
+  var clave = ctx.font + '|' + txt;
+  var anchos = _arcoCache[clave];
+  if(!anchos){
+    anchos = { w: [], total: 0 };
+    for(var i = 0; i < txt.length; i++){
+      var w = ctx.measureText(txt[i]).width;
+      anchos.w.push(w); anchos.total += w;
+    }
+    _arcoCache[clave] = anchos;
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // ¿Mitad inferior? (en canvas, sin>0 es abajo) → voltear
+  var abajo = Math.sin(angCentro) > 0;
+  var espacio = 1.5;                       // px extra entre letras
+  var angTotal = (anchos.total + espacio * (txt.length - 1)) / radio;
+  var a = angCentro + (abajo ? angTotal / 2 : -angTotal / 2);
+  for(var i = 0; i < txt.length; i++){
+    var da = (anchos.w[i] / 2 + (i ? espacio / 2 : 0)) / radio;
+    a += abajo ? -da : da;
+    var x = cx + Math.cos(a) * radio;
+    var y = cy + Math.sin(a) * radio;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a + (abajo ? -Math.PI / 2 : Math.PI / 2));
+    ctx.fillText(txt[i], 0, 0);
+    ctx.restore();
+    a += abajo ? -da : da;
+  }
 }
 
 function _dialDraw(){
