@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.38 (FASE E: Z continuo — parallax individual por estrella)
+/* RAW Entry — Overlay v.8.40 (curva firma unificada + MATERIAL restaurado)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -3511,7 +3511,7 @@ function _crearDialOverlay(){
       '.hud-h-expand:hover{opacity:1;background:rgba(255,255,255,0.06);transform:scale(1.1)}',
       '.hud-h-expand i{font-size:11px;line-height:1}',
       // Panel expandido: ocupa la zona central donde estaba el dial
-      '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)!important;z-index:9050!important;display:flex;flex-direction:column}',
+      '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.2,0,0,1),top .42s cubic-bezier(.2,0,0,1),width .42s cubic-bezier(.2,0,0,1),height .42s cubic-bezier(.2,0,0,1)!important;z-index:9050!important;display:flex;flex-direction:column}',
       '.hud-pnl.hud-expanded > [id$="-inner"]{display:flex;flex-direction:column;flex:1;min-height:0}',
       // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
       // v5.142 (heredado v5.137): overflow-y:auto + min-height:0 + overflow-x:hidden
@@ -3550,8 +3550,10 @@ function _crearDialOverlay(){
       // que el navegador interpolara y repintara sombras multicapa con blur
       // en 7 cards a 60fps → RAM/GPU disparadas. El material de las cards se
       // reintroducirá de forma estática y barata en una fase posterior.
-      '@keyframes hudBreath{0%,100%{box-shadow:0 0 0 0 var(--hb-c,rgba(255,255,255,0.0)),inset 0 0 0 0 transparent}50%{box-shadow:0 0 32px 6px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 14px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
+      '@keyframes hudBreath{0%,100%{box-shadow:var(--mat-bevel),var(--mat-elev-1),0 0 0 0 var(--hb-c,rgba(255,255,255,0.0))}50%{box-shadow:var(--mat-bevel),var(--mat-elev-1),0 0 32px 6px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 14px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
       '.hud-breathing{animation:hudBreath 5.5s ease-in-out infinite}',
+      '.hud-pnl{background-image:var(--mat-glass-top)}',
+      '.hud-pnl:not(.hud-breathing){box-shadow:var(--mat-bevel),var(--mat-elev-1)}',
       // Perimeter scan principal — pseudo-elemento conic-gradient que rota (sentido horario)
       '@keyframes hudScanRot{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
       '@keyframes hudScanRotRev{from{transform:rotate(360deg)}to{transform:rotate(0deg)}}',
@@ -4637,7 +4639,7 @@ function _crearDialOverlay(){
       // Provisional: asignar zona completa centrada (sin medir contenido aún).
       // _hudAjustarTamañoExpandido (llamado por _hudExpand post-hydrate) hará
       // el ajuste fino de altura según el contenido real.
-      expandedEl.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)';
+      expandedEl.style.transition = 'left .42s cubic-bezier(.2,0,0,1),top .42s cubic-bezier(.2,0,0,1),width .42s cubic-bezier(.2,0,0,1),height .42s cubic-bezier(.2,0,0,1)';
       expandedEl.style.left      = centerX + 'px';
       expandedEl.style.width     = centerW + 'px';
       expandedEl.style.top       = topRowBottom + 'px';
@@ -4652,7 +4654,7 @@ function _crearDialOverlay(){
       var dialMini = 80;
       var dialMiniY = vH - dialMini - GAP - 90; // arriba de las cards bottom
       var dialMiniX = Math.round((vW - dialMini) / 2);
-      _dialCanvas.style.transition = 'width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1),transform .42s cubic-bezier(.4,1.4,.5,1)';
+      _dialCanvas.style.transition = 'width .42s cubic-bezier(.2,0,0,1),height .42s cubic-bezier(.2,0,0,1),transform .42s cubic-bezier(.2,0,0,1)';
       _dialCanvas.style.position = 'fixed';
       _dialCanvas.style.left = dialMiniX + 'px';
       _dialCanvas.style.top  = dialMiniY + 'px';
@@ -4687,7 +4689,7 @@ function _crearDialOverlay(){
         });
         var y = topRowBottom;
         panels.forEach(function(hp){
-          hp.el.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1)';
+          hp.el.style.transition = 'left .42s cubic-bezier(.2,0,0,1),top .42s cubic-bezier(.2,0,0,1),width .42s cubic-bezier(.2,0,0,1)';
           hp.el.style.left = x + 'px';
           hp.el.style.top  = y + 'px';
           hp.el.style.width = COL_W_exp + 'px';
@@ -4709,13 +4711,13 @@ function _crearDialOverlay(){
       var pTrackEx  = getTop('bottom-2nd')[0];
       var botYEx = vH - 90;
       if(pMisionEx){
-        pMisionEx.el.style.transition = 'all .42s cubic-bezier(.4,1.4,.5,1)';
+        pMisionEx.el.style.transition = 'all .42s cubic-bezier(.2,0,0,1)';
         pMisionEx.el.style.left = GAP + 'px';
         pMisionEx.el.style.top  = botYEx + 'px';
         pMisionEx.el.style.width = '320px';
       }
       if(pNivelEx){
-        pNivelEx.el.style.transition = 'all .42s cubic-bezier(.4,1.4,.5,1)';
+        pNivelEx.el.style.transition = 'all .42s cubic-bezier(.2,0,0,1)';
         pNivelEx.el.style.left = (vW - 360 - GAP) + 'px';
         pNivelEx.el.style.top  = botYEx + 'px';
         pNivelEx.el.style.width = '360px';
@@ -5377,7 +5379,7 @@ function _crearDialOverlay(){
 
   function _animarSuave(el, props){
     // Aplica un set de propiedades CSS con transición suave.
-    // Mismo easing que los anillos del dial: cubic-bezier(.4,1.4,.5,1).
+    // Mismo easing que los anillos del dial: cubic-bezier(.2,0,0,1).
     Object.keys(props).forEach(function(k){ el.style[k] = props[k]; });
   }
 
@@ -6653,7 +6655,7 @@ function _crearDialOverlay(){
     if(_dialCanvas){
       // Solo el dial mantiene transition completa para que la animación
       // de mini→grande se vea (es la animación principal del regreso).
-      _dialCanvas.style.transition = 'width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1),box-shadow .35s ease';
+      _dialCanvas.style.transition = 'width .42s cubic-bezier(.2,0,0,1),height .42s cubic-bezier(.2,0,0,1),box-shadow .35s ease';
     }
 
     // PASO 2: Reposicionar después de un rAF para que el browser haga

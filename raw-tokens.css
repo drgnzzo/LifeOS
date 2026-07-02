@@ -143,6 +143,10 @@
   /* Línea holográfica interior (usa el acento vía --pc-border si existe) */
   --mat-holo-line:     inset 0 0 0 1px rgba(167,139,250,0.06);
 
+  /* ── Curva firma (v8.40) — Hubtown-style: arranque veloz, frenado
+     largo y elegante. LA curva de movimiento de toda la app. ────── */
+  --ease-hub:          cubic-bezier(.2, 0, 0, 1);
+
   /* ── Timing del breathing ─────────────────────────────────────── */
   --hud-breath-dur:    4s;
   --hud-breath-easing: ease-in-out;

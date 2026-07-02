@@ -1,4 +1,4 @@
-/* RAW Entry — Coverflow v.8.37 (ANILLO 3D estilo Ring Switcher: las cards orbitan un círculo)
+/* RAW Entry — Coverflow v.8.40 (anillo con curva firma)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -71,9 +71,9 @@
       'box-shadow:0 0 30px rgba(0,0,0,.65),0 0 18px var(--cf7-glow,transparent);'+
       'opacity:0;pointer-events:none;'+
       'transform:perspective(1500px) rotateY(var(--rotY,0deg));'+
-      'transition:left .5s cubic-bezier(.22,.9,.3,1),top .5s cubic-bezier(.22,.9,.3,1),'+
-        'width .5s cubic-bezier(.22,.9,.3,1),height .5s cubic-bezier(.22,.9,.3,1),'+
-        'transform .5s cubic-bezier(.22,.9,.3,1),opacity .4s ease}'+
+      'transition:left .5s cubic-bezier(.2,0,0,1),top .5s cubic-bezier(.2,0,0,1),'+
+        'width .5s cubic-bezier(.2,0,0,1),height .5s cubic-bezier(.2,0,0,1),'+
+        'transform .5s cubic-bezier(.2,0,0,1),opacity .4s ease}'+
     'html.cf-on .cf7-ghost[data-slot="1"],html.cf-on .cf7-ghost[data-slot="-1"]{'+
       'opacity:.92;pointer-events:auto;z-index:9040}'+
     'html.cf-on .cf7-ghost[data-slot="2"],html.cf-on .cf7-ghost[data-slot="-2"]{'+
