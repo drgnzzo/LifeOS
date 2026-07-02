@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.34 (Activity: tabla compacta sin corte ni scroll, columnas 400px)
+/* RAW Entry — Core v.8.41 (ondas cósmicas en eventos reales: guardar + SOS)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -643,7 +643,10 @@ function guardar(){
   }).catch(e=>{progDone();setBtn(false);mostrarRes(false,'Error: '+e.message);showToast('Error',false);});
 }
 function setBtn(l){ const b=document.getElementById('btnG');if(b)b.disabled=l;const sp=document.getElementById('spin');if(sp)sp.style.display=l?'block':'none';const bi=document.getElementById('bico');if(bi)bi.style.display=l?'none':'inline'; }
-function mostrarRes(ok,msg){ const el=document.getElementById('save-res');document.getElementById('res-ico').textContent=ok?'✓':'✗';document.getElementById('res-msg').textContent=msg;el.className='save-res '+(ok?'ok':'err'); }
+function mostrarRes(ok,msg){
+  // v8.41 — onda cósmica: el cosmos responde cuando guardas con éxito.
+  if(ok && typeof window._ondaCosmica === 'function') window._ondaCosmica('#4ADE80');
+  const el=document.getElementById('save-res');document.getElementById('res-ico').textContent=ok?'✓':'✗';document.getElementById('res-msg').textContent=msg;el.className='save-res '+(ok?'ok':'err'); }
 function ocultarRes(){ document.getElementById('save-res').className='save-res'; }
 function limpiar(rf=true){
   if(rf){const fEl=document.getElementById('fecha');if(fEl)fEl.value=fmtD(new Date());}
@@ -992,6 +995,7 @@ window._sosEnviar = function(idx){
           msgEl.className = 'sos-msg ' + (r.ok?'ok':'err');
         }
         if(typeof showToast==='function') showToast(r.ok?'🚨 SOS enviado':'Error al enviar SOS', r.ok);
+        if(r.ok && typeof window._ondaCosmica === 'function') window._ondaCosmica('#EF4444');
       }).catch(function(){
         if(msgEl){ msgEl.textContent='Error al enviar'; msgEl.className='sos-msg err'; }
       });

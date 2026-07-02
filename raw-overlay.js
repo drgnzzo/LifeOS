@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.40 (curva firma unificada + MATERIAL restaurado)
+/* RAW Entry — Overlay v.8.41 (TRIPLE: vórtice espagueti + ondas expansivas + reveal Hubtown)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1121,6 +1121,50 @@ function _crearDialOverlay(){
       _warpEnergia = 1;
     };
 
+    /* v8.41 — ONDAS EXPANSIVAS (matemática de batcloud: uRings). Cuando
+       pasa algo REAL en la app (guardar entrada, completar hábito, SOS),
+       una onda recorre el campo de estrellas iluminándolas a su paso
+       (brillo gaussiano según distancia al frente de onda) + un anillo
+       tenue visible. El cosmos RESPONDE a tus acciones.
+       API: window._ondaCosmica(colorOpcional)
+       Costo: solo cuando hay ondas vivas (máx 3); nada en reposo. */
+    var _ondas = [];
+    window._ondaCosmica = function(color){
+      if(_ondas.length >= 3) _ondas.shift();
+      _ondas.push({ r: 20, color: color || '#A78BFA', alpha: 1 });
+    };
+    function _ondasTick(dt){
+      for(var i = _ondas.length - 1; i >= 0; i--){
+        var o = _ondas[i];
+        o.r += 620 * dt;                       // velocidad de propagación px/s
+        o.alpha = Math.max(0, 1 - o.r / (MAX_R * 1.15));
+        if(o.alpha <= 0.01) _ondas.splice(i, 1);
+      }
+    }
+    function _ondasBoost(rEstrella){
+      // Brillo extra si la estrella está cerca del frente de alguna onda.
+      var b = 0;
+      for(var i = 0; i < _ondas.length; i++){
+        var d = rEstrella - _ondas[i].r;
+        if(d > -70 && d < 70){
+          b += Math.exp(-(d*d) / 1800) * _ondas[i].alpha;   // gauss σ≈30
+        }
+      }
+      return b;
+    }
+    function _ondasDibujar(){
+      for(var i = 0; i < _ondas.length; i++){
+        var o = _ondas[i];
+        pctx.beginPath();
+        pctx.arc(CX, CY, o.r, 0, Math.PI * 2);
+        pctx.strokeStyle = o.color;
+        pctx.globalAlpha = o.alpha * 0.22;
+        pctx.lineWidth = 1.5;
+        pctx.stroke();
+        pctx.globalAlpha = 1;
+      }
+    }
+
     /* v8.19 — CÁMARA VIRTUAL · smooth parallax / camera movement.
        Una "cámara" con dos ejes (camX, camY) en rango ~[-1,1]. El TARGET lo
        fija el mouse (escritorio) o el giroscopio (móvil); el valor CURRENT
@@ -1996,6 +2040,11 @@ function _crearDialOverlay(){
         pY += _camGY * (_prof - 0.85);
         var neb = nebulaIntensityAt(pX, pY);
         var alpha = lifeAlpha * (0.5 + twinkle * 0.45) * neb;
+        // v8.41 — onda expansiva: brillo extra al paso del frente de onda.
+        if(_ondas.length){
+          var _ob = _ondasBoost(s.r);
+          if(_ob > 0.01){ alpha = Math.min(1, alpha + _ob * 0.85); }
+        }
         s._cachedX = pX; s._cachedY = pY;
         var colHex = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
 
@@ -2016,13 +2065,30 @@ function _crearDialOverlay(){
           var _dzVel = (0.85 + (s.baseSize/1.9) * 0.5) * warp;   // cercanas algo más rápidas
           var _zPrev = s._wz;
           s._wz += (_warpDir > 0 ? -1 : 1) * _dzVel * dt * 2.2;   // sumergirse: z decrece
+          // v8.41 — VÓRTICE ESPAGUETI (matemática de joseph-san): torsión
+          // angular con decaimiento exponencial según el radio. El centro
+          // gira violento, los bordes casi nada → las estrellas espiralan
+          // hacia adentro mientras viajan en Z. exp(-r×3) adaptado a
+          // nuestro rango (su exp(-r×7) era para UV 0..0.7).
+          var _rN = Math.min(1, s.r / MAX_R);
+          s.theta += _warpDir * Math.exp(-_rN * 3.0) * warp * 2.4 * dt;
           // Reciclaje del túnel: al pasar la cámara renace al fondo (y viceversa)
           if(s._wz < 0.18){ s._wz = 2.6 + Math.random()*0.5; _zPrev = s._wz; }
           if(s._wz > 3.1){ s._wz = 0.2 + Math.random()*0.2;  _zPrev = s._wz; }
 
           var _f  = 1 / s._wz;      // factor de perspectiva actual
           var _fp = 1 / _zPrev;     // factor de hace un instante (para la cola)
-          var _dirX = Math.cos(s.theta), _dirY = Math.sin(s.theta);
+          // v8.41 — VÓRTICE ESPAGUETI (receta joseph-san): torsión angular
+          // con decaimiento exponencial exp(-r×7) — el centro gira violento,
+          // los bordes casi nada → las estelas se curvan en espiral hacia
+          // adentro. La cabeza y la cola usan torsiones distintas (según su
+          // Z), así el trazo mismo se curva: espagueti, no línea recta.
+          var _rN = s.r / MAX_R;
+          var _twBase = Math.exp(-_rN * 7.0) * warp * 2.4;
+          var _angH = s.theta + _twBase / s._wz;      // cabeza: más torsión al acercarse
+          var _angT = s.theta + _twBase / _zPrev;     // cola: torsión de hace un instante
+          var _dirX = Math.cos(_angH), _dirY = Math.sin(_angH);
+          var _dirXT = Math.cos(_angT), _dirYT = Math.sin(_angT);
           var _px1 = CX + _dirX * s.r * _f,  _py1 = CY + _dirY * s.r * _f;   // cabeza
           var _px2 = CX + _dirX * s.r * _fp, _py2 = CY + _dirY * s.r * _fp;  // cola
           // La cola mínima garantiza trazo visible incluso recién nacida.
@@ -2844,6 +2910,8 @@ function _crearDialOverlay(){
         _warpEnergia -= dt / 1.6;
         if(_warpEnergia < 0) _warpEnergia = 0;
       }
+      // v8.41 — avanzar las ondas expansivas (solo si hay vivas).
+      if(_ondas.length) _ondasTick(dt);
 
       // 1) Actualizar nebulosa (modulador de estrellas — sin cambios)
       updateNebula(dt);
@@ -2918,6 +2986,7 @@ function _crearDialOverlay(){
 
       // 10) Estrellas
       drawStars(dt);
+      if(_ondas.length) _ondasDibujar();
 
       // 10b) v5.201: HALOS LEJANOS (objetos cósmicos con aro)
       drawFarHalos(dt);
@@ -5572,6 +5641,9 @@ function _crearDialOverlay(){
     var sub = subtitulo
       ? '<div style="font-size:var(--fs-2xs);font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:var(--hud-text-dim);margin-top:2px">'+subtitulo+'</div>'
       : '';
+    // v8.41 — REVEAL POR LÍNEAS (Hubtown): el título entra deslizándose
+    // desde abajo dentro de un wrapper con overflow oculto, con la curva
+    // firma. El keyframe se inyecta una vez.
     return ''+
       '<div style="display:flex;align-items:center;gap:var(--sp-3);padding:0 2px">'+
         '<div style="width:34px;height:34px;border-radius:var(--rad-card);flex-shrink:0;'+
@@ -5582,13 +5654,24 @@ function _crearDialOverlay(){
           '<i class="'+iconClass+'" style="color:'+color+';font-size:15px"></i>'+
         '</div>'+
         '<div style="min-width:0">'+
-          '<div style="font-size:var(--fs-base);font-weight:var(--fw-bold);letter-spacing:var(--ls-title);'+
-            'color:'+color+';text-shadow:0 0 8px color-mix(in srgb,'+color+' 35%,transparent)">'+titulo+'</div>'+
+          '<div style="overflow:hidden">'+
+            '<div style="font-size:var(--fs-base);font-weight:var(--fw-bold);letter-spacing:var(--ls-title);'+
+              'color:'+color+';text-shadow:0 0 8px color-mix(in srgb,'+color+' 35%,transparent);'+
+              'animation:expTituloReveal .65s var(--ease-hub) both">'+titulo+'</div>'+
+          '</div>'+
           sub+
         '</div>'+
       '</div>';
   }
   window._expHeader = _expHeader;
+  // Keyframe del reveal (una sola vez)
+  (function(){
+    if(document.getElementById('exp-reveal-kf')) return;
+    var st = document.createElement('style');
+    st.id = 'exp-reveal-kf';
+    st.textContent = '@keyframes expTituloReveal{from{transform:translateY(115%)}to{transform:translateY(0)}}';
+    document.head.appendChild(st);
+  })();
 
   var _EXPAND_CONFIG = {
     // ── PATRIMONIO ──
