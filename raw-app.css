@@ -3389,3 +3389,41 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
 ═══════════════════════════════════════════════════════════════════ */
 *{scrollbar-width:none;-ms-overflow-style:none}
 *::-webkit-scrollbar{width:0!important;height:0!important;display:none}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MATERIAL v2 (v8.35) — profundidad física en todas las superficies.
+   Fase B de la renovación visual: bisel (luz de arriba, asiento de
+   sombra abajo), elevación de 2 capas y highlight de vidrio en el tope.
+   Todo aditivo: solo box-shadow + background-image (cero layout).
+═══════════════════════════════════════════════════════════════════ */
+/* Columnas de tableros (Bitácora y Activity comparten patrón visual) */
+.bit-col{
+  box-shadow:var(--mat-bevel),var(--mat-elev-1),0 0 0 1px rgba(120,160,255,0.04)!important;
+  background-image:var(--mat-glass-top);
+}
+/* Columnas de Activity (creadas por JS con data-panel-tipo) */
+[data-panel-tipo]{
+  box-shadow:var(--mat-bevel),var(--mat-elev-1)!important;
+  background-image:var(--mat-glass-top)!important;
+}
+/* Grupos de panel (Notas/config) */
+.panel-group{
+  box-shadow:var(--mat-bevel),var(--mat-elev-1);
+  background-image:var(--mat-glass-top);
+}
+/* Cards de Timers */
+.tm-card{
+  box-shadow:var(--mat-bevel),var(--mat-elev-1);
+  background-image:var(--mat-glass-top);
+}
+/* Cards de SOS */
+.sos-card{
+  box-shadow:var(--mat-bevel),var(--mat-elev-2)!important;
+  background-image:var(--mat-glass-top);
+}
+/* Popups y formulario RAW: elevación máxima (flotan sobre todo) */
+.popup-overlay > *:first-child,
+#popup-entrada > *:first-child{
+  box-shadow:var(--mat-bevel),var(--mat-elev-3);
+  background-image:var(--mat-glass-top);
+}

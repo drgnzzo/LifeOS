@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.34 (HYPERDRIVE Z-3D: proyección de perspectiva real en el warp)
+/* RAW Entry — Overlay v.8.35 (MATERIAL v2: bisel + vidrio en cards, breathing con material integrado)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -3486,8 +3486,16 @@ function _crearDialOverlay(){
       '.hud-empty-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px 16px;color:rgba(220,224,235,0.45)}',
       '.hud-empty-msg span{font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;text-align:center}',
       // Breathing glow — sombra que pulsa suavemente (más lento: 5.5s)
-      '@keyframes hudBreath{0%,100%{box-shadow:0 0 0 0 var(--hb-c,rgba(255,255,255,0.0)),inset 0 0 0 0 transparent}50%{box-shadow:0 0 32px 6px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 14px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
+      // v8.35 MATERIAL: el bisel (luz arriba/asiento abajo) y la elevación
+      // van DENTRO del keyframe en ambos estados — el breathing anima
+      // box-shadow completo, así que el material debe viajar con él.
+      '@keyframes hudBreath{0%,100%{box-shadow:var(--mat-bevel),var(--mat-elev-1),0 0 0 0 var(--hb-c,rgba(255,255,255,0.0))}50%{box-shadow:var(--mat-bevel),var(--mat-elev-1),0 0 32px 6px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 14px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
       '.hud-breathing{animation:hudBreath 5.5s ease-in-out infinite}',
+      // v8.35 MATERIAL: highlight de vidrio en el tope de cada card + bisel
+      // para las cards SIN breathing (estado base). background-image se suma
+      // al background-color existente sin pisarlo.
+      '.hud-pnl{background-image:var(--mat-glass-top)}',
+      '.hud-pnl:not(.hud-breathing){box-shadow:var(--mat-bevel),var(--mat-elev-1)}',
       // Perimeter scan principal — pseudo-elemento conic-gradient que rota (sentido horario)
       '@keyframes hudScanRot{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
       '@keyframes hudScanRotRev{from{transform:rotate(360deg)}to{transform:rotate(0deg)}}',
