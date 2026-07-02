@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.41 (TRIPLE: vórtice espagueti + ondas expansivas + reveal Hubtown)
+/* RAW Entry — Overlay v.8.42 (velocity-glitch RGB-split diegético)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1222,9 +1222,21 @@ function _crearDialOverlay(){
        · la lista de inners se cachea (querySelectorAll cada ~7s, no por frame)
        · en niv-2 / móvil se resetea y descansa */
     var _ctrInners = null, _ctrRefresco = 0, _ctrLastX = 99, _ctrLastY = 99, _ctrActivo = false;
+    var _velGlitch = 0;   // v8.42: energía del glitch por velocidad (0..1)
     function _ctrMov(){
       // Guard de reposo: cámara quieta = ni un write al DOM.
-      if(Math.abs(_camX - _ctrLastX) < 0.0015 && Math.abs(_camY - _ctrLastY) < 0.0015) return;
+      if(Math.abs(_camX - _ctrLastX) < 0.0015 && Math.abs(_camY - _ctrLastY) < 0.0015){
+        // decaer el glitch aunque la cámara pare
+        if(_velGlitch > 0.01){ _velGlitch *= 0.86; } else { return; }
+      }
+      // v8.42 — VELOCITY-GLITCH (joseph-san): la VELOCIDAD del movimiento
+      // alimenta una energía de "degradación de señal". Movimiento brusco →
+      // los hologramas sufren un RGB-split sutil (los canales de color se
+      // separan un instante) que decae solo. Mouse suave = imagen perfecta.
+      var _vx = _camX - _ctrLastX, _vy = _camY - _ctrLastY;
+      var _vel = Math.sqrt(_vx*_vx + _vy*_vy);
+      if(_vel > 0.012) _velGlitch = Math.min(1, _velGlitch + _vel * 6);
+      _velGlitch *= 0.90;   // decaimiento
       _ctrLastX = _camX; _ctrLastY = _camY;
 
       if(!_ctrInners || --_ctrRefresco <= 0){
@@ -1234,8 +1246,16 @@ function _crearDialOverlay(){
       var tx = (-_camX * 3.5).toFixed(2), ty = (-_camY * 3.5).toFixed(2);
       var rx = ( _camY * 0.7).toFixed(2), ry = (-_camX * 0.7).toFixed(2);
       var t = 'perspective(900px) translate3d('+tx+'px,'+ty+'px,0) rotateX('+rx+'deg) rotateY('+ry+'deg)';
+      // RGB-split vía text-shadow (rojo a un lado, cian al otro) — barato,
+      // solo cuando hay energía; con energía ~0 se limpia el filtro.
+      var g = _velGlitch;
+      var sombra = (g > 0.06)
+        ? (1.6*g).toFixed(2)+'px 0 rgba(255,60,60,'+(0.35*g).toFixed(2)+'), '+
+          (-1.6*g).toFixed(2)+'px 0 rgba(60,220,255,'+(0.35*g).toFixed(2)+')'
+        : '';
       for(var i = 0; i < _ctrInners.length; i++){
         _ctrInners[i].style.transform = t;
+        _ctrInners[i].style.textShadow = sombra;
       }
       _ctrActivo = true;
     }
@@ -1243,7 +1263,7 @@ function _crearDialOverlay(){
     // que las secciones no hereden un tilt congelado.
     var _ctrObs = new MutationObserver(function(){
       if(document.documentElement.classList.contains('niv-2') && _ctrActivo){
-        if(_ctrInners){ for(var i=0;i<_ctrInners.length;i++){ _ctrInners[i].style.transform = ''; } }
+        if(_ctrInners){ for(var i=0;i<_ctrInners.length;i++){ _ctrInners[i].style.transform = ''; _ctrInners[i].style.textShadow = ''; } }
         _ctrActivo = false; _ctrLastX = 99; _ctrLastY = 99;
       }
     });
