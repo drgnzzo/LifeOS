@@ -9,7 +9,7 @@
    · Cuando subas una versión nueva del SW, incrementa CACHE_NAME
      (cambiando el número) para que se invaliden los archivos viejos.
 */
-const CACHE_NAME = 'lifeos-v8-35';
+const CACHE_NAME = 'lifeos-v8-37';
 const SHELL = [
   '/LifeOS/',
   '/LifeOS/index.html',

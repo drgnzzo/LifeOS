@@ -1,4 +1,4 @@
-/* RAW Entry — Coverflow v.8.23 (expone aplicar() para re-render externo)
+/* RAW Entry — Coverflow v.8.37 (ANILLO 3D estilo Ring Switcher: las cards orbitan un círculo)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -252,34 +252,40 @@
   }
 
   // Geometría de cada slot relativo al centro.
-  function slotGeo(d, r){
+  function slotGeo(d, r, n){
     var vw = window.innerWidth;
     var vh = window.innerHeight;
-    // v7.115 — FIX CARDS APLASTADAS: la card central a veces queda con
-    // altura provisional baja (ej. 348px en pantallas donde deberian ser
-    // ~700px) porque _hudAjustarTamañoExpandido no se dispara o se queda
-    // con ese valor. Los marcos laterales heredaban esa altura aplastada
-    // y se veian raros (las cards laterales del Cover Flow estaban muy
-    // chicas hasta que el usuario navegaba).
-    // Solucion: la ALTURA de los marcos se calcula desde la ZONA DISPONIBLE
-    // real (vh - top - margen inferior), NO desde r.height del centro.
-    // Asi los marcos siempre tienen altura digna aunque el centro este
-    // provisionalmente bajo.
     var zonaH = Math.max(360, vh - r.top - 120);   // 120 = barra bottom + margen
-    var w1 = Math.min(470, Math.max(300, r.width*0.46));
-    var h1 = Math.round(zonaH*0.88);
-    var w2 = Math.round(w1*0.8), h2 = Math.round(h1*0.84);
-    // Centrar verticalmente en la zona disponible, no en r (r.height
-    // puede ser la altura provisional baja).
-    var t1 = Math.max(60, r.top + (zonaH-h1)/2);
-    var t2 = Math.max(60, r.top + (zonaH-h2)/2);
-    if(d === 0)  return { w:Math.round(r.width), h:Math.round(r.height), top:Math.round(r.top), left:Math.round(r.left), rot:0 };
-    if(d === -1) return { w:w1,h:h1,top:t1, left:Math.max(4, r.left - w1 + 28), rot:+20 };
-    if(d === +1) return { w:w1,h:h1,top:t1, left:Math.min(vw-w1-4, r.right - 28), rot:-20 };
-    if(d === -2) return { w:w2,h:h2,top:t2, left:Math.max(2, r.left - w1 + 28 - Math.round(w2*0.5)), rot:+32 };
-    if(d === +2) return { w:w2,h:h2,top:t2, left:Math.min(vw-w2-2, r.right - 28 + Math.round(w1*0.5)), rot:-32 };
-    if(d < 0)    return { w:w2,h:h2,top:t2, left:-w2-80, rot:+40 };
-    return             { w:w2,h:h2,top:t2, left:vw+80,  rot:-40 };
+    if(d === 0)  return { w:Math.round(r.width), h:Math.round(r.height), top:Math.round(r.top), left:Math.round(r.left), rot:0, op:0, zi:9030 };
+
+    // ══ ANILLO 3D (v8.37) — estilo Ring Switcher (Compiz/Linux) ══════
+    // Las cards viven en un CÍRCULO y navegar = girar el anillo entero.
+    // Cada slot es un ángulo (d × 360/n): la proyección da posición,
+    // escala, giro, opacidad y capa según su profundidad en el anillo.
+    // Si el aro crece (más cards), el círculo solo reparte más ángulos.
+    n = n || 7;
+    var th = (d / n) * Math.PI * 2;          // ángulo en el anillo
+    var zz = Math.cos(th);                    // profundidad: 1 frente … -1 atrás
+    var xx = Math.sin(th);                    // lateral: -1 izq … 1 der
+    var esc = 0.42 + 0.58 * ((zz + 1) / 2);  // escala: atrás 42% … frente 100%
+
+    var wBase = Math.min(470, Math.max(300, r.width * 0.46));
+    var hBase = Math.round(zonaH * 0.88);
+    var w  = Math.round(wBase * esc);
+    var hh = Math.round(hBase * esc);
+
+    var cx = vw / 2;
+    var radioX = Math.max(340, vw / 2 - wBase * 0.42);
+    var left = Math.round(cx + xx * radioX - w / 2);
+    // Anillo visto levemente desde arriba: las de atrás SUBEN → se asoman
+    // por encima de la central en vez de quedar tapadas (efecto Compiz).
+    var top = Math.round(Math.max(40, r.top + (zonaH - hh) / 2 - (1 - zz) * 38));
+    var rot = Math.round(-xx * 42);           // giran siguiendo la tangente
+
+    // Opacidad y capa por profundidad: las traseras SE VEN pasar (tenues).
+    var op = (zz > 0.7) ? 0.95 : (0.16 + 0.72 * ((zz + 1) / 2));
+    var zi = 9030 + Math.round((zz + 1) * 8); // frente tapa a atrás
+    return { w:w, h:hh, top:top, left:left, rot:rot, op:op, zi:zi };
   }
 
   var _slots = {};   // id -> slot actual (para q007)
@@ -356,14 +362,20 @@
         var d = ((i - idx) % n + n) % n;          // 0..n-1
         if(d > n/2) d -= n;                       // camino corto: -3..+3
         var g = marcoDe(card);
-        var q = slotGeo(d, r);
+        var q = slotGeo(d, r, n);
         g.setAttribute('data-slot', String(d));
         g.style.width=q.w+'px'; g.style.height=q.h+'px';
         g.style.left=q.left+'px'; g.style.top=q.top+'px';
         g.style.setProperty('--rotY', q.rot+'deg');
+        // v8.37 ANILLO: opacidad y capa por PROFUNDIDAD (inline pisa el CSS
+        // fijo por slot). Las traseras se ven pasar tenues por arriba.
+        g.style.opacity = q.op;
+        g.style.zIndex = q.zi;
+        if(d !== 0) g.style.pointerEvents = 'auto';
         _slots[card.id] = d;
-        // Clon: montar/refrescar al entrar al rango visible
-        if(Math.abs(d) <= 2 && d !== 0){
+        // Clon: en el anillo TODAS las posiciones se ven → montar todas
+        // (menos el frente, que es la card real). _fresco evita remontajes.
+        if(d !== 0){
           if(_fresco[card.id] !== centro.id){
             var pos = i+1;
             g.querySelector('.cf7-pos').textContent =
@@ -392,6 +404,12 @@
     h.classList.remove('cf-on','cf-nav');
     document.querySelectorAll('.hud-pnl[data-cf-ring],.hud-pnl[data-cf-center]')
       .forEach(function(el){ el.removeAttribute('data-cf-ring'); el.removeAttribute('data-cf-center'); });
+    // v8.37 ANILLO: resetear los estilos inline (opacity/zIndex/pointer)
+    // de los ghosts — el inline pisa el CSS base opacity:0, así que sin
+    // esto quedarían visibles flotando al salir del coverflow.
+    document.querySelectorAll('.cf7-ghost').forEach(function(g){
+      g.style.opacity = ''; g.style.zIndex = ''; g.style.pointerEvents = '';
+    });
     _slots = {};
   }
 
