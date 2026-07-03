@@ -1,4 +1,4 @@
-/* RAW Entry — Coverflow v.8.40 (anillo con curva firma)
+/* RAW Entry — Coverflow v.9.7 (viaje visible: crossfade al centro + clones sin remonte)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -73,7 +73,7 @@
       'transform:perspective(1500px) rotateY(var(--rotY,0deg));'+
       'transition:left .5s cubic-bezier(.2,0,0,1),top .5s cubic-bezier(.2,0,0,1),'+
         'width .5s cubic-bezier(.2,0,0,1),height .5s cubic-bezier(.2,0,0,1),'+
-        'transform .5s cubic-bezier(.2,0,0,1),opacity .4s ease}'+
+        'transform .5s cubic-bezier(.2,0,0,1),opacity .22s ease .30s}'+
     'html.cf-on .cf7-ghost[data-slot="1"],html.cf-on .cf7-ghost[data-slot="-1"]{'+
       'opacity:.92;pointer-events:auto;z-index:9040}'+
     'html.cf-on .cf7-ghost[data-slot="2"],html.cf-on .cf7-ghost[data-slot="-2"]{'+
@@ -376,11 +376,13 @@
         // Clon: en el anillo TODAS las posiciones se ven → montar todas
         // (menos el frente, que es la card real). _fresco evita remontajes.
         if(d !== 0){
-          if(_fresco[card.id] !== centro.id){
-            var pos = i+1;
-            g.querySelector('.cf7-pos').textContent =
-              (d<0 ? '◀ ' : '') + pos + ' / ' + n + (d>0 ? ' ▶' : '');
-            // refrescar contenido solo si el wrap está vacío o cambió el centro
+          var pos = i+1;
+          g.querySelector('.cf7-pos').textContent =
+            (d<0 ? '◀ ' : '') + pos + ' / ' + n + (d>0 ? ' ▶' : '');
+          // v9.7 — montar el contenido UNA vez (wrap vacío): remontarlo en
+          // cada navegación reconstruía el DOM del clon = parpadeo visible.
+          var _wrap = g.querySelector('.cf7-wrap');
+          if(_wrap && !_wrap.childElementCount){
             montarClon(g, card, q.w - 4);
             _fresco[card.id] = centro.id;
           }
