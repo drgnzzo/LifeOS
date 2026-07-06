@@ -281,12 +281,92 @@ rim.position.set(-620,-180,-420);scene.add(rim);
       pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
     }
     geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
-    scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:color,
+    scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:color,fog:false,
       size:size,transparent:true,opacity:op,sizeAttenuation:true,depthWrite:false})));
   }
   nube(900,0xA7B4FA,2.3,.7);
   nube(70,0xFCD377,2.8,.5);
 })();
+
+/* ═══ v11.2R E3-A — COSMOS RICO (look v9 en la MISMA escena 3D) ═══
+   Constelaciones conectadas, estrellas de color, nebulosas y meteoros
+   — como el fondo del HOME v9 (raw-overlay), pero viviendo en Three:
+   paralaje correcto con la cámara. Solo AÑADE objetos a la escena. */
+(function(){
+  var PAL=[0xA7B4FA,0x67E8F9,0x86EFAC,0xC4B5FD,0xF0ABFC,0x93C5FD];
+  function rnd(a,b){return a+Math.random()*(b-a)}
+  /* — estrellas grandes con glow (sprite radial) — */
+  function texGlow(hex,núcleo){
+    var cv=document.createElement('canvas');cv.width=cv.height=64;
+    var c=cv.getContext('2d');
+    var g=c.createRadialGradient(32,32,0,32,32,32);
+    var col='#'+hex.toString(16).padStart(6,'0');
+    g.addColorStop(0,col);g.addColorStop(núcleo,col+'88');g.addColorStop(1,col+'00');
+    c.fillStyle=g;c.fillRect(0,0,64,64);
+    return new THREE.CanvasTexture(cv);
+  }
+  for(var q=0;q<14;q++){
+    var col=PAL[q%PAL.length];
+    var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow(col,.18),fog:false,
+      transparent:true,opacity:rnd(.5,.9),blending:THREE.AdditiveBlending,
+      depthWrite:false}));
+    var r=rnd(2200,3600),th=Math.random()*Math.PI*2,ph=Math.acos(rnd(-1,1));
+    sp.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.cos(ph),r*Math.sin(ph)*Math.sin(th));
+    var e=rnd(26,64);sp.scale.set(e,e,1);sp.renderOrder=-2;
+    scene.add(sp);
+  }
+  /* — nebulosas: manchas suaves enormes, aditivas, muy tenues — */
+  for(var n=0;n<6;n++){
+    var coln=PAL[(n*2+1)%PAL.length];
+    var neb=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow(coln,.5),fog:false,
+      transparent:true,opacity:rnd(.045,.085),blending:THREE.AdditiveBlending,
+      depthWrite:false}));
+    var rn=rnd(2600,3800),tn=Math.random()*Math.PI*2,pn=Math.acos(rnd(-1,1));
+    neb.position.set(rn*Math.sin(pn)*Math.cos(tn),rn*Math.cos(pn),rn*Math.sin(pn)*Math.sin(tn));
+    var en=rnd(900,1800);neb.scale.set(en,en*rnd(.55,.9),1);neb.renderOrder=-3;
+    scene.add(neb);
+  }
+  /* — constelaciones: cúmulos conectados por líneas tenues — */
+  for(var k=0;k<10;k++){
+    var rc=rnd(2300,3400),tc=Math.random()*Math.PI*2,pc=Math.acos(rnd(-1,1));
+    var cx=rc*Math.sin(pc)*Math.cos(tc),cy=rc*Math.cos(pc),cz=rc*Math.sin(pc)*Math.sin(tc);
+    var pts=[],np=3+Math.floor(Math.random()*4);
+    for(var m=0;m<np;m++)
+      pts.push(new THREE.Vector3(cx+rnd(-260,260),cy+rnd(-260,260),cz+rnd(-260,260)));
+    var vs=[];
+    for(var m2=0;m2<pts.length-1;m2++){vs.push(pts[m2],pts[m2+1]);}
+    var lg=new THREE.BufferGeometry().setFromPoints(vs);
+    var ln=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({fog:false,
+      color:PAL[k%PAL.length],transparent:true,opacity:.14,
+      blending:THREE.AdditiveBlending,depthWrite:false}));
+    ln.renderOrder=-2;scene.add(ln);
+    var pg=new THREE.BufferGeometry().setFromPoints(pts);
+    scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:PAL[k%PAL.length],fog:false,
+      size:4.5,transparent:true,opacity:.85,sizeAttenuation:true,depthWrite:false})));
+  }
+  /* — meteoros: rayas fugaces ocasionales (1 a la vez, barato) — */
+  var met=null;
+  function lanzarMeteoro(){
+    var r0=rnd(1800,2600),t0=Math.random()*Math.PI*2,p0=rnd(.5,1.4);
+    var a=new THREE.Vector3(r0*Math.sin(p0)*Math.cos(t0),r0*Math.cos(p0),r0*Math.sin(p0)*Math.sin(t0));
+    var dir=new THREE.Vector3(rnd(-1,1),rnd(-.6,-.1),rnd(-1,1)).normalize().multiplyScalar(rnd(500,900));
+    var g=new THREE.BufferGeometry().setFromPoints([a,a.clone().add(dir)]);
+    var l=new THREE.Line(g,new THREE.LineBasicMaterial({fog:false,color:0xD5E0FF,
+      transparent:true,opacity:.0,blending:THREE.AdditiveBlending,depthWrite:false}));
+    l.renderOrder=-1;scene.add(l);
+    met={l:l,t0:performance.now(),dur:rnd(700,1200)};
+  }
+  function pasoMeteoro(){
+    if(met){
+      var p=(performance.now()-met.t0)/met.dur;
+      if(p>=1){scene.remove(met.l);met.l.geometry.dispose();met=null;}
+      else met.l.material.opacity=Math.sin(Math.PI*p)*.6;
+    } else if(Math.random()<0.004) lanzarMeteoro();   /* ~cada 6-10s */
+    requestAnimationFrame(pasoMeteoro);
+  }
+  pasoMeteoro();
+})();
+
 
 /* ═══ LABELS del dial (anclas proyectadas) + RAW en el casquete ═══ */
 var anclasEl=document.getElementById('anclas');
