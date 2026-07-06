@@ -59,6 +59,7 @@ html.en-exp #telon{opacity:1}
 .ancla-inner{transform:translate(-50%,-50%);display:flex;flex-direction:column;
   align-items:center;gap:3px;text-align:center}
 .lbl .ico{font-size:21px;color:var(--c);filter:drop-shadow(0 0 9px var(--c))}
+.lbl .ico-img{filter:drop-shadow(0 0 8px var(--c))}
 .lbl .t{font-family:var(--font-mono);font-size:var(--fs-2xs);font-weight:var(--fw-bold);
   letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--hud-text-mid);
   text-shadow:0 0 10px color-mix(in srgb,var(--c) 55%,transparent)}
@@ -180,7 +181,12 @@ html.sec-out #seccion{display:flex;align-items:center;justify-content:center;
   border:1px solid color-mix(in srgb,var(--sc,#A78BFA) 40%,transparent);
   box-shadow:var(--mat-bevel),var(--mat-elev);padding:28px 34px;
   min-height:76vh;width:min(1150px,92vw);
-  position:relative;overflow:hidden;--pc-accent:var(--sc,#A78BFA)}
+  position:relative;overflow:hidden;--pc-accent:var(--sc,#A78BFA);
+  /* v11.2R: NEUTRALIZAR el drawer .panel de raw-app.css (convivirá
+     en etapa 2): cubre TODA propiedad que v9 declara */
+  transform:none;top:auto;right:auto;bottom:auto;left:auto;
+  z-index:auto;transition:none;display:block;flex-direction:initial;
+  border-left:1px solid color-mix(in srgb,var(--sc,#A78BFA) 40%,transparent)}
 #seccion .panel::before{content:'';position:absolute;inset:0;pointer-events:none;
   background:repeating-linear-gradient(0deg,rgba(213,224,255,.02) 0 1px,transparent 1px 4px)}
 html.en-exp .nodo{opacity:0 !important;pointer-events:none !important}

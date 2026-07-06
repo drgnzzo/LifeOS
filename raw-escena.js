@@ -14,15 +14,42 @@ var giroMundo = 0;                             /* rotación de la esfera al gira
 var nivel = 0, idx = 0, enTransicion = false;
 
 /* PALETA CANÓNICA del proto (literal) */
+/* SECTORES REALES v9 — id/label/accent/draw VERBATIM de
+   _DIAL_ITEMS en raw-core.js (v11.2R: 11 sectores, canon del dial HOME) */
 var SEC = [
-  { id:'patrimonio', t:'PATRIMONIO', s:'Saldos y apartados', ico:'◆', c:'#9BB0FA' },
-  { id:'financiero', t:'FINANCIERO', s:'Ingresos y flujo',   ico:'$', c:'#8FA6F8' },
-  { id:'variables',  t:'VARIABLES',  s:'Gastos variables',   ico:'≈', c:'#B49DF9' },
-  { id:'fijos',      t:'FIJOS',      s:'Pagos recurrentes',  ico:'▣', c:'#7C9EF5' },
-  { id:'necesidades',t:'NECESIDADES',s:'Estado del sim',     ico:'♥', c:'#A78BFA' },
-  { id:'bitacora',   t:'BITÁCORA',   s:'Pensamientos',       ico:'✎', c:'#C4B5FD' },
-  { id:'activity',   t:'ACTIVITY',   s:'Hábitos y logros',   ico:'⚡', c:'#8B87F0' }
+  { id:'activity', t:'ACTIVITY', s:'Hábitos y logros', c:'#22d3c8',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x-8*k,y+4*k);ctx.lineTo(x-2*k,y-2*k);ctx.lineTo(x+3*k,y+3*k);ctx.lineTo(x+9*k,y-7*k);ctx.strokeStyle=c;ctx.lineWidth=2.4;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();} },
+  { id:'apartado', t:'APARTADO', s:'Metas de ahorro', c:'#4ade80',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y-2*k,5.5*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x-8*k,y+5*k);ctx.lineTo(x+8*k,y+5*k);ctx.lineTo(x+6*k,y+10*k);ctx.lineTo(x-6*k,y+10*k);ctx.closePath();ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();} },
+  { id:'bancos', t:'BANCOS', s:'Cuentas y bancos', c:'#f59e0b',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x-9*k,y+7*k);ctx.lineTo(x+9*k,y+7*k);ctx.moveTo(x-6*k,y-1*k);ctx.lineTo(x-6*k,y+7*k);ctx.moveTo(x,y-1*k);ctx.lineTo(x,y+7*k);ctx.moveTo(x+6*k,y-1*k);ctx.lineTo(x+6*k,y+7*k);ctx.moveTo(x-9*k,y-1*k);ctx.lineTo(x+9*k,y-1*k);ctx.moveTo(x-10*k,y-6*k);ctx.lineTo(x,y-12*k);ctx.lineTo(x+10*k,y-6*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();} },
+  { id:'entrenamiento', t:'ENTRENA', s:'Fuerza / cardio / más', c:'#fb923c',
+    draw:function(ctx,x,y,s,c){var k=s/22;[[-9,0,3.5],[9,0,3.5]].forEach(function(p){ctx.beginPath();ctx.arc(x+p[0]*k,y+p[1]*k,p[2]*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2.2;ctx.stroke();});ctx.beginPath();ctx.moveTo(x-5*k,y);ctx.lineTo(x+5*k,y);ctx.strokeStyle=c;ctx.lineWidth=3;ctx.lineCap='round';ctx.stroke();} },
+  { id:'nutricion', t:'NUTRICIÓN', s:'Comidas del día', c:'#86efac',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y+2*k,7*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x,y-5*k);ctx.bezierCurveTo(x,y-12*k,x+7*k,y-11*k,x+6*k,y-5*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();} },
+  { id:'patrimonio', t:'PATRIMONIO', s:'Saldos y apartados', c:'#c4b5fd',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x-10*k,y+8*k);ctx.lineTo(x+10*k,y+8*k);ctx.moveTo(x-6*k,y-1*k);ctx.lineTo(x-6*k,y+8*k);ctx.moveTo(x,y-1*k);ctx.lineTo(x,y+8*k);ctx.moveTo(x+6*k,y-1*k);ctx.lineTo(x+6*k,y+8*k);ctx.moveTo(x-10*k,y-1*k);ctx.lineTo(x+10*k,y-1*k);ctx.moveTo(x-12*k,y-7*k);ctx.lineTo(x,y-13*k);ctx.lineTo(x+12*k,y-7*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();} },
+  { id:'pensamiento', t:'PENSA', s:'Bitácora mental', c:'#f0abfc',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x-1*k,y-2*k,8*k,Math.PI*.3,Math.PI*2.2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x+5*k,y+8*k,2.5*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x+9*k,y+13*k,1.5*k,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();} },
+  { id:'persona', t:'PERSONA', s:'Relaciones y energía', c:'#93c5fd',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x-3*k,y-5*k,4*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x+5*k,y-7*k,3.2*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=1.8;ctx.stroke();ctx.beginPath();ctx.moveTo(x-12*k,y+10*k);ctx.quadraticCurveTo(x-3*k,y+2*k,x+5*k,y+10*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();ctx.beginPath();ctx.moveTo(x+3*k,y+4*k);ctx.quadraticCurveTo(x+11*k,y,x+14*k,y+10*k);ctx.strokeStyle=c;ctx.lineWidth=1.8;ctx.lineCap='round';ctx.stroke();} },
+  { id:'timer', t:'TIMER', s:'Cronómetros', c:'#67e8f9',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y+1*k,8*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x,y+1*k);ctx.lineTo(x,y-4*k);ctx.moveTo(x,y+1*k);ctx.lineTo(x+4*k,y+3*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();ctx.beginPath();ctx.moveTo(x-3*k,y-9*k);ctx.lineTo(x+3*k,y-9*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();} },
+  { id:'editar', t:'EDITAR', s:'Captura rápida', c:'#a5b4fc',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.save();ctx.translate(x,y);ctx.rotate(-Math.PI/4);ctx.beginPath();ctx.rect(-2.5*k,-9*k,5*k,16*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();ctx.beginPath();ctx.moveTo(-2.5*k,7*k);ctx.lineTo(0,12*k);ctx.lineTo(2.5*k,7*k);ctx.fillStyle=c;ctx.fill();ctx.restore();} },
+  { id:'salud', t:'SALUD', s:'Citas y síntomas', c:'#fca5a5',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x,y+9*k);ctx.bezierCurveTo(x-12*k,y,x-12*k,y-9*k,x,y-4*k);ctx.bezierCurveTo(x+12*k,y-9*k,x+12*k,y,x,y+9*k);ctx.strokeStyle=c;ctx.lineWidth=2.2;ctx.lineJoin='round';ctx.stroke();} }
 ];
+
+/* v11.2R: iconos REALES del dial v9 — cada sector dibuja su icono
+   con su función canvas original (nada de glyphs inventados) */
+function _icoV9(sec,px){
+  var cv=document.createElement('canvas');cv.width=cv.height=px;
+  var c=cv.getContext('2d');
+  sec.draw(c,px/2,px/2,px*0.62,sec.c);
+  return cv.toDataURL();
+}
+
 var N = SEC.length, PASO = 24, RADIO = 780;    /* canon del carrusel CSS */
 
 /* ═══ curva firma ═══ */
@@ -271,7 +298,8 @@ SEC.forEach(function(s,i){
   var lbl=document.createElement('div');
   lbl.className='ancla';
   lbl.innerHTML='<div class="ancla-inner lbl" style="--c:'+s.c+'">'+
-    '<div class="ico">'+s.ico+'</div><div class="t">'+s.t+'</div></div>';
+    '<img class="ico-img" src="'+_icoV9(s,44)+'" width="22" height="22">'+
+    '<div class="t">'+s.t+'</div></div>';
   anclasEl.appendChild(lbl);
   anclas.push({pt:pt,lbl:lbl,i:i});
 });
@@ -324,7 +352,7 @@ SEC.forEach(function(s,i){
   n.className='nodo';
   n.style.setProperty('--c',s.c);
   n.innerHTML='<div class="lift"><div class="barra"></div>'+
-    '<div class="card"><div class="ico">'+s.ico+'</div>'+
+    '<div class="card"><div class="ico"><img src="'+_icoV9(s,96)+'" width="30" height="30"></div>'+
     '<div class="t">'+s.t+'</div><div class="s">'+s.s+'</div>'+
     '<div class="div"></div>'+
     '<div class="m"><span>REGISTROS</span><b>—</b></div>'+
@@ -347,18 +375,18 @@ function colocar(){
     var envuelve=(prev!==undefined&&Math.abs(rel-prev)>N/2);
     nodos[i]._rel=rel;
     if(envuelve)nodos[i].style.transition='none';
-    /* ángulo NEGATIVO: rotateY(+θ)+translateZ(-R) cae a la izquierda,
-       así que derecha=+rel requiere -θ. Las ±2 usan paso comprimido
-       para asomarse ~20% en el borde (5 cards visibles). */
-    var mag=Math.min(Math.abs(rel),1)+Math.max(0,Math.abs(rel)-1)*.72;
-    var angC=-Math.sign(rel)*mag*PASO;
+    /* v11.2R — ROCOLA COMPLETA: abanico lineal físico (sin paso
+       comprimido); TODAS las cards colocadas, la opacidad cae con la
+       distancia angular. El usuario decide dónde detenerse. */
+    var angC=-rel*PASO;
     nodos[i].style.transform=
       'rotateY('+angC+'deg) translateZ(-'+RADIO+'px)';
     nodos[i].style.setProperty('--dly',(Math.abs(rel)*90)+'ms');
     nodos[i].classList.toggle('lejana',Math.abs(rel)>=2);
+    var _ar=Math.abs(rel);
     nodos[i].style.opacity=
       document.documentElement.classList.contains('en-anillo')
-        ?(Math.abs(rel)>=3?0:Math.abs(rel)===2?0.5:1):'';
+        ?(_ar<=1?1:_ar===2?0.65:_ar===3?0.38:_ar===4?0.18:0):'';
     if(envuelve){void nodos[i].offsetWidth;nodos[i].style.transition='';}
   }
 }
@@ -1004,7 +1032,7 @@ function _v11RenderSeccion(i){
   var d=window._capa1Data;
   var id=SEC[i].id;
   if(!d){cu.innerHTML='<div class="v11-vacio">SINCRONIZANDO…</div>';return}
-  var fn=_v11Render[id];
+  var fn=_v11Render[id]||(id==='pensamiento'?_v11Render.bitacora:null);
   cu.innerHTML=fn?fn(d):'<div class="v11-vacio">SECCIÓN EN CONSTRUCCIÓN</div>';
   cu.scrollTop=0;
 }
