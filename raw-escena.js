@@ -867,6 +867,40 @@ function _distribuirGetAll(d){
 }
 
 /* ═══ CHIPS HUD — misma información del HOME v9 ═══ */
+
+/* ═══ v11.2R ETAPA 2 — NEEDS BAR (v9: _SIMS_NEEDS + render verbatim
+   de renderSimsNeeds en raw-overlay.js, adaptado al grid propio) ═══ */
+var _SIMS_NEEDS=[
+  { key:'hambre',   label:'Hambre',   icon:'🍔', color:'#FB923C' },
+  { key:'energia',  label:'Energía',  icon:'⚡',  color:'#FBBF24' },
+  { key:'cuerpo',   label:'Cuerpo',   icon:'💪', color:'#F87171' },
+  { key:'higiene',  label:'Higiene',  icon:'🚿', color:'#67E8F9' },
+  { key:'mental',   label:'Mental',   icon:'🧠', color:'#C4B5FD' },
+  { key:'disfrute', label:'Disfrute', icon:'🎮', color:'#F0ABFC' },
+  { key:'entorno',  label:'Entorno',  icon:'🏠', color:'#86EFAC' },
+  { key:'social',   label:'Social',   icon:'👥', color:'#93C5FD' },
+  { key:'trabajo',  label:'Trabajo',  icon:'💼', color:'#22D3EE' }
+];
+function poblarNeeds(){
+  var el=document.getElementById('v11-needs-grid');
+  if(!el)return;
+  var needs=_calcSimsNeeds();
+  el.innerHTML=_SIMS_NEEDS.map(function(s){
+    var v=needs[s.key]; if(v==null)v=50;
+    var lc=v<30?'#EF4444':(v<60?'#FBBF24':s.color);
+    return '<div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">'+
+      '<div style="display:flex;align-items:center;gap:5px">'+
+        '<span style="font-size:12px;filter:drop-shadow(0 0 6px '+s.color+'66)">'+s.icon+'</span>'+
+        '<span style="font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,220,240,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.label+'</span>'+
+        '<span style="margin-left:auto;font-size:10px;font-weight:800;color:'+lc+';font-variant-numeric:tabular-nums">'+v+'</span></div>'+
+      '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">'+
+        '<div style="height:100%;width:'+v+'%;background:'+lc+';box-shadow:0 0 6px '+lc+'80;transition:width .6s ease;border-radius:2px"></div></div></div>';
+  }).join('');
+  /* barra de XP del chip USER */
+  var x=_calcXPNivel(),f=document.getElementById('v11-xpfill');
+  if(f&&x&&x.xpMeta)f.style.width=Math.min(100,Math.round(100*x.xpActual/x.xpMeta))+'%';
+}
+
 function poblarChips(){
   var x=_calcXPNivel(),rc=_calcRachaCreditos(),mi=_calcMisionDiaria(),
       lg=_calcLogroReciente(),ns=_calcNivelSiguiente(),needs=_calcSimsNeeds();
@@ -1056,10 +1090,13 @@ function cargarDatosCapa1(){
   api.getAll().then(function(d){
     if(!d||d.ok===false){_marcarSync('ERR');console.error('getAll:',d&&d.error);return}
     _distribuirGetAll(d);
-    poblarChips();
+    poblarChips();poblarNeeds();
     poblarCards(d);
     if(nivel===2)_v11RenderSeccion(idx);
   }).catch(function(e){_marcarSync('ERR');console.error('getAll falló:',e)});
 }
 window.refrescarCapa1=cargarDatosCapa1;
 cargarDatosCapa1();
+
+/* v11.2R: la needs bar pinta desde el arranque (con o sin API) */
+try{poblarNeeds()}catch(e){}

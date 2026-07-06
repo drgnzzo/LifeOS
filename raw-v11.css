@@ -292,3 +292,46 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
   box-shadow:0 0 8px color-mix(in srgb,var(--sc,#A78BFA) 60%,transparent)}
 .v11-vacio{padding:30px;text-align:center;color:var(--hud-text-faint);
   font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+
+/* ═══ v11.2R ETAPA 2 — CHROME v9 (bandas propias, prefijo v11-) ═══ */
+body.v11-escena{overflow:hidden;background:var(--hud-bg-base)}
+body.v11-escena .hero{z-index:200}
+#v11-top{position:fixed;left:12px;right:12px;top:58px;z-index:190;
+  display:flex;gap:12px;pointer-events:none}
+.v11-chip{background:var(--hud-panel-bg);background-image:var(--glass);
+  border:1px solid color-mix(in srgb,var(--a) 40%,transparent);
+  border-radius:10px;box-shadow:var(--mat-bevel),var(--mat-elev-1);
+  padding:8px 14px;min-width:230px}
+.v11-chip .l{font-size:9px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--hud-text-dim)}
+.v11-chip .l b{color:var(--a);font-family:var(--font-mono)}
+.v11-chip .v{font-family:var(--font-mono);font-size:12px;font-weight:700;
+  color:var(--a);margin-left:auto}
+.v11-chip-hdr{display:flex;align-items:center;gap:8px}
+.v11-chip-hdr i{color:var(--a);font-size:12px}
+.v11-xpbar{height:4px;margin-top:6px;background:rgba(255,255,255,.06);
+  border-radius:2px;overflow:hidden}
+#v11-xpfill{height:100%;width:0%;background:var(--a,#A78BFA);
+  box-shadow:0 0 8px var(--a);transition:width .8s var(--ease)}
+.v11-sim{flex:1}
+#v11-needs-grid{display:flex;gap:10px;margin-top:6px}
+#v11-bot{position:fixed;left:12px;right:12px;bottom:10px;z-index:190;
+  display:flex;gap:12px;pointer-events:none}
+.v11-cell{flex:1;display:flex;align-items:center;gap:10px;
+  background:var(--hud-panel-bg);background-image:var(--glass);
+  border:1px solid color-mix(in srgb,var(--a) 35%,transparent);
+  border-top:2px solid var(--a);
+  border-radius:10px;box-shadow:var(--mat-bevel),var(--mat-elev-1),
+    0 -6px 22px color-mix(in srgb,var(--a) 12%,transparent);
+  padding:9px 14px;position:relative}
+.v11-cell i{color:var(--a);font-size:13px}
+.v11-cell .tx{display:flex;flex-direction:column;gap:2px}
+.v11-cell .l{font-size:9px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--hud-text-dim)}
+.v11-cell .v{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--a)}
+.v11-erc{margin-left:auto;font-family:var(--font-mono);font-size:10px;
+  color:var(--hud-text-dim)}
+/* el HUD de estado de la escena baja para no chocar con el chrome */
+#estado{top:auto;bottom:56px;right:18px}
+/* raw-app.css trae body con su fondo/scroll: el modo escena manda */
+body.v11-escena{position:fixed;inset:0}

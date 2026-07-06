@@ -5,9 +5,91 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#020810">
 <title>LifeOS v11 · ESCENA</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="raw-tokens.css?v=1120">
+<link rel="stylesheet" href="raw-app.css?v=1120">
 <link rel="stylesheet" href="raw-v11.css?v=1120">
 </head>
-<body>
+<body class="v11-escena">
+<div class="hero" id="hero">
+
+    <!-- IZQUIERDA — marca -->
+    <div class="hero-left">
+      <button class="hero-hamburger" id="hamburger"><i class="fas fa-bars"></i></button>
+      <div class="hero-brand">
+        <div class="hero-icon"><i class="fas fa-diamond"></i></div>
+        <div class="hero-brand-txt">
+          <div class="hero-title">Life<span>OS</span></div>
+          <div class="hero-sub">v11.2R · Escena</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTRO — tabs de navegación (estilo HUD, acento por sección) -->
+    <nav class="hero-tabs" id="hero-tabs">
+      <button class="hud-tab btn-flip is-home active" id="btn-home" data-acc="#94A3B8" onclick="_puenteV9()" title="Home">
+        <i class="fas fa-house"></i><span>Home</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-logros" data-acc="#FACC15" onclick="_puenteV9()" title="Logros">
+        <i class="fas fa-trophy"></i><span>Logros</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-maslow" data-acc="#C4B5FD" onclick="_puenteV9()" title="Bitácora">
+        <i class="fas fa-book-open"></i><span>Bitácora</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-activity" data-acc="#FB923C" onclick="_puenteV9()" title="Activity Check">
+        <i class="fas fa-bolt"></i><span>Activity</span>
+      </button>
+      <button class="hud-tab btn-flip is-sos" id="btn-sos" data-acc="#EF4444" onclick="_puenteV9()" title="SOS">
+        <i class="fas fa-circle-exclamation"></i><span>SOS</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-nutricion" data-acc="#4ADE80" onclick="_puenteV9()" title="Nutrición">
+        <i class="fas fa-leaf"></i><span>Nutrición</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-notas" data-acc="#FEF3A0" onclick="_puenteV9()" title="Notas">
+        <i class="fas fa-note-sticky"></i><span>Notas</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-timers" data-acc="#67E8F9" onclick="_puenteV9()" title="Timers">
+        <i class="fas fa-stopwatch"></i><span>Timers</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-sheets" data-acc="#A5B4FC" onclick="_puenteV9()" title="RAW en la web">
+        <i class="fas fa-table"></i><span>RAW</span>
+      </button>
+    </nav>
+
+    <!-- DERECHA — estado + acciones + SIM -->
+    <div class="hero-right">
+      <div id="chip" class="hero-chip load"><span class="chip-dot"></span><span id="chip-txt">Cargando</span></div>
+      <button class="hero-act" id="btn-sheets-direct" onclick="window.open('https://docs.google.com/spreadsheets/d/15T14Hb7tvmv24ZAaC3su1NRtDwVS6-dWbJGxQYUGP1o/edit#gid=0','_blank')" title="Abrir RAW directo en Google Sheets">
+        <i class="fab fa-google-drive"></i>
+      </button>
+      <button class="hero-act" id="btn-rf" onclick="location.reload()" title="Actualizar">
+        <i class="fas fa-rotate-right"></i>
+      </button>
+      <div class="hero-sim" id="hero-sim">
+        <div class="hero-sim-avatar">U</div>
+        <div class="hero-sim-txt">
+          <span class="hero-sim-name">SIM</span>
+          <span class="hero-sim-lv" id="hero-sim-lv">Lv 1</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- ═══ BANDA SUPERIOR: USER + ESTADO DEL SIM (v9, datos vivos) ═══ -->
+<div id="v11-top">
+  <div class="v11-chip" style="--a:#A78BFA">
+    <div class="v11-chip-hdr"><i class="fas fa-user"></i>
+      <span class="l" id="chip-user-l">USER · Nv 1</span>
+      <span class="v" id="chip-user">0 / 1,000 XP</span></div>
+    <div class="v11-xpbar"><div id="v11-xpfill"></div></div>
+  </div>
+  <div class="v11-chip v11-sim" style="--a:#C4B5FD">
+    <div class="v11-chip-hdr"><i class="fas fa-heart-pulse"></i>
+      <span class="l">ESTADO DEL SIM · <b id="chip-sim">9 needs · OK</b></span></div>
+    <div id="v11-needs-grid"></div>
+  </div>
+</div>
+
 <canvas id="gl"></canvas>
 <div id="anclas"></div>
 <div id="visor"><div id="mundoCSS"></div></div>
@@ -22,24 +104,25 @@
 </div></div>
 <div class="sec-lado" id="sec-izq"><span class="fl">◀</span> —</div>
 <div class="sec-lado" id="sec-der">— <span class="fl">▶</span></div>
-<div class="hudfila" id="hud-top">
-  <div class="hchip" style="--a:#A78BFA"><span class="l" id="chip-user-l">USER · Nv 1</span><span class="v" id="chip-user">0 / 1,000 XP</span></div>
-  <div class="hchip" style="--a:#C4B5FD"><span class="l">Estado del Sim</span><span class="v" id="chip-sim">9 needs · OK</span></div>
-  <div class="hchip" style="--a:#8FA6F8"><span class="l">Energía · Racha · Créditos</span><span class="v" id="chip-erc">— · — · —</span></div>
+
+<!-- ═══ BANDA INFERIOR: MISIÓN · NIVEL · LOGRO · SIGUIENTE (v9) ═══ -->
+<div id="v11-bot">
+  <div class="v11-cell" style="--a:#22D3EE"><i class="fas fa-bullseye"></i>
+    <div class="tx"><span class="l">Misión diaria</span><span class="v" id="chip-mision">0 / 3</span></div></div>
+  <div class="v11-cell" style="--a:#A78BFA"><i class="fas fa-layer-group"></i>
+    <div class="tx"><span class="l">Nivel actual</span><span class="v" id="chip-nivel">1 · 0/1,000</span></div></div>
+  <div class="v11-cell" style="--a:#FACC15"><i class="fas fa-star"></i>
+    <div class="tx"><span class="l">Logro reciente</span><span class="v" id="chip-logro">—</span></div></div>
+  <div class="v11-cell" style="--a:#B49DF9"><i class="fas fa-gift"></i>
+    <div class="tx"><span class="l">Nivel siguiente</span><span class="v" id="chip-signivel">+1,000 XP</span></div>
+    <span class="v11-erc" id="chip-erc">— · — · —</span></div>
 </div>
-<div class="hudfila" id="hud-bot">
-  <div class="hchip" style="--a:#A78BFA"><span class="l">Nivel actual</span><span class="v" id="chip-nivel">1 · 0/1,000</span></div>
-  <div class="hchip" style="--a:#9BB0FA"><span class="l">Misión diaria</span><span class="v" id="chip-mision">0 / 3</span></div>
-  <div class="hchip" style="--a:#C4B5FD"><span class="l">Logro reciente</span><span class="v" id="chip-logro">—</span></div>
-  <div class="hchip" style="--a:#B49DF9"><span class="l">Nivel siguiente</span><span class="v" id="chip-signivel">+1,000 XP</span></div>
-</div>
-<div class="hud" id="marca">LIFE<b>OS</b> <span style="font-size:9px;opacity:.5">v11.2R · ESCENA</span></div>
+
 <div class="hud" id="estado">NIVEL 0 · ÓRBITA</div>
 <div class="hud" id="hint">[RUEDA/↓] SUMERGIR · [CLIC] SECTOR</div>
 <div class="hud" id="fps">— fps</div>
+<script>function _puenteV9(){location.href='index.html'}</script>
 <script src="three.min.js?v=1120"></script>
 <script src="raw-escena.js?v=1120"></script>
 </body>
 </html>
-
-
