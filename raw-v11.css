@@ -335,3 +335,7 @@ body.v11-escena .hero{z-index:200}
 #estado{top:auto;bottom:56px;right:18px}
 /* raw-app.css trae body con su fondo/scroll: el modo escena manda */
 body.v11-escena{position:fixed;inset:0}
+
+/* v11.2R: tipografía del dial como v9 (legible) */
+.lbl .t{font-size:10.5px !important;letter-spacing:.1em}
+.lbl .ico-img{width:32px;height:32px}

@@ -298,7 +298,7 @@ SEC.forEach(function(s,i){
   var lbl=document.createElement('div');
   lbl.className='ancla';
   lbl.innerHTML='<div class="ancla-inner lbl" style="--c:'+s.c+'">'+
-    '<img class="ico-img" src="'+_icoV9(s,44)+'" width="22" height="22">'+
+    '<img class="ico-img" src="'+_icoV9(s,64)+'" width="32" height="32">'+
     '<div class="t">'+s.t+'</div></div>';
   anclasEl.appendChild(lbl);
   anclas.push({pt:pt,lbl:lbl,i:i});
@@ -321,7 +321,7 @@ function proyectarAnclas(){
     a.pt.getWorldPosition(_v);
     var pr=_v.clone().project(camera),detras=pr.z>1;
     var x=Math.round((pr.x*.5+.5)*W*2)/2, y=Math.round((-pr.y*.5+.5)*H*2)/2;
-    var esc=Math.round(Math.max(.25,Math.min(1.6,620/camera.position.distanceTo(_v)))*200)/200;
+    var esc=Math.round(Math.max(.95,Math.min(1.45,950/camera.position.distanceTo(_v)))*200)/200;  /* v11.2R: labels legibles tamaño v9 */
     var o=((1-gajos.lift)*(detras?0:1)*gajos.spread*(visible||enTransicion?1:0)).toFixed(2);
     _setSi(a.lbl,'transform','translate('+x+'px,'+y+'px) scale('+esc+')');
     _setSi(a.lbl,'opacity',o);
@@ -1086,14 +1086,24 @@ function _v11RenderSeccion(i){
 })();
 
 /* ═══ ARRANQUE: getAll en paralelo al boot (llamada DIRECTA) ═══ */
+function _chipHero(estado){   /* v11.2R: mismo chip del hero v9 */
+  var ch=document.getElementById('chip'),tx=document.getElementById('chip-txt');
+  if(!ch||!tx)return;
+  ch.classList.remove('load','ok','err');
+  if(estado==='ok'){ch.classList.add('ok');tx.textContent='Listo'}
+  else if(estado==='err'){ch.classList.add('err');tx.textContent='Sin conexión'}
+  else{ch.classList.add('load');tx.textContent='Cargando'}
+}
 function cargarDatosCapa1(){
+  _chipHero('load');
   api.getAll().then(function(d){
-    if(!d||d.ok===false){_marcarSync('ERR');console.error('getAll:',d&&d.error);return}
+    if(!d||d.ok===false){_marcarSync('ERR');_chipHero('err');console.error('getAll:',d&&d.error);return}
     _distribuirGetAll(d);
     poblarChips();poblarNeeds();
     poblarCards(d);
+    _chipHero('ok');
     if(nivel===2)_v11RenderSeccion(idx);
-  }).catch(function(e){_marcarSync('ERR');console.error('getAll falló:',e)});
+  }).catch(function(e){_marcarSync('ERR');_chipHero('err');console.error('getAll falló:',e)});
 }
 window.refrescarCapa1=cargarDatosCapa1;
 cargarDatosCapa1();
