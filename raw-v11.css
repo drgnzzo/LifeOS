@@ -493,3 +493,13 @@ body.v11-escena{font-family:var(--font-ui)}
 /* nada dentro del cuerpo se corta: alto libre + el scroll lo pone sec-cuerpo */
 #sec-cuerpo>*{flex-shrink:0}
 #sec-cuerpo .board-face.v11-hosted [style*="max-height"]{max-height:none !important}
+
+/* ═══ v11.3 E3-D15 ═══ */
+/* nivel 2: fuera las bandas (user/sim/misión/nivel) — la card gana alto */
+html.niv-2 #v11-top,html.niv-2 #v11-bot{opacity:0 !important;pointer-events:none;
+  transition:opacity .4s var(--ease)}
+html.niv-2 #seccion .panel{height:calc(100vh - 96px) !important}
+/* boards de lienzo (stickies/grid): alto real para que su contenido
+   absoluto no colapse invisible */
+#sec-cuerpo #board-notas,#sec-cuerpo #board-logros{
+  min-height:calc(100vh - 220px);position:relative}

@@ -2925,5 +2925,210 @@ function renderVariablesExpandido(data, containerId){
 }
 
 
+/* ── _refrescarEspejos → refrescarCapa1 (SHIM DECLARADO, no verbatim:
+   el original repinta los espejos del dial-canvas v9, inexistente en
+   v11; el equivalente real es el refresh de la capa de datos de
+   escena, que repuebla cards, needs y paneles tras cada guardado) ── */
+if(typeof window._refrescarEspejos!=='function'){
+  window._refrescarEspejos = function(){
+    if(typeof window.refrescarCapa1==='function') window.refrescarCapa1();
+  };
+}
+
+/* ── NECESIDADES inline — pirámide/radar/distribución/cards ALTO-OK-
+   DESCUIDADO (verbatim raw-dashboard.js:715-906) ── */
+function renderNecesidadesInline(data){
+  if(!data) return;
+  _necInlineData = data;
+  window._necInlineData = data;
+  _initNecInlineSelectors();
+
+  // Si ya tenemos niveles en los datos recibidos, dibujar directo sin nueva llamada a API
+  var niveles = data.niveles || [];
+  if(niveles.length){
+    function _drawWithChart(){
+      _dibujarNecesidesInlineCompleto(niveles);
+    }
+    if(!window.Chart){
+      var s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+      s.onload=function(){ setTimeout(_drawWithChart, 80); };
+      document.head.appendChild(s);
+    } else {
+      _drawWithChart();
+    }
+    return;
+  }
+
+  // Si no hay niveles en los datos, hacer llamada a API
+  if(!window.Chart){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+    s.onload=function(){ actualizarNecInline(); };
+    document.head.appendChild(s);
+  } else {
+    actualizarNecInline();
+  }
+}
+
+function _dataNivelInline(key,arr){return(arr||[]).find(function(n){return n.key===key;})||{key:key,total:0,conceptos:[]};}
+
+// ════════════════════════════════════════════════════════════
+//  SIM NEEDS — Stub que reenvía al render del OVERLAY del dial
+//  (la banda Sim ya NO vive en el dashboard; se eliminaron sec-sim/sec-nav
+//   del index.html. La banda vive en _pSim del dial overlay y la pinta
+//   renderSimsBandSimsStyle() de raw-core.js.)
+// ════════════════════════════════════════════════════════════
+function renderSimsPanel(){
+  // Si el overlay del dial está montado y abierto, reenviar al renderer del overlay.
+  if(typeof window.renderSimsBandSimsStyle === 'function'
+     && document.getElementById('hud-sim-band-grid')){
+    try { window.renderSimsBandSimsStyle('hud-sim-band-grid'); } catch(_){}
+  }
+  // Si hubiera quedado el contenedor viejo en el dashboard, lo dejamos vacío.
+  var legacy = document.getElementById('sim-needs-grid');
+  if(legacy && !legacy._cleared){
+    legacy.innerHTML = '';
+    legacy._cleared = true;
+  }
+}
+
+window.renderSimsPanel = renderSimsPanel;
+// Alias retrocompat: cualquier código viejo que aún llame renderSimsNeeds()
+window.renderSimsNeeds = renderSimsPanel;
+
+// ══════════════════════════════════════════
+//  PATRIMONIO
+// ══════════════════════════════════════════
+function renderPatrimonio(data, containerId){
+  var body=document.getElementById(containerId||'patrimonio-body');if(!body)return;
+  if(!data||!data.ok){body.innerHTML='<div style="padding:20px;text-align:center;color:var(--m)">Sin datos</div>';return;}
+  var fmt=function(v){return'$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:0});};
+  var fmt2=function(v){return'$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});};
+  var f=data.fondo||{},banco=data.banco||{saldo:0,pct:0,items:[]},fisico=data.fisico||{saldo:0,pct:0,items:[]},inversion=data.inversion||{saldo:0,pct:0,rendimientoTotal:0,items:[]},total=data.total||0;
+  var saludColor=f.salud==='ok'?'#4ADE80':f.salud==='warn'?'#F59E0B':'#EF4444';
+  var saludLbl=f.salud==='ok'?'Fondo completo':f.salud==='warn'?'Fondo parcial':'Sin fondo';
+  var apPorBanco={},totalAp=0;
+  (window._apartadosData||[]).forEach(function(ap){if(ap.estado&&ap.estado.toLowerCase()==='usado')return;var b=(ap.banco||'').trim().toUpperCase();apPorBanco[b]=(apPorBanco[b]||0)+(ap.monto||0);totalAp+=(ap.monto||0);});
+  var totalDisponible=total-totalAp,totalBruto=total;
+  var html='';
+  html+='<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,.06)">';
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--m)">Disponible</div>';
+  if(totalAp>0)html+='<div style="font-size:10px;color:var(--m);margin-left:auto">Bruto <span style="color:rgba(255,255,255,.4);font-weight:600">'+fmt2(totalBruto)+'</span> − Apartados <span style="color:#F59E0B;font-weight:600">'+fmt(totalAp)+'</span></div>';
+  html+='</div><div style="display:flex;align-items:center;width:100%">';
+  html+='<div style="flex:0 0 auto"><div style="font-size:34px;font-weight:800;letter-spacing:-.04em;color:#4ADE80;line-height:1;white-space:nowrap">'+fmt2(totalDisponible)+'</div></div>';
+  var chipItems=[];
+  if((banco.items||[]).length>0){var totalApBanco=0;(banco.items||[]).forEach(function(it){totalApBanco+=apPorBanco[(it.nombre||'').toUpperCase()]||0;});chipItems.push({nombre:'Banco',disp:banco.saldo-totalApBanco,saldo:banco.saldo,color:'#4ADE80',apIt:totalApBanco});}
+  if((fisico.items||[]).length>0){var totalApFisico=0;(fisico.items||[]).forEach(function(it){totalApFisico+=apPorBanco[(it.nombre||'').toUpperCase()]||0;});chipItems.push({nombre:'Efectivo',disp:fisico.saldo-totalApFisico,saldo:fisico.saldo,color:'#FBBF24',apIt:totalApFisico});}
+  if(inversion.saldo>0)chipItems.push({nombre:'Inversión',disp:inversion.saldo,saldo:inversion.saldo,color:'#C4B5FD',apIt:0});
+  chipItems.forEach(function(ch){html+='<div style="width:1px;height:32px;background:rgba(255,255,255,.1);margin:0 16px;flex-shrink:0"></div><div style="flex:1;min-width:0"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m);margin-bottom:3px">'+ch.nombre+'</div><div style="font-size:18px;font-weight:700;color:'+ch.color+';letter-spacing:-.02em;line-height:1">'+fmt(ch.disp)+'</div>'+(ch.apIt>0?'<div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:1px">saldo '+fmt(ch.saldo)+'</div>':'')+'</div>';});
+  html+='</div></div>';
+  if(totalBruto>0){html+='<div style="margin:0 16px 10px;height:5px;border-radius:3px;overflow:hidden;display:flex;gap:1px">';(banco.items||[]).forEach(function(it){var apIt=apPorBanco[(it.nombre||'').toUpperCase()]||0;var dP=Math.round(((it.monto||0)-apIt)/totalBruto*100);var aP=Math.round(apIt/totalBruto*100);if(dP>0)html+='<div style="width:'+dP+'%;background:#4ADE80"></div>';if(aP>0)html+='<div style="width:'+aP+'%;background:rgba(245,158,11,.4)"></div>';});(fisico.items||[]).forEach(function(it){var pct=Math.round((it.monto||0)/totalBruto*100);if(pct>0)html+='<div style="width:'+pct+'%;background:#FBBF24"></div>';});if(inversion.saldo>0){var pct=Math.round(inversion.saldo/totalBruto*100);if(pct>0)html+='<div style="width:'+pct+'%;background:#8B5CF6"></div>';}html+='</div>';}
+  if(f.meta>0){html+='<div style="margin:0 16px 10px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:var(--rad-card)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span style="font-size:11px;color:var(--m)">🎯 Fondo emergencia</span><span style="font-size:12px;font-weight:700;color:'+saludColor+'">'+(f.avance||0)+'% · '+saludLbl+'</span></div><div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:5px"><div style="height:100%;width:'+Math.min(100,f.avance||0)+'%;background:'+saludColor+';border-radius:2px"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--m)"><span>Banco: <b style="color:rgba(255,255,255,.5)">'+fmt(banco.saldo)+'</b></span><span>Meta: <b style="color:rgba(255,255,255,.5)">'+fmt(f.meta)+'</b> · '+(f.meses||0)+' meses</span></div></div>';}
+  html+='<div style="border-top:1px solid rgba(255,255,255,.06);margin:2px 0 0"></div>';
+  html+='<div style="padding:4px 0 0">';
+  var _fijosGlobal=window._fijosData||[];
+  if(_fijosGlobal.length){
+    var totalFijos=_fijosGlobal.reduce(function(s,fi){return fi.nombre==='P'?s:s+(fi.monto||0);},0);
+    var totalDisp=totalFijos-totalAp;var hayP=_fijosGlobal.some(function(fi){return fi.nombre==='P';});
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px 6px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--m)">Saldos</div><div style="font-size:16px;font-weight:800;color:#4ADE80;letter-spacing:-.02em">'+fmt2(totalDisp)+'</div></div>';
+    _fijosGlobal.forEach(function(fi){
+      var excluido=fi.nombre==='P';var bancKey=(fi.nombre||'').trim().toUpperCase();var apBanco=apPorBanco[bancKey]||0;var disp=(fi.monto||0)-apBanco;
+      var montoFmt=(fi.monto||0)>=0?'$ '+Math.abs(fi.monto||0).toLocaleString('es-MX',{minimumFractionDigits:2}):'− $ '+Math.abs(fi.monto||0).toLocaleString('es-MX',{minimumFractionDigits:2});
+      var montoColor=excluido?'#EF4444':'#4ADE80';
+      html+='<div class="ente-row'+(excluido?' excluido-total':'')+'" onclick="togEnteEdit('+fi.fila+',event)" style="padding:10px 16px"><div class="ente-nombre">'+fi.nombre+'</div><div class="ente-right"><div style="text-align:right"><div class="ente-monto" id="em-'+fi.fila+'" style="color:'+montoColor+'">'+montoFmt+'</div>'+((!excluido&&apBanco>0)?'<div style="font-size:11px;color:var(--m);margin-top:1px">disponible: <span style="color:#4ADE80;font-weight:700;font-size:12px">'+fmt(disp)+'</span></div>':'')+'</div><div class="ente-fecha">'+fmtDiaSemana(fi.fecha)+'</div></div></div>';
+      html+='<div class="ente-edit" id="ee-'+fi.fila+'"><input type="number" value="'+(fi.monto!==null?fi.monto:'')+'" step="0.01" inputmode="decimal" id="ei-'+fi.fila+'" placeholder="0.00" onkeydown="if(event.key===\'Enter\')guardarEnte('+fi.fila+',event);if(event.key===\'Escape\')togEnteEdit('+fi.fila+',event)"><button class="btn-check" id="ec-'+fi.fila+'" onclick="guardarEnte('+fi.fila+',event)"><i class="fas fa-check" id="ei-ico-'+fi.fila+'"></i></button></div>';
+    });
+    if(hayP)html+='<div class="ente-excluido-nota">* excluido del total</div>';
+  }
+  if((window._apartadosData||[]).length){
+    html+='<div style="padding:8px 16px 4px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,.06);margin-top:4px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--m)">Apartados</div><span style="font-size:13px;font-weight:700;color:var(--warn)">'+fmt(totalAp)+'</span></div>';
+    var hoy=new Date();hoy.setHours(0,0,0,0);
+    (window._apartadosData||[]).forEach(function(ap){
+      var usado=ap.estado&&ap.estado.toLowerCase()==='usado';var metaStr='';
+      if(ap.meta){var diff=Math.floor((new Date(ap.meta)-hoy)/86400000);metaStr=diff<0?'Vencido':diff===0?'Hoy':'en '+diff+' días';}
+      html+='<div class="apartado-item '+(usado?'usado':'')+'"><div class="apartado-icon">💰</div><div class="apartado-info"><div class="apartado-nombre">'+ap.nombre+'</div><div class="apartado-meta">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+(metaStr?' · '+metaStr:'')+'</div></div><div><div class="apartado-monto">'+fmt(ap.monto)+'</div>'+(!usado?'<button onclick="_marcarApartadoUsado('+ap.fila+')" style="font-size:10px;padding:3px 10px;border-radius:var(--rad-pill);border:1px solid rgba(74,222,128,.25);background:rgba(74,222,128,.08);color:#4ADE80;cursor:pointer;font-family:inherit;margin-top:5px;display:block">Usar ✓</button>':'<div style="font-size:10px;color:var(--m);margin-top:4px">Usado</div>')+'</div></div>';
+    });
+  }
+  html+='</div>';
+  body.innerHTML=html;
+}
+// ══════════════════════════════════════════════════════════════════
+//  FIJOS — VISTA EXPANDIDA (mockup v5.193)
+//  Rediseño de la card expandida de Fijos. Consume api.getGastos()
+//  (data.grupos) y, si existen, los campos nuevos del backend; si no,
+//  los deriva. NO reemplaza renderAnualidad (usado en vista normal).
+//
+//  ─── CONTRATO DE DATOS (lo que el GAS deberia entregar) ───
+//  data.grupos[i] = {
+//    concepto:  string                       // ya existe
+//    estado:    string  (opcional)           // NUEVO. Se normaliza:
+//               "activo"|"pendiente"|"inactivo"|"cancelado"
+//               (acepta sinonimos/acentos/mayus). Si falta -> derivado.
+//    items[j] = { clave:mes, monto:number, pagado:"Sí"/"No" }  // ya existe
+//  }
+//  Todo lo demas (total mensual, servicios activos, variacion,
+//  barras apiladas, tendencia) se DERIVA de lo anterior.
+// ══════════════════════════════════════════════════════════════════
+
+// Normaliza el estado a una de 4 claves canonicas. Acepta sinonimos.
+function _fijosNormEstado(raw){
+  if(raw===null||raw===undefined||raw==='') return null;
+  var s=String(raw).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  if(/activ|cobr|vigent|si\b/.test(s)) return 'activo';
+  if(/pend|proxim|por cobrar/.test(s)) return 'pendiente';
+  if(/inactiv|pausad|stop|baja/.test(s)) return 'inactivo';
+  if(/cancel|elimin/.test(s)) return 'cancelado';
+  return null;
+}
+
+// Config visual por estado.
+var _FIJOS_ESTADOS={
+  activo:    {lbl:'Activo',    color:'#4ADE80', dot:'fa-circle'},
+  pendiente: {lbl:'Pendiente', color:'#F59E0B', dot:'fa-clock'},
+  inactivo:  {lbl:'Inactivo',  color:'#94A3B8', dot:'fa-circle'},
+  cancelado: {lbl:'Cancelado', color:'#EF4444', dot:'fa-ban'}
+};
+
+// Deriva el estado de un grupo cuando el backend no lo da:
+//  - tiene monto en el mes actual y esta pagado -> activo
+//  - tiene monto en el mes actual sin pagar     -> pendiente
+//  - no tiene monto en ningun mes               -> inactivo
+function _fijosEstadoDerivado(g){
+  var mesActIdx=new Date().getMonth();
+  var MIDX={enero:0,febrero:1,marzo:2,abril:3,mayo:4,junio:5,
+    julio:6,agosto:7,septiembre:8,octubre:9,noviembre:10,diciembre:11};
+  var itemMesAct=null, tieneAlgunMonto=false;
+  (g.items||[]).forEach(function(it){
+    if(it.monto!==null&&it.monto!==undefined&&it.monto!==0) tieneAlgunMonto=true;
+    var cl=(it.clave||'').toLowerCase();
+    var m=Object.keys(MIDX).find(function(k){return cl.indexOf(k)>=0;});
+    if(m&&MIDX[m]===mesActIdx) itemMesAct=it;
+  });
+  var pag=itemMesAct&&(itemMesAct.pagado==='Sí'||itemMesAct.pagado==='Si'||itemMesAct.pagado==='sí');
+  if(itemMesAct&&itemMesAct.monto){ return pag?'activo':'pendiente'; }
+  if(tieneAlgunMonto) return 'activo';
+  return 'inactivo';
+}
+
+// Icono FontAwesome sugerido por concepto (heuristico, decorativo).
+function _fijosIcono(concepto){
+  var c=(concepto||'').toLowerCase();
+  if(/renta|casa|hogar/.test(c)) return 'fa-house';
+  if(/cfe|luz|electric/.test(c)) return 'fa-bolt';
+  if(/gas/.test(c)) return 'fa-fire';
+  if(/telcel|movil|cel|telefon/.test(c)) return 'fa-tower-cell';
+  if(/izzi|internet|wifi|totalplay|megacable/.test(c)) return 'fa-wifi';
+  if(/spotify|musica/.test(c)) return 'fa-music';
+  if(/icloud|drive|nube|storage/.test(c)) return 'fa-cloud';
+  if(/netflix|hbo|disney|prime|stream/.test(c)) return 'fa-film';
+  if(/gym|gimnasio/.test(c)) return 'fa-dumbbell';
+  if(/seguro|1917/.test(c)) return 'fa-shield-halved';
+  if(/agua/.test(c)) return 'fa-droplet';
+  return 'fa-circle-dot';
+}
+
+
 window._formListo = true;
 console.log('[v11-form] E3-D3 · form RAW activo (api extendida: insertarEnRAW/editarFilaRAW y guardar*)');

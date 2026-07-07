@@ -556,6 +556,9 @@ addEventListener('keydown',function(e){
 },true);
 addEventListener('wheel',function(e){
   if(_formAbierto()) e.stopImmediatePropagation();
+  /* E3-D15: en nivel 2 la rueda es PARA EL CONTENIDO — el motor no
+     emerge por scroll; se sale con Escape o el mini-dial */
+  else if(window.nivel===2 && !window.enTransicion) e.stopImmediatePropagation();
 },{capture:true,passive:true});
 
 
@@ -1361,6 +1364,77 @@ addEventListener('wheel',function(e){
         }
       },
     },
+    // ── NECESIDADES expandido — usa renderNecesidadesInline si los IDs existen ──
+    'hud-necesidades': {
+      html: function(){
+        return ''+
+          '<div style="display:flex;flex-direction:column;gap:14px;min-height:0">'+
+            // Header unificado (v8.9) + filtros a la derecha
+            '<div style="display:flex;align-items:center;justify-content:space-between">'+
+              _expHeader('NECESIDADES', '', 'fas fa-wave-square', '#A855F7')+
+              '<div style="display:flex;align-items:center;gap:8px">'+
+                '<div id="nec-overlay-anio-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:var(--rad-card);background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85);font-family:var(--font-mono)">'+(new Date().getFullYear())+'</div>'+
+                '<div id="nec-overlay-mes-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:var(--rad-card);background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85)">Hasta hoy</div>'+
+              '</div>'+
+            '</div>'+
+            // Radar + Pirámide lado a lado
+            '<div style="display:flex;gap:14px;min-height:240px;flex-shrink:0">'+
+              '<div id="nec-inline-radar-wrap-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:var(--rad-lg);background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
+              '<div id="nec-inline-piramide-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:var(--rad-lg);background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
+            '</div>'+
+            // v5.144: contenedor inferior SIN scroll interno — el modo
+            // expansión ya hace que el panel crezca para mostrar todo el
+            // contenido. Antes tenía overflow:auto + flex:1 + min-height:0
+            // que forzaba scroll vertical aunque el contenido cabiera.
+            '<div id="nec-inline-container-overlay" style="flex:0 0 auto;overflow:visible;padding:4px"></div>'+
+          '</div>';
+      },
+      hydrate: function(){
+        var radarDest    = document.getElementById('nec-inline-radar-wrap-overlay');
+        var piramideDest = document.getElementById('nec-inline-piramide-overlay');
+        var detDest      = document.getElementById('nec-inline-container-overlay');
+        if(!radarDest || !piramideDest || !detDest) return;
+
+        function _aplicar(data){
+          if(!data || !data.niveles || !data.niveles.length){
+            radarDest.innerHTML    = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin registros con necesidad asignada</div>';
+            piramideDest.innerHTML = '';
+            detDest.innerHTML      = '';
+            return;
+          }
+          // _hudRenderNecesidadesEn ahora recibe DOS destinos (radar + listaContainer).
+          // Splitamos lista en pirámide+lista usando la implementación interna:
+          // pasamos piramideDest+detDest combinados via wrapper.
+          _hudRenderNecesidadesEn(data.niveles, radarDest, piramideDest);
+          // _hudRenderNecesidadesEn puso pyrHTML + listaHTML en piramideDest.
+          // Mover la lista (último <div style="margin-top:14px;...">) a detDest:
+          var listaNode = piramideDest.querySelector(':scope > div[style*="margin-top:14px"]');
+          var totalNode = piramideDest.querySelector(':scope > div[style*="margin-top:12px"]');
+          detDest.innerHTML = '';
+          if(listaNode){ detDest.appendChild(listaNode); }
+          if(totalNode){ detDest.appendChild(totalNode); }
+        }
+
+        var data = window._necInlineData || (window._hudDatos && window._hudDatos.necesidades);
+        if(data && data.niveles && data.niveles.length){
+          _aplicar(data);
+        } else {
+          radarDest.innerHTML    = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px"><i class="fas fa-circle-notch fa-spin"></i> Cargando…</div>';
+          piramideDest.innerHTML = '';
+          detDest.innerHTML      = '';
+          if(typeof api !== 'undefined' && api.getNecesidades){
+            var hoy = new Date();
+            api.getNecesidades(hoy.getFullYear(), String(hoy.getMonth()+1), null).then(function(d){
+              window._necInlineData = d;
+              if(d && d.ok){ _aplicar(d); }
+              else { radarDest.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">No se pudieron cargar las necesidades</div>'; }
+            }).catch(function(){
+              radarDest.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Error al cargar</div>';
+            });
+          }
+        }
+      },
+    },
   };
   window._V11_EXPAND = _EXPAND_CONFIG;
 
@@ -1380,7 +1454,8 @@ var _MAPA_PANEL = {
                                        nutrición/entrena en mini-tableros;
                                        esas cards conservan su vista propia */
   financiero:'hud-financiero',  /* E3-D7: panel v9 verbatim (6036-6290) */
-  fijos:'hud-fijos', variables:'hud-variables'   /* E3-D12: expandidos v9 */
+  fijos:'hud-fijos', variables:'hud-variables',
+  necesidades:'hud-necesidades'   /* E3-D15: radar+pirámide v9 */
 };
 /* E3-D11: activity abandona el resumen — su nivel 2 es el Activity
    Check COMPLETO (board v9), todo junto como pediste. */
@@ -1461,7 +1536,6 @@ function _distribuirV9(d){
   if(d.nutricion)     window._nutData        = d.nutricion;
   if(d.entrenamiento) window._entData        = d.entrenamiento;
   if(d.fijos)         window._fijosData      = d.fijos;
-  if(d.gastos)        window._fijosAnualidadData = d.gastos;   /* E3-D12 */
   /* E3-D7: globals que el panel FINANCIERO v9 consume */
   if(d.financieroAvanzado) window._finData = d.financieroAvanzado;
   if(d.flujoPorMes)        window._flujoMensualData = d.flujoPorMes;
@@ -1646,5 +1720,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D13 activo · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D15 activo · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
