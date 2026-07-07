@@ -284,8 +284,8 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:color,fog:false,
       size:size,transparent:true,opacity:op,sizeAttenuation:true,depthWrite:false})));
   }
-  nube(900,0xA7B4FA,2.3,.7);
-  nube(70,0xFCD377,2.8,.5);
+  nube(1600,0xA7B4FA,2.6,.85);
+  nube(130,0xFCD377,3.1,.6);
 })();
 
 /* ═══ v11.2R E3-A — COSMOS RICO (look v9 en la MISMA escena 3D) ═══
@@ -305,29 +305,29 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     c.fillStyle=g;c.fillRect(0,0,64,64);
     return new THREE.CanvasTexture(cv);
   }
-  for(var q=0;q<14;q++){
+  for(var q=0;q<22;q++){
     var col=PAL[q%PAL.length];
     var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow(col,.18),fog:false,
       transparent:true,opacity:rnd(.5,.9),blending:THREE.AdditiveBlending,
       depthWrite:false}));
     var r=rnd(2200,3600),th=Math.random()*Math.PI*2,ph=Math.acos(rnd(-1,1));
     sp.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.cos(ph),r*Math.sin(ph)*Math.sin(th));
-    var e=rnd(26,64);sp.scale.set(e,e,1);sp.renderOrder=-2;
+    var e=rnd(34,92);sp.scale.set(e,e,1);sp.renderOrder=-2;
     scene.add(sp);
   }
   /* — nebulosas: manchas suaves enormes, aditivas, muy tenues — */
-  for(var n=0;n<6;n++){
+  for(var n=0;n<9;n++){
     var coln=PAL[(n*2+1)%PAL.length];
     var neb=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow(coln,.5),fog:false,
-      transparent:true,opacity:rnd(.045,.085),blending:THREE.AdditiveBlending,
+      transparent:true,opacity:rnd(.10,.16),blending:THREE.AdditiveBlending,
       depthWrite:false}));
     var rn=rnd(2600,3800),tn=Math.random()*Math.PI*2,pn=Math.acos(rnd(-1,1));
     neb.position.set(rn*Math.sin(pn)*Math.cos(tn),rn*Math.cos(pn),rn*Math.sin(pn)*Math.sin(tn));
-    var en=rnd(900,1800);neb.scale.set(en,en*rnd(.55,.9),1);neb.renderOrder=-3;
+    var en=rnd(1200,2200);neb.scale.set(en,en*rnd(.55,.9),1);neb.renderOrder=-3;
     scene.add(neb);
   }
   /* — constelaciones: cúmulos conectados por líneas tenues — */
-  for(var k=0;k<10;k++){
+  for(var k=0;k<16;k++){
     var rc=rnd(2300,3400),tc=Math.random()*Math.PI*2,pc=Math.acos(rnd(-1,1));
     var cx=rc*Math.sin(pc)*Math.cos(tc),cy=rc*Math.cos(pc),cz=rc*Math.sin(pc)*Math.sin(tc);
     var pts=[],np=3+Math.floor(Math.random()*4);
@@ -337,12 +337,12 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     for(var m2=0;m2<pts.length-1;m2++){vs.push(pts[m2],pts[m2+1]);}
     var lg=new THREE.BufferGeometry().setFromPoints(vs);
     var ln=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({fog:false,
-      color:PAL[k%PAL.length],transparent:true,opacity:.14,
+      color:PAL[k%PAL.length],transparent:true,opacity:.22,
       blending:THREE.AdditiveBlending,depthWrite:false}));
     ln.renderOrder=-2;scene.add(ln);
     var pg=new THREE.BufferGeometry().setFromPoints(pts);
     scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:PAL[k%PAL.length],fog:false,
-      size:4.5,transparent:true,opacity:.85,sizeAttenuation:true,depthWrite:false})));
+      size:5.5,transparent:true,opacity:.95,sizeAttenuation:true,depthWrite:false})));
   }
   /* — meteoros: rayas fugaces ocasionales (1 a la vez, barato) — */
   var met=null;
@@ -360,12 +360,47 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     if(met){
       var p=(performance.now()-met.t0)/met.dur;
       if(p>=1){scene.remove(met.l);met.l.geometry.dispose();met=null;}
-      else met.l.material.opacity=Math.sin(Math.PI*p)*.6;
-    } else if(Math.random()<0.004) lanzarMeteoro();   /* ~cada 6-10s */
+      else met.l.material.opacity=Math.sin(Math.PI*p)*.85;
+    } else if(Math.random()<0.012) lanzarMeteoro();   /* ~cada 6-10s */
     requestAnimationFrame(pasoMeteoro);
   }
   pasoMeteoro();
 })();
+
+/* ═══ v11.2R E3-C — HYPERDRIVE: rayas de warp durante transiciones
+   (el viaje es por el eje polar → streaks verticales en cilindro) ═══ */
+(function(){
+  var NL=150,vs=new Float32Array(NL*2*3);
+  for(var i=0;i<NL;i++){
+    var r=280+Math.random()*760,a=Math.random()*Math.PI*2;
+    var x=Math.cos(a)*r,z=Math.sin(a)*r,y=-600+Math.random()*2400,L=260+Math.random()*420;
+    vs[i*6]=x;vs[i*6+1]=y;vs[i*6+2]=z;vs[i*6+3]=x;vs[i*6+4]=y+L;vs[i*6+5]=z;
+  }
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(vs,3));
+  var mat=new THREE.LineBasicMaterial({color:0x9BB0FA,fog:false,transparent:true,
+    opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+  var warp=new THREE.LineSegments(g,mat);warp.renderOrder=-1;scene.add(warp);
+  (function pasoWarp(){
+    var target=(typeof enTransicion!=='undefined'&&enTransicion)?0.42:0;
+    mat.opacity+=(target-mat.opacity)*0.14;
+    warp.visible=mat.opacity>0.01;
+    requestAnimationFrame(pasoWarp);
+  })();
+})();
+/* ═══ HALO del planeta: glow suave alrededor de la esfera ═══ */
+(function(){
+  var cv=document.createElement('canvas');cv.width=cv.height=128;
+  var c=cv.getContext('2d');
+  var gr=c.createRadialGradient(64,64,26,64,64,64);
+  gr.addColorStop(0,'rgba(139,92,246,0)');gr.addColorStop(.55,'rgba(139,92,246,.28)');
+  gr.addColorStop(.8,'rgba(139,92,246,.10)');gr.addColorStop(1,'rgba(139,92,246,0)');
+  c.fillStyle=gr;c.fillRect(0,0,128,128);
+  var halo=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),
+    fog:false,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));
+  halo.scale.set(560,560,1);halo.renderOrder=0;scene.add(halo);
+})();
+
 
 
 /* ═══ LABELS del dial (anclas proyectadas) + RAW en el casquete ═══ */
@@ -912,12 +947,17 @@ function _calcNivelSiguiente(){
   var braille=['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
   var el=document.getElementById('boot-spin'),k=0;
   var iv=setInterval(function(){el.textContent=braille[k++%braille.length]},70);
-  var lineas=['INICIALIZANDO ESCENA','PROYECTANDO DIAL','ENLAZANDO HOLOGRAMAS'];
+  var lineas=['INICIALIZANDO ESCENA','PROYECTANDO DIAL','ENLAZANDO HOLOGRAMAS','SINCRONIZANDO DATOS'];
   var lEl=document.getElementById('boot-linea'),lk=0;
-  var ivL=setInterval(function(){lk++;if(lk<lineas.length)lEl.textContent=lineas[lk]},520);
+  var ivL=setInterval(function(){lk++;if(lk<lineas.length)lEl.textContent=lineas[lk]},430);
+  /* barra de progreso del boot (visual-only: JAMÁS espera a la API) */
+  var bar=document.createElement('div');bar.className='bbar';
+  bar.innerHTML='<div class="bfill"></div>';
+  document.getElementById('boot').appendChild(bar);
+  requestAnimationFrame(function(){bar.querySelector('.bfill').style.width='100%'});
   var t0=performance.now();
   requestAnimationFrame(function(){requestAnimationFrame(function(){
-    var falta=Math.max(0,1400-(performance.now()-t0));
+    var falta=Math.max(0,1800-(performance.now()-t0));
     setTimeout(function(){
       var b=document.getElementById('boot');
       b.classList.add('off');clearInterval(iv);clearInterval(ivL);

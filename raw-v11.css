@@ -339,3 +339,10 @@ body.v11-escena{position:fixed;inset:0}
 /* v11.2R: tipografía del dial como v9 (legible) */
 .lbl .t{font-size:10.5px !important;letter-spacing:.1em}
 .lbl .ico-img{width:32px;height:32px}
+
+/* v11.2R E3-C: barra del boot */
+#boot .bbar{width:220px;height:3px;margin-top:18px;background:rgba(255,255,255,.07);
+  border-radius:2px;overflow:hidden}
+#boot .bfill{height:100%;width:0;background:var(--acc-violet,#8B5CF6);
+  box-shadow:0 0 12px var(--acc-violet,#8B5CF6);
+  transition:width 1.75s cubic-bezier(.2,0,0,1)}
