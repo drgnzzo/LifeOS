@@ -335,6 +335,100 @@ function _pasoMini(){
   if(mostrar&&window.idx!==_miniIdx){ _miniIdx=window.idx; _pintarMini(); }
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   E3-D5 — TRATAMIENTO v9 DEL DIAL (valores VERBATIM de _dialDrawSector,
+   raw-overlay.js:7389-7448): tinte del acento .18 activo / .08 reposo,
+   borde exterior con glow (blur 12 reposo / 28+pasada 50 activo),
+   rim interior rgba(acento,.15). Reproducido en 3D como:
+   · piso de emisivo por sector (envoltura de poblarCards)
+   · arcos de borde con halo (RingGeometry aditiva) que viajan con el
+     mundo y se ABSORBEN con los gajos (opacidad × gajos.spread)
+   · anillo exterior segmentado cian/violeta con deriva (v9)
+   · hover: el sector gana potencia (como luz), cursor pointer
+   ═══════════════════════════════════════════════════════════════════ */
+var _R2=372, _PLANO_Y=8, _GAP=0.045;
+var _angSec=[];                       /* ángulo mundo-local por sector */
+(function(){
+  var W=new THREE.Vector3();
+  for(var i=0;i<window.N;i++){        /* giroMundo=0 en init: world==local */
+    window.anclas[i].pt.getWorldPosition(W);
+    _angSec.push(Math.atan2(W.z,W.x));
+  }
+})();
+function _arcoRing(rIn,rOut,a0,len,color,op){
+  var g=new THREE.RingGeometry(rIn,rOut,40,1,-(a0+len),len);
+  var m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:color,fog:false,
+    transparent:true,opacity:op,blending:THREE.AdditiveBlending,
+    depthWrite:false,side:THREE.DoubleSide}));
+  m.rotation.x=-Math.PI/2; m.position.y=_PLANO_Y; m.renderOrder=3;
+  return m;
+}
+var _rimG=new THREE.Group(); window.mundo.add(_rimG);
+var _rims=[];                          /* {core,halo,inner} por sector */
+(function(){
+  var half=Math.PI/window.N-_GAP;
+  for(var i=0;i<window.N;i++){
+    var c=new THREE.Color(window.SEC[i].c), a0=_angSec[i]-half, ln=half*2;
+    var core =_arcoRing(_R2-1.6,_R2+1.6,a0,ln,c,.55);   /* borde: rgba(acc,.35)~ */
+    var halo =_arcoRing(_R2-7,  _R2+9,  a0,ln,c,.14);   /* glow blur12 ~ */
+    var inner=_arcoRing(172-1,  172+1.2,a0,ln,c,.15);   /* rim interior .15 */
+    _rimG.add(core,halo,inner);
+    _rims.push({core:core,halo:halo,inner:inner});
+  }
+})();
+/* anillo exterior segmentado (decorativo v9): arcos cian/violeta */
+var _segG=new THREE.Group(); window.mundo.add(_segG);
+[[0x67E8F9, 398, 402, 0.0, 2.1, .45],
+ [0xA78BFA, 398, 402, 2.6, 1.5, .40],
+ [0x67E8F9, 412, 414, 4.4, 1.2, .30],
+ [0xA78BFA, 412, 414, 0.6, 0.9, .30]].forEach(function(a){
+  _segG.add(_arcoRing(a[1],a[2],a[3],a[4],new THREE.Color(a[0]),a[5]));
+});
+/* piso v9 de emisivo: envoltura de poblarCards (misma propiedad que la
+   capa de datos ya escribe; el motor jamás la toca) */
+function _pisoV9(){
+  for(var i=0;i<window.N;i++){
+    var mesh=window.gajoMeshes[i];
+    var I=mesh.material.emissiveIntensity;          /* .12–.38 (capa datos) */
+    mesh._v11I = .30 + Math.max(0,(I-.12))*1.2;     /* → .30–.61 (tinte v9) */
+    mesh.material.emissiveIntensity = mesh._v11I;
+    if(mesh.children[0]&&mesh.children[0].material){
+      var o=mesh.children[0].material.opacity;
+      mesh.children[0].material.opacity = Math.min(1,.78+Math.max(0,(o-.55))*.5);
+    }
+  }
+}
+var _pcBase=window.poblarCards;
+window.poblarCards=function(d){ _pcBase(d); _pisoV9(); };
+_pisoV9();
+/* hover: raycast en mousemove (nivel 0) — el sector gana potencia */
+var _hov=-1,_rayH=new THREE.Raycaster(),_ptrH=new THREE.Vector2();
+function _setHover(i){
+  if(i===_hov)return;
+  if(_hov>=0){
+    var m0=window.gajoMeshes[_hov];
+    m0.material.emissiveIntensity=m0._v11I||.30;
+    _rims[_hov].core.material.opacity=.55;
+    _rims[_hov].halo.material.opacity=.14;
+  }
+  _hov=i;
+  if(i>=0){
+    var m=window.gajoMeshes[i];
+    m.material.emissiveIntensity=Math.max(.68,(m._v11I||.3)+.25);
+    _rims[i].core.material.opacity=1;      /* activo: w3.5 blur28+50 ~ */
+    _rims[i].halo.material.opacity=.45;
+  }
+  document.body.style.cursor=(i>=0)?'pointer':'';
+}
+addEventListener('mousemove',function(e){
+  if(window.nivel!==0||window.enTransicion){ if(_hov>=0)_setHover(-1); return; }
+  _ptrH.x=(e.clientX/innerWidth)*2-1;_ptrH.y=-(e.clientY/innerHeight)*2+1;
+  _rayH.setFromCamera(_ptrH,window.camera);
+  var h=_rayH.intersectObjects(window.gajoMeshes,false);
+  _setHover(h.length?h[0].object.userData.i:-1);
+},{passive:true});
+
 /* ═══ ENTRADAS ═══ */
 var _ray=new THREE.Raycaster(),_ptr=new THREE.Vector2();
 addEventListener('click',function(e){
@@ -342,6 +436,9 @@ addEventListener('click',function(e){
   if(e.target.closest&&(e.target.closest('.hero')||e.target.closest('#v11-top')||
      e.target.closest('#v11-bot')||e.target.closest('#seccion')))return;
   if(window.nivel!==0||window.enTransicion)return;
+  /* E3-D5: en nivel 0 el clic es NUESTRO — el dial no gira (v9).
+     stopImmediatePropagation corta el listener del motor (girarA). */
+  e.stopImmediatePropagation();
   _ptr.x=(e.clientX/innerWidth)*2-1;_ptr.y=-(e.clientY/innerHeight)*2+1;
   _ray.setFromCamera(_ptr,window.camera);
   var hit=_ray.intersectObjects(window.gajoMeshes,false);
@@ -368,7 +465,7 @@ addEventListener('click',function(e){
     }
     if(ring.abierto){ _cerrarRing(); }
   }
-});
+},true);   /* E3-D5: captura — antes que el clic del motor */
 addEventListener('keydown',function(e){
   if(e.key==='Escape'&&ring.abierto)_cerrarRing();
 },{passive:true});
@@ -937,6 +1034,17 @@ window.colocar = function(){
   }
   /* halo del planeta: se apaga al descender (a alt 172 la cámara queda
      DENTRO del sprite de 560u y su gradiente violeta ahogaba el cosmos) */
+  /* arcos del dial: viven y mueren CON los gajos (spread) y el nivel */
+  var vis = (window.nivel===0||window.enTransicion) ? window.gajos.spread : 0;
+  for(var ri=0;ri<_rims.length;ri++){
+    var rr=_rims[ri], on=(ri===_hov);
+    rr.core.material.opacity =(on?1:.55)*vis;
+    rr.halo.material.opacity =(on?.45:.14)*vis;
+    rr.inner.material.opacity=.15*vis;
+  }
+  _segG.children.forEach(function(m,mi){ m.material.opacity=(mi<2?.45:.30)*vis; });
+  _segG.rotation.y += 0.0009;                    /* anillo con deriva (v9) */
+  if(window._v11Cosmos) window._v11Cosmos.rotation.y += 0.00014;  /* cosmos vivo */
   var hl = window._v11Halo;
   if(hl){
     var ka = Math.max(0, Math.min(1, (window.cam.alt-500)/620));
@@ -945,5 +1053,5 @@ window.colocar = function(){
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D4 activo · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D5 activo · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

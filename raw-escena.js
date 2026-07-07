@@ -270,6 +270,8 @@ var rim=new THREE.DirectionalLight(0x7C6BD8,.6);
 rim.position.set(-620,-180,-420);scene.add(rim);
 
 /* ── cosmos ── */
+var _cosmosG=new THREE.Group();scene.add(_cosmosG);
+window._v11Cosmos=_cosmosG;   /* E3-D5: deriva lenta (v9) desde nav */
 (function(){
   function nube(M,color,size,op){
     var geo=new THREE.BufferGeometry(),pos=new Float32Array(M*3);
@@ -281,7 +283,7 @@ rim.position.set(-620,-180,-420);scene.add(rim);
       pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
     }
     geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
-    scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:color,fog:false,
+    _cosmosG.add(new THREE.Points(geo,new THREE.PointsMaterial({color:color,fog:false,
       size:size,transparent:true,opacity:op,sizeAttenuation:true,depthWrite:false})));
   }
   nube(2600,0xA7B4FA,3.0,.95);   /* E3-D4: cosmos con presencia v9 */
@@ -313,7 +315,7 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     var r=rnd(2200,3600),th=Math.random()*Math.PI*2,ph=Math.acos(rnd(-1,1));
     sp.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.cos(ph),r*Math.sin(ph)*Math.sin(th));
     var e=rnd(40,110);sp.scale.set(e,e,1);sp.renderOrder=-2;
-    scene.add(sp);
+    _cosmosG.add(sp);
   }
   /* — nebulosas: manchas suaves enormes, aditivas, muy tenues — */
   for(var n=0;n<14;n++){
@@ -324,7 +326,7 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     var rn=rnd(2600,3800),tn=Math.random()*Math.PI*2,pn=Math.acos(rnd(-1,1));
     neb.position.set(rn*Math.sin(pn)*Math.cos(tn),rn*Math.cos(pn),rn*Math.sin(pn)*Math.sin(tn));
     var en=rnd(1400,2600);neb.scale.set(en,en*rnd(.55,.9),1);neb.renderOrder=-3;
-    scene.add(neb);
+    _cosmosG.add(neb);
   }
   /* — constelaciones: cúmulos conectados por líneas tenues — */
   for(var k=0;k<26;k++){
@@ -339,9 +341,9 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     var ln=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({fog:false,
       color:PAL[k%PAL.length],transparent:true,opacity:.34,
       blending:THREE.AdditiveBlending,depthWrite:false}));
-    ln.renderOrder=-2;scene.add(ln);
+    ln.renderOrder=-2;_cosmosG.add(ln);
     var pg=new THREE.BufferGeometry().setFromPoints(pts);
-    scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:PAL[k%PAL.length],fog:false,
+    _cosmosG.add(new THREE.Points(pg,new THREE.PointsMaterial({color:PAL[k%PAL.length],fog:false,
       size:6.5,transparent:true,opacity:.95,sizeAttenuation:true,depthWrite:false})));
   }
   /* — meteoros: rayas fugaces ocasionales (1 a la vez, barato) — */
