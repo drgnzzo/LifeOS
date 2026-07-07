@@ -463,3 +463,6 @@ body.v11-escena{background:transparent}
 /* ═══ v11.3 E3-D9 ═══ */
 html{background:#020810}
 #v11-cosmos{background:transparent !important}
+
+/* ═══ v11.3 E3-D10 — la pantalla de carga v9 sustituye al boot E3-C ═══ */
+#boot{display:none !important}
