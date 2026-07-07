@@ -13,7 +13,9 @@
 var _hudExpanded = null;
 var _dialOverlay = document.createElement('div');
 _dialOverlay.id = 'v11-cosmos';
-_dialOverlay.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none;background:#020810';
+_dialOverlay.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none';
+/* E3-D9: SIN fondo — start() (v7.078) muda el canvas a body ANTES del
+   holder en orden DOM; un fondo opaco aquí lo tapaba por completo. */
 document.body.insertBefore(_dialOverlay, document.body.firstChild);
 
   var _particlesCanvas = document.createElement('canvas');

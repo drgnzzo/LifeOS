@@ -459,3 +459,7 @@ html.en-anillo .nodo:hover .card{animation-play-state:paused}
 .lbl .t{font-size:11px !important;font-weight:800;letter-spacing:.14em}
 /* el cosmos v9 vive en su propio canvas: el body no aporta fondo */
 body.v11-escena{background:transparent}
+
+/* ═══ v11.3 E3-D9 ═══ */
+html{background:#020810}
+#v11-cosmos{background:transparent !important}

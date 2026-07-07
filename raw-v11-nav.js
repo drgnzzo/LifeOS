@@ -373,9 +373,9 @@ var _rims=[];                          /* {core,halo,inner} por sector */
   var half=Math.PI/window.N-_GAP;
   for(var i=0;i<window.N;i++){
     var c=new THREE.Color(window.SEC[i].c), a0=_angSec[i]-half, ln=half*2;
-    var core =_arcoRing(_R2-1.6,_R2+1.6,a0,ln,c,.55);   /* borde: rgba(acc,.35)~ */
-    var halo =_arcoRing(_R2-7,  _R2+9,  a0,ln,c,.14);   /* glow blur12 ~ */
-    var inner=_arcoRing(172-1,  172+1.2,a0,ln,c,.15);   /* rim interior .15 */
+    var core =_arcoRing(_R2-2.6,_R2+2.6,a0,ln,c,.85);   /* arco protagonista v9 */
+    var halo =_arcoRing(_R2-10, _R2+12, a0,ln,c,.22);   /* glow blur12 */
+    var inner=_arcoRing(172-1,  172+1.4,a0,ln,c,.18);   /* rim interior */
     _rimG.add(core,halo,inner);
     _rims.push({core:core,halo:halo,inner:inner});
   }
@@ -389,11 +389,12 @@ function _pisoV9(){
   for(var i=0;i<window.N;i++){
     var mesh=window.gajoMeshes[i];
     var I=mesh.material.emissiveIntensity;          /* .12–.38 (capa datos) */
-    mesh._v11I = .30 + Math.max(0,(I-.12))*1.2;     /* → .30–.61 (tinte v9) */
+    mesh._v11I = .16 + Math.max(0,(I-.12))*0.6;     /* v9 reposo .08: casi
+                                                       oscuro → .16–.31 */
     mesh.material.emissiveIntensity = mesh._v11I;
     if(mesh.children[0]&&mesh.children[0].material){
       var o=mesh.children[0].material.opacity;
-      mesh.children[0].material.opacity = Math.min(1,.78+Math.max(0,(o-.55))*.5);
+      mesh.children[0].material.opacity = Math.min(1,.62+Math.max(0,(o-.55))*.6);
     }
   }
 }
@@ -413,7 +414,7 @@ function _setHover(i){
   _hov=i;
   if(i>=0){
     var m=window.gajoMeshes[i];
-    m.material.emissiveIntensity=Math.max(.68,(m._v11I||.3)+.25);
+    m.material.emissiveIntensity=Math.max(.42,(m._v11I||.16)+.18);   /* hover v9 .18 */
     _rims[i].core.material.opacity=1;      /* activo: w3.5 blur28+50 ~ */
     _rims[i].halo.material.opacity=.45;
   }
@@ -1503,9 +1504,9 @@ colocar();
   var vis = (window.nivel===0||window.enTransicion) ? window.gajos.spread : 0;
   for(var ri=0;ri<_rims.length;ri++){
     var rr=_rims[ri], on=(ri===_hov);
-    rr.core.material.opacity =(on?1:.55)*vis;
-    rr.halo.material.opacity =(on?.45:.14)*vis;
-    rr.inner.material.opacity=.15*vis;
+    rr.core.material.opacity =(on?1:.85)*vis;
+    rr.halo.material.opacity =(on?.50:.22)*vis;
+    rr.inner.material.opacity=.18*vis;
   }
   var hl = window._v11Halo;
   if(hl){
@@ -1515,5 +1516,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D8 activo · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D9 activo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
