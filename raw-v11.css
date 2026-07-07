@@ -432,3 +432,30 @@ html.en-anillo .nodo:hover .card{animation-play-state:paused}
   width:100% !important;height:100% !important;min-height:0;
   overflow-y:auto !important;overflow-x:hidden;
   background:transparent !important;border:none !important;box-shadow:none !important}
+
+/* ═══ v11.3 E3-D8 — HUB RAW v9 + labels radiales + tipografía fuerte ═══ */
+#v11-hub{position:fixed;left:0;top:0;z-index:6;border-radius:50%;opacity:0;
+  pointer-events:none;cursor:pointer;will-change:transform,opacity;
+  background:radial-gradient(circle at 50% 42%,rgba(28,28,50,.98),rgba(14,14,28,.98) 60%,rgba(8,8,16,.98));
+  border:1.5px solid rgba(167,139,250,.55);
+  box-shadow:0 0 14px rgba(139,92,246,.25),inset 0 0 30px rgba(0,0,0,.55)}
+#v11-hub .h-in{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px}
+#v11-hub .h-ico{font-size:20px;color:#A78BFA;text-shadow:0 0 12px rgba(167,139,250,.8)}
+#v11-hub .h-t{font-family:var(--font-mono);font-size:13px;font-weight:800;
+  letter-spacing:.22em;color:#C4B5FD;text-shadow:0 0 10px rgba(167,139,250,.7)}
+#v11-hub.hov{border-color:rgba(165,150,255,.85);
+  background:radial-gradient(circle at 50% 42%,rgba(40,36,80,.99),rgba(24,22,52,.99) 55%,rgba(10,10,22,.99));
+  box-shadow:0 0 40px rgba(165,150,255,.45),0 0 80px rgba(140,120,255,.18),
+    inset 0 0 34px rgba(60,40,120,.35)}
+#v11-hub.hov::before,#v11-hub.hov::after{content:'';position:absolute;border-radius:50%;
+  pointer-events:none;animation:v11hubPulse 1.6s ease-in-out infinite}
+#v11-hub.hov::before{inset:-5px;border:2px solid rgba(165,150,255,.45)}
+#v11-hub.hov::after{inset:-15px;border:1px solid rgba(140,120,255,.22);animation-delay:.3s}
+@keyframes v11hubPulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.03)}}
+/* el label RAW del motor se retira: el hub lo contiene */
+#lbl-raw{display:none !important}
+/* tipografía fuerte de labels del dial (proto) */
+.lbl .t{font-size:11px !important;font-weight:800;letter-spacing:.14em}
+/* el cosmos v9 vive en su propio canvas: el body no aporta fondo */
+body.v11-escena{background:transparent}

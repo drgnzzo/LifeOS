@@ -276,8 +276,11 @@ function _pasoRing(now){
   var dx=A.x-C.x, dy=A.y-C.y, rA=Math.hypot(dx,dy);
   if(rA<2)return;
   var phi=Math.atan2(dy,dx);
-  var rRim=rA*(372/272), rSub=rA*(486/272);     /* R1=172·R2=372·ancla=272 */
-  var dPhi=(M>=6?0.185:M>=4?0.225:0.30);
+  /* GEOMETRÍA v9 EXACTA (_DC: R_OUT 310 · R_SI 328 · R_SO 420 ·
+     spread π*0.50, items en centros de slice — raw-overlay:7376-7380) */
+  var rOutS=rA*(372/272);
+  var rSub=rOutS*((328+420)/2/310);          /* ×1.2065 */
+  var spread=Math.PI*0.50, subSlice=spread/M, startA=phi-spread/2;
   var vivo=false;
   for(var j=0;j<M;j++){
     var n=ring.nodos[j];
@@ -291,8 +294,8 @@ function _pasoRing(now){
       vivo=true;
     }
     var e=n._p;
-    var r=rRim+(rSub-rRim)*e;
-    var a=phi+(j-(M-1)/2)*dPhi;
+    var r=rOutS+(rSub-rOutS)*e;
+    var a=startA+(j+0.5)*subSlice;
     n.style.transform='translate('+(C.x+Math.cos(a)*r)+'px,'+(C.y+Math.sin(a)*r)+'px)';
     n.style.opacity=e.toFixed(3);
     n.style.pointerEvents=(e>0.6&&!ring.cerrando)?'auto':'none';
@@ -377,14 +380,9 @@ var _rims=[];                          /* {core,halo,inner} por sector */
     _rims.push({core:core,halo:halo,inner:inner});
   }
 })();
-/* anillo exterior segmentado (decorativo v9): arcos cian/violeta */
-var _segG=new THREE.Group(); window.mundo.add(_segG);
-[[0x67E8F9, 398, 402, 0.0, 2.1, .45],
- [0xA78BFA, 398, 402, 2.6, 1.5, .40],
- [0x67E8F9, 412, 414, 4.4, 1.2, .30],
- [0xA78BFA, 412, 414, 0.6, 0.9, .30]].forEach(function(a){
-  _segG.add(_arcoRing(a[1],a[2],a[3],a[4],new THREE.Color(a[0]),a[5]));
-});
+/* E3-D8: el anillo decorativo 3D se retira — el cosmos v9 exacto
+   (raw-v11-cosmos.js) dibuja SUS anillos de Dyson alrededor del dial */
+if(window._v11Cosmos) window._v11Cosmos.visible=false;   /* E3-A fuera: exacto > interpretado */
 /* piso v9 de emisivo: envoltura de poblarCards (misma propiedad que la
    capa de datos ya escribe; el motor jamás la toca) */
 function _pisoV9(){
@@ -428,6 +426,62 @@ addEventListener('mousemove',function(e){
   var h=_rayH.intersectObjects(_gajos3D,false);
   _setHover(h.length?h[0].object.userData.i:-1);
 },{passive:true});
+
+
+/* ═══ E3-D8 — CENTRO RAW (v9 _dialDrawCentro, raw-overlay:7449-...):
+   gradiente rgba(28,28,50)→(14,14,28)→(8,8,16), anillo violeta;
+   hover: gradiente vivo + doble anillo pulsante rgba(165,150,255).
+   Vive atado al dial: opacidad = (1−lift)·spread — en el descenso se
+   absorbe con los gajos, exactamente como pediste. ═══ */
+var _hub=document.createElement('div');_hub.id='v11-hub';
+_hub.innerHTML='<div class="h-in"><div class="h-ico">⇄</div><div class="h-t">RAW</div></div>';
+document.body.appendChild(_hub);
+var _hubHov=false;
+function _pasoHub(){
+  window.anclas[0].pt.getWorldPosition(_WA);
+  _W0.set(0,10,0);
+  var C=_projWorld(_W0), A=_projWorld(_WA);
+  var rA=Math.hypot(A.x-C.x,A.y-C.y);
+  var rIn=rA*(172/272);
+  var g=window.gajos;
+  var vis=(window.nivel===0||window.enTransicion)?1:0;
+  var o=((1-g.lift)*g.spread*vis);
+  _hub.style.transform='translate('+(C.x-rIn)+'px,'+(C.y-rIn)+'px)';
+  _hub.style.width=_hub.style.height=(rIn*2)+'px';
+  _hub.style.opacity=o.toFixed(3);
+  _hub.style.pointerEvents=(o>0.6)?'auto':'none';
+}
+addEventListener('mousemove',function(e){
+  if(window.nivel!==0){ if(_hubHov){_hubHov=false;_hub.classList.remove('hov');} return; }
+  _W0.set(0,10,0); var C=_projWorld(_W0);
+  window.anclas[0].pt.getWorldPosition(_WA); var A=_projWorld(_WA);
+  var rIn=Math.hypot(A.x-C.x,A.y-C.y)*(172/272);
+  var dentro=Math.hypot(e.clientX-C.x,e.clientY-C.y)<rIn;
+  if(dentro!==_hubHov){_hubHov=dentro;_hub.classList.toggle('hov',dentro);}
+},{passive:true});
+_hub.addEventListener('click',function(e){
+  e.stopPropagation();
+  if(typeof abrirFormulario==='function'){_cerrarRing(true);abrirFormulario('nueva');}
+});
+
+/* ═══ E3-D8 — LABELS RADIALES (proto aprobado): el texto sale de la
+   pestaña, orientado a su sector; se voltea 180° en la mitad baja
+   para seguir legible. Tipografía fuerte (CSS). ═══ */
+function _pasoLabelsRadiales(){
+  if(window.nivel!==0&&!window.enTransicion)return;
+  _W0.set(0,10,0); var C=_projWorld(_W0);
+  for(var i=0;i<window.N;i++){
+    window.anclas[i].pt.getWorldPosition(_WA);
+    var A=_projWorld(_WA);
+    var ang=Math.atan2(A.y-C.y,A.x-C.x)*180/Math.PI+90;
+    if(ang>90&&ang<270)ang+=180;
+    var inner=window.anclas[i].lbl.firstElementChild;
+    if(inner&&inner._rot!==Math.round(ang)){
+      inner._rot=Math.round(ang);
+      inner.style.transform='translate(-50%,-50%) rotate('+ang.toFixed(1)+'deg)';
+    }
+  }
+}
 
 /* ═══ ENTRADAS ═══ */
 var _ray=new THREE.Raycaster(),_ptr=new THREE.Vector2();
@@ -1443,6 +1497,8 @@ colocar();
   /* halo del planeta: se apaga al descender (a alt 172 la cámara queda
      DENTRO del sprite de 560u y su gradiente violeta ahogaba el cosmos) */
   _purgaExtras();
+  _pasoHub();
+  _pasoLabelsRadiales();
   /* arcos del dial: viven y mueren CON los gajos (spread) y el nivel */
   var vis = (window.nivel===0||window.enTransicion) ? window.gajos.spread : 0;
   for(var ri=0;ri<_rims.length;ri++){
@@ -1451,9 +1507,6 @@ colocar();
     rr.halo.material.opacity =(on?.45:.14)*vis;
     rr.inner.material.opacity=.15*vis;
   }
-  _segG.children.forEach(function(m,mi){ m.material.opacity=(mi<2?.45:.30)*vis; });
-  _segG.rotation.y += 0.0009;                    /* anillo con deriva (v9) */
-  if(window._v11Cosmos) window._v11Cosmos.rotation.y += 0.00014;  /* cosmos vivo */
   var hl = window._v11Halo;
   if(hl){
     var ka = Math.max(0, Math.min(1, (window.cam.alt-500)/620));
@@ -1462,5 +1515,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D7 activo · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D8 activo · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
