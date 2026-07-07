@@ -384,3 +384,10 @@ body.v11-escena{position:fixed;inset:0}
   padding:8px 14px;border-radius:6px;white-space:nowrap;
   opacity:0;pointer-events:none;transition:opacity .3s var(--ease)}
 #v11-hint.on{opacity:1}
+
+/* ═══ v11.3 E3-D2 ═══ */
+/* el indicador NIVEL/SECTOR estaba tapado por la banda inferior:
+   sube por encima de ella (info visible, banda abajo, mini-dial arriba) */
+#estado{bottom:84px !important;z-index:196}
+/* #sec-cuerpo hospeda los paneles v9 (alto completo, scroll propio) */
+#sec-cuerpo{display:flex;flex-direction:column;min-height:0}

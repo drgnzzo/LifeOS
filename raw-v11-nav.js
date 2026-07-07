@@ -350,12 +350,548 @@ addEventListener('keydown',function(e){
   if(e.key==='Escape'&&ring.abierto)_cerrarRing();
 },{passive:true});
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   E3-D2 — PANELES v9 EN NIVEL 2
+   _expHeader + bloques hud-patrimonio / hud-bitacora / hud-activity
+   RESCATADOS VERBATIM de raw-overlay.js:5697-6493 (extracción sed,
+   cero retipeo). Consumen window._patrimonioData/_apartadosData/
+   _pensamientosData/_relacionesData/_saludData/_nutData/_entData/
+   _actData/_logrosData — distribuidos abajo desde el getAll de escena.
+   ═══════════════════════════════════════════════════════════════════ */
+  function _expHeader(titulo, subtitulo, iconClass, color){
+    var sub = subtitulo
+      ? '<div style="font-size:var(--fs-2xs);font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:var(--hud-text-dim);margin-top:2px">'+subtitulo+'</div>'
+      : '';
+    // v8.41 — REVEAL POR LÍNEAS (Hubtown): el título entra deslizándose
+    // desde abajo dentro de un wrapper con overflow oculto, con la curva
+    // firma. El keyframe se inyecta una vez.
+    return ''+
+      '<div style="display:flex;align-items:center;gap:var(--sp-3);padding:0 2px">'+
+        '<div style="width:34px;height:34px;border-radius:var(--rad-card);flex-shrink:0;'+
+          'background:color-mix(in srgb,'+color+' 12%,transparent);'+
+          'border:1px solid color-mix(in srgb,'+color+' 40%,transparent);'+
+          'display:flex;align-items:center;justify-content:center;'+
+          'box-shadow:0 0 12px color-mix(in srgb,'+color+' 22%,transparent)">'+
+          '<i class="'+iconClass+'" style="color:'+color+';font-size:15px"></i>'+
+        '</div>'+
+        '<div style="min-width:0">'+
+          '<div style="overflow:hidden">'+
+            '<div style="font-size:var(--fs-base);font-weight:var(--fw-bold);letter-spacing:var(--ls-title);'+
+              'color:'+color+';text-shadow:0 0 8px color-mix(in srgb,'+color+' 35%,transparent);'+
+              'animation:expTituloReveal .65s var(--ease-hub) both">'+titulo+'</div>'+
+          '</div>'+
+          sub+
+        '</div>'+
+      '</div>';
+  }
+  window._expHeader = _expHeader;
+  // Keyframe del reveal (una sola vez)
+  (function(){
+    if(document.getElementById('exp-reveal-kf')) return;
+    var st = document.createElement('style');
+    st.id = 'exp-reveal-kf';
+    st.textContent = '@keyframes expTituloReveal{from{transform:translateY(115%)}to{transform:translateY(0)}}';
+    document.head.appendChild(st);
+  })();
+
+  var _EXPAND_CONFIG = {
+    'hud-patrimonio': {
+      html: function(){
+        return ''+
+        '<div style="display:flex;flex-direction:column;gap:14px;padding:0;height:100%">'+
+          // ── HEADER unificado (v8.9) ──
+          _expHeader('CENTRO PATRIMONIAL', '', 'fas fa-landmark', '#22C55E')+
+          // ── 5 cards top con sparkline + delta ──
+          '<div id="pat-cards-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.1fr;gap:10px;flex-shrink:0"></div>'+
+          // ── Banda Bruto = Disponible + Apartados ──
+          '<div id="pat-banda" style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;padding:14px 16px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03);flex-shrink:0"></div>'+
+          // ── Saldos y Cuentas + Distribución de Fondos ──
+          '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px;flex-shrink:0">'+
+            '<div id="pat-saldos" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03)"></div>'+
+            '<div id="pat-distribucion" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03);display:flex;flex-direction:column"></div>'+
+          '</div>'+
+          // ── Apartados (crece para llenar el alto restante; scroll si es largo) ──
+          '<div id="pat-apartados" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:var(--rad-lg);background:rgba(34,197,94,0.03);flex:1;min-height:0;overflow-y:auto"></div>'+
+        '</div>';
+      },
+      hydrate: function(){
+        var data = window._patrimonioData || {};
+        if(!data.ok && typeof api !== 'undefined' && api.getPatrimonio){
+          api.getPatrimonio().then(function(d){
+            window._patrimonioData = d;
+            var cfg = window._EXPAND_CONFIG && window._EXPAND_CONFIG['hud-patrimonio'];
+            if(cfg && document.getElementById('pat-cards-row')) cfg.hydrate();
+          }).catch(function(){});
+        }
+        var banco = data.banco || {saldo:0, items:[]};
+        var fisico = data.fisico || {saldo:0, items:[]};
+        var inv = data.inversion || {saldo:0, items:[]};
+        var fondo = data.fondo || {};
+        var total = data.total || 0;
+        // Apartados
+        var apartados = window._apartadosData || [];
+        var totalAp = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); })
+                               .reduce(function(s,a){ return s + (a.monto||0); }, 0);
+        var totalDisp = total - totalAp;
+
+        var fmt = function(v){ return '$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:0}); };
+        var fmt2 = function(v){ return '$ '+Math.abs(v||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+        function _spark(color, seed){
+          var pts = []; for(var i=0;i<10;i++){ pts.push((i*8)+','+(22-((Math.sin(i*0.7+seed)+1)/2*16)).toFixed(1)); }
+          return '<svg viewBox="0 0 80 24" preserveAspectRatio="none" style="width:100%;height:34px;margin-top:4px"><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+color+'" stroke-width="1.4" stroke-linecap="round" style="filter:drop-shadow(0 0 3px '+color+'80)"/></svg>';
+        }
+        function _card(label, value, color, delta, deltaSign){
+          return '<div style="padding:11px 13px;border:1px solid '+color+'40;border-radius:10px;background:'+color+'08;position:relative;overflow:hidden">'+
+            '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';box-shadow:0 0 8px '+color+';opacity:.7"></div>'+
+            '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:'+color+';margin-bottom:6px;opacity:.85">'+label+'</div>'+
+            '<div style="font-size:17px;font-weight:800;color:'+color+';font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 10px '+color+'40;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+value+'</div>'+
+            _spark(color, color.charCodeAt(1))+
+            (delta!==undefined ? '<div style="font-size:9px;color:'+(deltaSign>=0?'#4ADE80':'#EF4444')+';margin-top:2px;font-weight:700">'+(deltaSign>=0?'+':'')+delta+'% vs ayer</div>' : '')+
+          '</div>';
+        }
+        // 5 cards
+        var fondoPct = fondo.avance||0;
+        var fondoMeta = fondo.meta||0;
+        document.getElementById('pat-cards-row').innerHTML =
+          _card('Disponible Hoy', fmt2(totalDisp), '#22C55E', 3.2, 1)+
+          _card('Banco',           fmt2(banco.saldo),  '#4ADE80', 1.8, 1)+
+          _card('Efectivo',        fmt2(fisico.saldo), '#FBBF24', 0.0, 0)+
+          _card('Apartados',       fmt2(totalAp),      '#F59E0B', -0.4, -1)+
+          '<div style="padding:11px 13px;border:1px solid rgba(34,197,94,0.40);border-radius:10px;background:rgba(34,197,94,0.06);position:relative;overflow:hidden">'+
+            '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:#22C55E;box-shadow:0 0 8px #22C55E;opacity:.7"></div>'+
+            '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#22C55E;margin-bottom:6px;opacity:.85">Fondo de Emergencia</div>'+
+            '<div style="font-size:17px;font-weight:800;color:#22C55E;font-family:JetBrains Mono,monospace;line-height:1">'+fondoPct+'%</div>'+
+            '<div style="height:4px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:8px"><div style="width:'+Math.min(100,fondoPct)+'%;height:100%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 6px #22C55E;border-radius:999px"></div></div>'+
+            (fondoMeta>0 ? '<div style="font-size:9px;color:rgba(220,224,235,0.55);margin-top:3px">Meta <span style="color:#fff;font-family:JetBrains Mono,monospace;font-weight:700">'+fmt(fondoMeta)+'</span></div>' : '')+
+          '</div>';
+
+        // Banda
+        var pctApart = total>0 ? Math.round((totalAp/total)*100) : 0;
+        document.getElementById('pat-banda').innerHTML =
+          '<div style="display:flex;align-items:center;gap:10px">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-coins" style="color:#22C55E;font-size:13px"></i></div>'+
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55)">Patrimonio Bruto</div>'+
+              '<div style="font-size:18px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(total)+'</div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Activos totales</div></div>'+
+          '</div>'+
+          '<div style="color:rgba(220,224,235,0.30);font-size:18px;font-weight:300">−</div>'+
+          '<div style="display:flex;align-items:center;gap:10px">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(74,222,128,0.14);border:1px solid rgba(74,222,128,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-wallet" style="color:#4ADE80;font-size:13px"></i></div>'+
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55)">Disponible Total</div>'+
+              '<div style="font-size:18px;font-weight:800;color:#4ADE80;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(totalDisp)+'</div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Liquidez inmediata</div></div>'+
+          '</div>'+
+          '<div style="color:rgba(220,224,235,0.30);font-size:18px;font-weight:300">=</div>'+
+          '<div style="display:flex;align-items:center;gap:10px;justify-content:flex-end">'+
+            '<div style="text-align:right"><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55)">Apartados / Objetivos</div>'+
+              '<div style="font-size:18px;font-weight:800;color:#F59E0B;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(totalAp)+' <span style="color:rgba(220,224,235,0.45);font-size:13px;font-weight:600">· '+pctApart+'%</span></div>'+
+              '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Asignado a metas · '+pctApart+'% del patrimonio bruto</div></div>'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-lock" style="color:#F59E0B;font-size:13px"></i></div>'+
+          '</div>';
+
+        // ── Saldos y Cuentas: TODOS los fijos reales, con apartados por banco ──
+        // v5.149: usa la misma lógica que renderPatrimonio de HOME.
+        // Cada banco muestra: saldo bruto, apartados de ese banco, disponible neto.
+        (function(){
+          var fijosReales = window._fijosData || [];
+          var fijosVisibles = fijosReales.filter(function(fi){ return fi.nombre !== 'P'; });
+          var pFila = fijosReales.find(function(fi){ return fi.nombre === 'P'; });
+
+          // Apartados por banco (igual que HOME)
+          var apartadosArr = window._apartadosData || [];
+          var apPorBanco = {};
+          var totalApActivos = 0;
+          apartadosArr.forEach(function(ap){
+            if(ap.estado && ap.estado.toLowerCase()==='usado') return;
+            var b = (ap.banco||'').trim().toUpperCase();
+            apPorBanco[b] = (apPorBanco[b]||0) + (ap.monto||0);
+            totalApActivos += (ap.monto||0);
+          });
+
+          var rows = fijosVisibles.map(function(fi){
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            var dispBanco = (fi.monto||0) - apBanco;
+            var col = (fi.monto||0) >= 0 ? '#4ADE80' : '#EF4444';
+            return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">'+
+              '<td style="padding:8px 6px">'+
+                '<div style="display:flex;align-items:center;gap:8px">'+
+                  '<div style="width:26px;height:26px;border-radius:6px;background:'+col+'1a;border:1px solid '+col+'55;display:flex;align-items:center;justify-content:center"><i class="fas fa-building-columns" style="color:'+col+';font-size:10px"></i></div>'+
+                  '<div><div style="font-size:11px;font-weight:800;color:#fff">'+fi.nombre+'</div></div>'+
+                '</div>'+
+              '</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:'+col+';white-space:nowrap">'+fmt2(fi.monto)+'</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:'+(apBanco>0?'#F59E0B':'rgba(220,224,235,0.35)')+';white-space:nowrap">'+(apBanco>0?'-':'')+fmt(apBanco)+'</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:12px;font-weight:800;color:#4ADE80;white-space:nowrap">'+fmt2(dispBanco)+'</td>'+
+            '</tr>';
+          }).join('');
+
+          // Fila P* (excluida del total, pero visible como indicador)
+          if(pFila){
+            rows += '<tr style="border-top:1px dashed rgba(239,68,68,0.30)">'+
+              '<td style="padding:8px 6px">'+
+                '<div style="display:flex;align-items:center;gap:8px">'+
+                  '<div style="width:26px;height:26px;border-radius:6px;background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-circle-exclamation" style="color:#EF4444;font-size:10px"></i></div>'+
+                  '<div><div style="font-size:11px;font-weight:800;color:#fff">P <span style="color:#EF4444">*</span></div><div style="font-size:9px;color:rgba(220,224,235,0.45)">Indicador, excluido del total</div></div>'+
+                '</div>'+
+              '</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:#EF4444;white-space:nowrap">'+fmt2(pFila.monto)+'</td>'+
+              '<td style="padding:8px 6px;text-align:right;color:rgba(220,224,235,0.30)">—</td>'+
+              '<td style="padding:8px 6px;text-align:right;color:rgba(220,224,235,0.30)">—</td>'+
+            '</tr>';
+          }
+
+          // Total
+          var sumDisp = fijosVisibles.reduce(function(s,fi){
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            return s + ((fi.monto||0) - apBanco);
+          }, 0);
+          var sumBruto = fijosVisibles.reduce(function(s,fi){ return s + (fi.monto||0); }, 0);
+
+          document.getElementById('pat-saldos').innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+              '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E">Saldos por banco</div>'+
+              '<div style="font-size:11px;color:rgba(220,224,235,0.55)">'+fijosVisibles.length+' cuentas'+(pFila?' + P*':'')+'</div>'+
+            '</div>'+
+            '<table style="width:100%;border-collapse:collapse">'+
+              '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08)">'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:left">Cuenta</th>'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Saldo bruto</th>'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Apartados</th>'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Disponible</th>'+
+              '</tr></thead>'+
+              '<tbody>'+(rows || '<tr><td colspan="4" style="padding:18px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin cuentas</td></tr>')+'</tbody>'+
+              '<tfoot><tr style="border-top:2px solid rgba(34,197,94,0.30)">'+
+                '<td style="padding:10px 6px;font-size:11px;font-weight:800;color:#fff">TOTAL</td>'+
+                '<td style="padding:10px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:13px;font-weight:800;color:#fff">'+fmt2(sumBruto)+'</td>'+
+                '<td style="padding:10px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:13px;font-weight:800;color:#F59E0B">-'+fmt(totalApActivos)+'</td>'+
+                '<td style="padding:10px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:14px;font-weight:800;color:#4ADE80">'+fmt2(sumDisp)+'</td>'+
+              '</tr></tfoot>'+
+            '</table>';
+        })();
+
+        // ── Distribución de Fondos REAL (v5.149) ──
+        // Misma lógica de HOME: cada banco con su disponible + apartados.
+        // P* mostrado como indicador SEPARADO (no se mezcla con distribución).
+        (function(){
+          var fijosReales = window._fijosData || [];
+          var fijosVisibles = fijosReales.filter(function(fi){ return fi.nombre !== 'P'; });
+          var pFila = fijosReales.find(function(fi){ return fi.nombre === 'P'; });
+
+          var apartadosArr = window._apartadosData || [];
+          var apPorBanco = {};
+          var totalApActivos = 0;
+          apartadosArr.forEach(function(ap){
+            if(ap.estado && ap.estado.toLowerCase()==='usado') return;
+            var b = (ap.banco||'').trim().toUpperCase();
+            apPorBanco[b] = (apPorBanco[b]||0) + (ap.monto||0);
+            totalApActivos += (ap.monto||0);
+          });
+
+          var sumBruto = fijosVisibles.reduce(function(s,fi){ return s + Math.max(0, fi.monto||0); }, 0);
+
+          if(sumBruto <= 0){
+            document.getElementById('pat-distribucion').innerHTML = '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:24px">Sin datos</div>';
+            return;
+          }
+
+          // Paletas por banco
+          var paleta = ['#4ADE80','#22D3EE','#A78BFA','#FBBF24','#F472B6','#86EFAC','#67E8F9'];
+
+          // Barra apilada: cada banco (parte disponible) + apartados de ese banco
+          var barraHTML = '<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);margin-bottom:10px">';
+          fijosVisibles.forEach(function(fi, i){
+            var color = paleta[i % paleta.length];
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            var dispBanco = Math.max(0, (fi.monto||0) - apBanco);
+            var pctDisp = (dispBanco/sumBruto)*100;
+            var pctAp = (apBanco/sumBruto)*100;
+            if(pctDisp > 0){
+              barraHTML += '<div title="'+fi.nombre+' disponible" style="width:'+pctDisp.toFixed(2)+'%;background:'+color+';box-shadow:0 0 4px '+color+'80 inset"></div>';
+            }
+            if(pctAp > 0){
+              barraHTML += '<div title="'+fi.nombre+' apartados" style="width:'+pctAp.toFixed(2)+'%;background:'+color+'66;border-left:1px dashed rgba(255,255,255,0.20)"></div>';
+            }
+          });
+          barraHTML += '</div>';
+
+          // Lista por banco
+          var listaHTML = fijosVisibles.map(function(fi, i){
+            var color = paleta[i % paleta.length];
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            var dispBanco = (fi.monto||0) - apBanco;
+            var pct = sumBruto > 0 ? Math.round(((fi.monto||0)/sumBruto)*100) : 0;
+            return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'+
+              '<span style="display:flex;align-items:center;gap:6px;color:rgba(220,224,235,0.85);font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:'+color+';box-shadow:0 0 4px '+color+'"></span>'+fi.nombre+'</span>'+
+              '<span style="display:flex;align-items:center;gap:10px">'+
+                '<span style="color:rgba(220,224,235,0.55);font-family:JetBrains Mono,monospace">'+pct+'%</span>'+
+                '<span style="color:'+color+';font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap;min-width:90px;text-align:right">'+fmt2(fi.monto)+'</span>'+
+              '</span>'+
+            '</div>';
+          }).join('');
+
+          // P* como indicador SEPARADO (no se mezcla en distribución)
+          var pHTML = '';
+          if(pFila){
+            pHTML = '<div style="margin-top:10px;padding:10px 12px;border:1px dashed rgba(239,68,68,0.40);border-radius:8px;background:rgba(239,68,68,0.04)">'+
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+                '<div style="display:flex;align-items:center;gap:8px">'+
+                  '<i class="fas fa-circle-exclamation" style="color:#EF4444;font-size:11px"></i>'+
+                  '<div>'+
+                    '<div style="font-size:11px;font-weight:800;color:#fff">P <span style="color:#EF4444">*</span></div>'+
+                    '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Indicador, NO afecta el total</div>'+
+                  '</div>'+
+                '</div>'+
+                '<span style="font-size:13px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace">'+fmt2(pFila.monto)+'</span>'+
+              '</div>'+
+            '</div>';
+          }
+
+          document.getElementById('pat-distribucion').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Distribución por cuenta</div>'+
+            barraHTML +
+            '<div style="display:flex;flex-direction:column">'+listaHTML+'</div>'+
+            pHTML;
+        })();
+
+        // Apartados y Objetivos: TODOS los apartados activos (v5.147)
+        (function(){
+          var activos = apartados.filter(function(a){ return !(a.estado&&a.estado.toLowerCase()==='usado'); });
+          var hoy = new Date(); hoy.setHours(0,0,0,0);
+          var cards = activos.map(function(ap){
+            var pct = ap.meta && ap.monto ? Math.min(100, Math.round((ap.monto/(ap.metaMonto||ap.monto))*100)) : 66;
+            var metaStr = 'Sin meta';
+            if(ap.meta){
+              var diff = Math.floor((new Date(ap.meta)-hoy)/86400000);
+              metaStr = diff < 0 ? 'Vencido' : diff===0 ? 'Hoy' : 'en '+diff+' días';
+            }
+            var vencidoBadge = (ap.meta && new Date(ap.meta) < hoy) ? '<span style="font-size:8px;font-weight:800;padding:1px 6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.40);border-radius:4px;color:#EF4444;letter-spacing:.06em;text-transform:uppercase">Vencido</span>' : '';
+            return '<div style="padding:11px;border:1px solid rgba(34,197,94,0.30);border-radius:9px;background:rgba(34,197,94,0.04)">'+
+              '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+                '<div style="width:26px;height:26px;border-radius:6px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.40);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-coins" style="color:#F59E0B;font-size:11px"></i></div>'+
+                '<div style="flex:1;min-width:0">'+
+                  '<div style="font-size:11px;font-weight:800;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(ap.nombre||'')+'</div>'+
+                  '<div style="font-size:9px;color:rgba(220,224,235,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ap.banco||'')+(ap.categoria?' · '+ap.categoria:'')+' · '+metaStr+'</div>'+
+                '</div>'+
+              '</div>'+
+              '<div style="font-size:16px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;white-space:nowrap;margin-bottom:6px">'+fmt2(ap.monto)+'</div>'+
+              '<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-bottom:6px"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#F59E0B,#FBBF24);box-shadow:0 0 6px #F59E0B;border-radius:999px"></div></div>'+
+              '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:rgba(220,224,235,0.55)">Meta '+fmt(ap.metaMonto||ap.monto)+'</span><span style="font-size:10px;font-weight:800;color:#FBBF24;font-family:JetBrains Mono,monospace">'+pct+'%</span></div>'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+vencidoBadge+'<button onclick="if(typeof _marcarApartadoUsado===\'function\')_marcarApartadoUsado('+ap.fila+')" style="padding:3px 10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);border-radius:6px;font-size:9px;font-weight:800;color:#4ADE80;cursor:pointer;letter-spacing:.04em">Usar ✓</button></div>'+
+            '</div>';
+          }).join('');
+          var nuevo = ''; // v5.151: quitado botón decorativo "Nuevo apartado" — sin función
+          // v5.147: grid auto-fill — cantas tarjetas quepan por fila según ancho
+          document.getElementById('pat-apartados').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Apartados y Objetivos <span style="color:rgba(220,224,235,0.40);font-weight:700">('+activos.length+')</span></div>'+
+            '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">'+(cards || '')+nuevo+'</div>';
+        })();
+
+        // v5.148: sección "Flujo y Liquidez" eliminada — usaba datos
+        // sintéticos (sparkline Math.sin, deltas +12.3%/-5.1%/+22.1%
+        // hardcoded). Para análisis de flujo real, ver card Financiero.
+      },
+    },
+    // ── BITÁCORA — clonado del DOM de Home (sec-maslow-inline / col bitacora) ──
+    'hud-bitacora': {
+      html: function(){
+        return ''+
+          '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+            _expHeader('BITÁCORA', 'Pensamientos, relaciones y salud', 'fas fa-book-open', '#C084FC')+
+            '<div id="hud-bit-clone" style="display:flex;flex-direction:column;gap:14px;flex:1;min-height:0"></div>'+
+          '</div>';
+      },
+      hydrate: function(){
+        var dest = document.getElementById('hud-bit-clone');
+        if(!dest) return;
+        dest.innerHTML = '';
+        // Clonar resúmenes de pensamientos, relaciones, salud, nutrición, entrena
+        var d = window._pensamientosData;
+        // v8.10 — El grid LLENA el alto disponible. Antes tenía altura natural
+        // (solo lo que ocupaban las tarjetas) → quedaba un gran hueco vacío
+        // abajo. Ahora grid-auto-rows:1fr reparte el alto entre las filas y
+        // cada tarjeta crece; su lista interna hace scroll si es larga.
+        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:1fr;gap:14px;flex:1;min-height:0">';
+        function tarjeta(titulo, color, icon, items, vacio){
+          // v5.212: formateo de fecha seguro. Antes se hacía
+          // new Date(it.fecha).toLocaleDateString(...) directo — si
+          // it.fecha no era parseable, salía literalmente "Invalid Date".
+          // Ahora se valida con isNaN y, si falla, se intenta el formato
+          // 'yyyy-MM-dd' manualmente; si tampoco, cadena vacía.
+          function _fechaSegura(f){
+            if(!f) return '';
+            var dt = (f instanceof Date) ? f : new Date(f);
+            if(!isNaN(dt.getTime())){
+              return dt.toLocaleDateString('es-MX',{day:'2-digit',month:'short'});
+            }
+            // Fallback: parsear 'yyyy-MM-dd' a mano.
+            var m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if(m){
+              var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+              return m[3] + ' ' + (meses[parseInt(m[2],10)-1] || '');
+            }
+            return '';
+          }
+          var rows = '';
+          if(items && items.length){
+            rows = items.slice(0,8).map(function(it){
+              var fecha = _fechaSegura(it.fecha);
+              var txt = it.contenido || it.descripcion || it.actividad || it.persona || '';
+              return '<div style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:8px"><span style="font-size:11px;color:rgba(220,224,235,0.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+txt+'</span><span style="font-size:9px;color:rgba(220,224,235,0.40);flex-shrink:0">'+fecha+'</span></div>';
+            }).join('');
+          } else {
+            rows = '<div style="padding:18px;text-align:center;color:rgba(220,224,235,0.35);font-size:10px">'+vacio+'</div>';
+          }
+          return '<div style="border:1px solid '+color+'33;border-radius:var(--rad-lg);background:'+color+'08;overflow:hidden;display:flex;flex-direction:column;min-height:0"><div style="padding:9px 12px;border-bottom:1px solid '+color+'22;display:flex;align-items:center;gap:8px;flex-shrink:0"><i class="fas '+icon+'" style="color:'+color+';font-size:12px"></i><span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:'+color+'">'+titulo+'</span></div><div style="overflow-y:auto;flex:1;min-height:0">'+rows+'</div></div>';
+        }
+        html += tarjeta('Pensamientos', '#C084FC', 'fa-brain', (window._pensamientosData||{}).items, 'Sin pensamientos');
+        html += tarjeta('Relaciones', '#93C5FD', 'fa-users', (window._relacionesData||{}).items, 'Sin relaciones');
+        html += tarjeta('Salud', '#F87171', 'fa-heart-pulse', (window._saludData||{}).items, 'Sin registros');
+        html += tarjeta('Nutrición', '#86EFAC', 'fa-leaf', (window._nutData||{}).items, 'Sin registros');
+        html += tarjeta('Entrenamiento', '#FB923C', 'fa-dumbbell', (window._entData||{}).items, 'Sin sesiones');
+        html += '</div>';
+        dest.innerHTML = html;
+      },
+    },
+
+    // ── ACTIVITY + LOGROS expandido ──
+    'hud-activity': {
+      html: function(){
+        return ''+
+          '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+            _expHeader('ACTIVITY', 'Hábitos y logros de hoy', 'fas fa-bolt', '#FB923C')+
+            '<div id="hud-act-expanded-body" style="display:flex;flex-direction:column;gap:14px;flex:1;min-height:0"></div>'+
+          '</div>';
+      },
+      hydrate: function(){
+        var dest = document.getElementById('hud-act-expanded-body');
+        if(!dest) return;
+        var act = window._actData || {};
+        var logros = window._logrosData || {items:[]};
+        var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
+        // Hábitos personales con check hoy
+        var habitsP = (act.habitosPersonal||[]);
+        var doneP = habitsP.filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
+        var habitsE = (act.habitosElectronics||[]);
+        var doneE = habitsE.filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
+        var lgDone = (logros.items||[]).filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length;
+        var lgTotal = (logros.items||[]).length;
+        function bar(pct, color){ return '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:6px"><div style="width:'+Math.min(100,pct)+'%;height:100%;background:'+color+';box-shadow:0 0 8px '+color+'80;border-radius:999px"></div></div>'; }
+        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-content:start">';
+        // Hábitos personales
+        html += '<div style="padding:14px;border:1px solid rgba(251,146,60,0.30);border-radius:12px;background:rgba(251,146,60,0.04)"><div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#FB923C;margin-bottom:8px">Hábitos personales hoy</div><div style="font-size:24px;font-weight:800;color:#FB923C;font-family:JetBrains Mono,monospace">'+doneP+' / '+habitsP.length+'</div>'+bar(habitsP.length?(doneP/habitsP.length*100):0,'#FB923C')+'</div>';
+        // Electronics
+        html += '<div style="padding:14px;border:1px solid rgba(34,211,238,0.30);border-radius:12px;background:rgba(34,211,238,0.04)"><div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:8px">Hábitos Electronics hoy</div><div style="font-size:24px;font-weight:800;color:#22D3EE;font-family:JetBrains Mono,monospace">'+doneE+' / '+habitsE.length+'</div>'+bar(habitsE.length?(doneE/habitsE.length*100):0,'#22D3EE')+'</div>';
+        // Logros
+        html += '<div style="padding:14px;border:1px solid rgba(250,204,21,0.30);border-radius:12px;background:rgba(250,204,21,0.04);grid-column:1 / -1"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#FACC15">Logros</div><div style="font-size:18px;font-weight:800;color:#FACC15;font-family:JetBrains Mono,monospace">'+lgDone+' / '+lgTotal+'</div></div>'+bar(lgTotal?(lgDone/lgTotal*100):0,'#FACC15')+'</div>';
+        // Lista logros recientes
+        var recientes = (logros.items||[]).slice(0,10);
+        if(recientes.length){
+          html += '<div style="grid-column:1 / -1;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px">Logros recientes</div>';
+          recientes.forEach(function(l){
+            var done = l.completado==='Sí'||l.completado===true;
+            html += '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;gap:10px"><i class="fas '+(done?'fa-check-circle':'fa-circle')+'" style="color:'+(done?'#4ADE80':'rgba(220,224,235,0.30)')+';font-size:11px"></i><span style="font-size:11px;color:'+(done?'rgba(220,224,235,0.85)':'rgba(220,224,235,0.55)')+'">'+(l.titulo||l.nombre||'—')+'</span></div>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+        dest.innerHTML = html;
+      },
+    },
+
+  };
+  window._V11_EXPAND = _EXPAND_CONFIG;
+
+/* ── mapa sector → panel v9 (evidencia: presets "Ver sección" v9) ── */
+var _MAPA_PANEL = {
+  patrimonio:'hud-patrimonio', bancos:'hud-patrimonio', apartado:'hud-patrimonio',
+  pensamiento:'hud-bitacora', persona:'hud-bitacora', salud:'hud-bitacora',
+  entrenamiento:'hud-bitacora', activity:'hud-activity'
+};
+/* nutricion/timer/editar conservan su render E3-B hasta que sus
+   tableros v9 (boards) entren en D3. */
+var _renderBase = window._v11RenderSeccion;
+window._v11RenderSeccion = function(i){
+  var id = window.SEC[i].id, key = _MAPA_PANEL[id];
+  var cu = document.getElementById('sec-cuerpo');
+  if(!key || !cu || !window._capa1Data){ _renderBase(i); return; }
+  var cfg = _EXPAND_CONFIG[key];
+  try{
+    cu.innerHTML = cfg.html();
+    cfg.hydrate();
+    cu.scrollTop = 0;
+  }catch(e){
+    console.error('[v11-nav] hydrate '+key+':', e);
+    _renderBase(i);
+  }
+};
+
+/* ── distribución getAll → globals v9 (espejo del boot de overlay,
+   con el ok:true que hydrate patrimonio espera para no re-pedir) ── */
+var _lastCapa1 = null;
+function _distribuirV9(d){
+  if(d.patrimonio)    window._patrimonioData = Object.assign({ok:true}, d.patrimonio);
+  if(d.apartados)     window._apartadosData  = d.apartados.items || [];
+  if(d.nutricion)     window._nutData        = d.nutricion;
+  if(d.entrenamiento) window._entData        = d.entrenamiento;
+  if(d.fijos)         window._fijosData      = d.fijos;
+}
+
+/* ── "Usar ✓" de apartados — comportamiento rescatado de
+   raw-dashboard.js:603 (api directa; _hint en vez de showToast) ── */
+window._marcarApartadoUsado = function(fila){
+  if(!confirm('¿Marcar este apartado como Usado?')) return;
+  api.actualizarApartado(fila,'Usado').then(function(r){
+    if(r.ok){
+      _hint('✓ APARTADO MARCADO COMO USADO');
+      api.getApartados().then(function(a){
+        window._apartadosData = (a && a.items) || [];
+        if(window.nivel===2 && document.getElementById('pat-cards-row'))
+          _EXPAND_CONFIG['hud-patrimonio'].hydrate();
+      }).catch(function(){});
+    } else _hint(r.mensaje||'ERROR AL ACTUALIZAR');
+  }).catch(function(){ _hint('ERROR DE CONEXIÓN'); });
+};
+
+/* ═══ E3-D2 — ROCOLA PLENA: todas las cards visibles con contenido
+   (|rel|<=3 plenas; 4 tenue de canto; 5 fuera). Envoltura POR FUERA
+   de colocar() — el motor no se toca. ═══ */
+var _colocarBase = window.colocar;
+window.colocar = function(){
+  _colocarBase();
+  if(!document.documentElement.classList.contains('en-anillo')) return;
+  var ns = window.nodos;
+  for(var i=0;i<ns.length;i++){
+    var ar = Math.abs(ns[i]._rel);
+    ns[i].classList.toggle('lejana', ar>=4);
+    ns[i].style.opacity = ar<=3 ? 1 : ar===4 ? .45 : 0;
+  }
+};
+
 /* ═══ LOOP PROPIO (ligero; el del motor no se toca) ═══ */
 (function loopNav(now){
   _pasoRing(now);
   _pasoMini();
+  /* datos: cuando escena resuelve getAll (_capa1Data), espejar a los
+     globals v9 que consumen los paneles */
+  if(window._capa1Data && window._capa1Data !== _lastCapa1){
+    _lastCapa1 = window._capa1Data;
+    _distribuirV9(_lastCapa1);
+    if(window.nivel===2) window._v11RenderSeccion(window.idx);
+  }
+  /* halo del planeta: se apaga al descender (a alt 172 la cámara queda
+     DENTRO del sprite de 560u y su gradiente violeta ahogaba el cosmos) */
+  var hl = window._v11Halo;
+  if(hl){
+    var ka = Math.max(0, Math.min(1, (window.cam.alt-500)/620));
+    hl.material.opacity = .9*ka;
+  }
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D1 activo · sub-anillos + cadenas de nivel + mini-dial');
+console.log('[v11-nav] E3-D2 activo · sub-anillos + cadenas + mini-dial + paneles v9 nivel 2 + rocola plena');
 })();

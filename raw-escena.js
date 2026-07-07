@@ -399,6 +399,7 @@ rim.position.set(-620,-180,-420);scene.add(rim);
   var halo=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),
     fog:false,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));
   halo.scale.set(560,560,1);halo.renderOrder=0;scene.add(halo);
+  window._v11Halo=halo;   /* E3-D2: nav modula su opacidad por altitud */
 })();
 
 
