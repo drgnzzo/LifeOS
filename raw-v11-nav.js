@@ -959,10 +959,42 @@ var _MAPA_PANEL = {
   activity:'hud-activity'
 };
 /* CERO DUPLICADOS: un panel agrupador vive en UNA sola card. */
+/* E3-D6 — BOARDS v9 hospedados en nivel 2 (se MUEVEN, no se clonan:
+   conservan estado y listeners — patrón del carrusel v6). Al salir
+   vuelven al stash ANTES de que innerHTML los destruya. */
+window.volverAlAnverso = function(){ window._v11Home(); };
+function _devolverBoards(){
+  var st=document.getElementById('v11-boards'); if(!st)return;
+  ['board-timers','board-nutricion'].forEach(function(id){
+    var b=document.getElementById(id);
+    if(b && b.parentNode && b.parentNode.id==='sec-cuerpo'){
+      b.classList.remove('v11-hosted'); st.appendChild(b);
+    }
+  });
+}
+var _BOARD_SEC = { timer:'board-timers', nutricion:'board-nutricion' };
 var _renderBase = window._v11RenderSeccion;
 window._v11RenderSeccion = function(i){
   var id = window.SEC[i].id, key = _MAPA_PANEL[id];
   var cu = document.getElementById('sec-cuerpo');
+  _devolverBoards();
+  if(_BOARD_SEC[id] && cu){
+    var b=document.getElementById(_BOARD_SEC[id]);
+    if(b){
+      cu.innerHTML=''; b.classList.add('v11-hosted'); cu.appendChild(b);
+      if(id==='timer' && typeof window._timersAlEntrar==='function') window._timersAlEntrar();
+      if(id==='nutricion' && typeof window._renderNutLayoutCompleto==='function'){
+        /* espejo de irANutricion (raw-core.js:866): render inmediato + datos */
+        window._renderNutLayoutCompleto(window._nutData||null);
+        api.getNutricion().then(function(d){
+          window._nutData=d;
+          if(window.nivel===2 && window.SEC[window.idx].id==='nutricion')
+            window._renderNutLayoutCompleto(d);
+        }).catch(function(){});
+      }
+      cu.scrollTop=0; return;
+    }
+  }
   if(!key || !cu || !window._capa1Data){ _renderBase(i); _countUpSeccion(cu); return; }
   var cfg = _EXPAND_CONFIG[key];
   try{
@@ -1053,5 +1085,5 @@ window.colocar = function(){
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D5 activo · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D6 activo · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

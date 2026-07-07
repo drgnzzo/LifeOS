@@ -1295,5 +1295,182 @@ if(typeof window.renderAnualidad!=='function') window.renderAnualidad=function()
 if(typeof window.onDatosMes!=='function')      window.onDatosMes=function(){};
 window.oPanel = function(){ if(window._v11Hint) window._v11Hint('GESTIONAR LISTA LLEGA CON LOS BOARDS'); };
 window._setSheetUrl = function(u){ if(u) sheetUrl=u; };
+/* ── NUTRICIÓN — layout completo del board (verbatim raw-core.js:1052-1225:
+   macros, agua, ayuno, 7 días, comidas de hoy) ── */
+window._renderNutLayoutCompleto = window._renderNutLayoutCompleto || function(d){
+  var body = document.getElementById('nut-panel-body');
+  if(!body) return;
+
+  // Extraer datos con fallback a cero
+  var hoy   = (d && d.hoy) || {};
+  var meta  = (d && d.metas) || { calorias:1800, proteina:150, carbos:180, grasa:60, agua:2.5 };
+  var calH  = hoy.calorias  || hoy.cal      || 0;
+  var protH = hoy.proteina  || hoy.prot     || 0;
+  var carbH = hoy.carbos    || 0;
+  var grasH = hoy.grasa     || 0;
+  var aguaH = hoy.agua      || 0;
+  var fastH = hoy.fasting   || hoy.ayuno    || 0;
+
+  function kpiCard(label, val, metaVal, color, unidad, icon){
+    var pct = metaVal>0 ? Math.min(100, Math.round((val/metaVal)*100)) : 0;
+    return '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:14px 16px;'+
+      'box-shadow:0 4px 16px rgba(0,0,0,.35)">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+        '<i class="fas '+icon+'" style="font-size:14px;color:'+color+';filter:drop-shadow(0 0 6px '+color+'66)"></i>'+
+        '<span style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);text-transform:uppercase">'+label+'</span>'+
+      '</div>'+
+      '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px">'+
+        '<span style="font-size:24px;font-weight:800;color:'+color+';font-variant-numeric:tabular-nums;line-height:1">'+val+'</span>'+
+        '<span style="font-size:11px;color:rgba(200,208,230,0.40);font-weight:600">/ '+metaVal+' '+unidad+'</span>'+
+      '</div>'+
+      '<div style="height:4px;background:rgba(6,4,14,0.8);border-radius:2px;overflow:hidden;margin-bottom:4px">'+
+        '<div style="height:100%;width:'+pct+'%;background:'+color+';box-shadow:0 0 6px '+color+'80;border-radius:2px;transition:width .8s"></div>'+
+      '</div>'+
+      '<div style="font-size:10px;color:rgba(200,208,230,0.35);text-align:right;font-variant-numeric:tabular-nums">'+pct+'%</div>'+
+    '</div>';
+  }
+
+  // Header con fecha de hoy
+  var fechaHoy = new Date();
+  var fechaStr = String(fechaHoy.getDate()).padStart(2,'0')+'/'+String(fechaHoy.getMonth()+1).padStart(2,'0')+'/'+fechaHoy.getFullYear();
+  var lbl = document.getElementById('nut-fecha-lbl');
+  if(lbl) lbl.textContent = 'Hoy · '+fechaStr;
+
+  // Macros barra horizontal
+  var totalMacros = protH + carbH + grasH;
+  var protPct = totalMacros>0 ? Math.round(protH*4/((protH*4+carbH*4+grasH*9))*100) : 33;
+  var carbPct = totalMacros>0 ? Math.round(carbH*4/((protH*4+carbH*4+grasH*9))*100) : 34;
+  var grasPct = totalMacros>0 ? 100-protPct-carbPct : 33;
+
+  // Mini grid de los últimos 7 días
+  var semana = (d && d.semana) || [];
+  if(!semana.length){
+    semana = [];
+    for(var i=6;i>=0;i--){
+      var fc = new Date(); fc.setDate(fc.getDate()-i);
+      semana.push({ fecha: String(fc.getDate()).padStart(2,'0')+'/'+String(fc.getMonth()+1).padStart(2,'0'),
+                    calorias: 0, items: [] });
+    }
+  }
+  var maxCal = Math.max.apply(null, semana.map(function(d){ return d.calorias||0; }).concat([meta.calorias||1800]));
+
+  // Items de hoy (si hay)
+  var itemsHoy = (d && d.items) || (hoy.items) || [];
+
+  body.innerHTML =
+    '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px">'+
+
+      // Fila 1: 4 KPIs principales (calorías, proteína, carbos, grasa)
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">'+
+        kpiCard('Calorías',  Math.round(calH),  meta.calorias,  '#F97316', 'kcal', 'fa-fire')+
+        kpiCard('Proteína',  Math.round(protH), meta.proteina,  '#EF4444', 'g',    'fa-drumstick-bite')+
+        kpiCard('Carbos',    Math.round(carbH), meta.carbos,    '#FBBF24', 'g',    'fa-wheat-awn')+
+        kpiCard('Grasa',     Math.round(grasH), meta.grasa,     '#A855F7', 'g',    'fa-droplet')+
+      '</div>'+
+
+      // Fila 2: Distribución macros + Agua + Ayuno
+      '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px">'+
+
+        // Macros pie
+        '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:14px 16px">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+            '<i class="fas fa-chart-pie" style="font-size:14px;color:#A78BFA"></i>'+
+            '<span style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);text-transform:uppercase">Distribución macros</span>'+
+          '</div>'+
+          '<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;background:rgba(6,4,14,0.8);margin-bottom:10px">'+
+            '<div style="width:'+protPct+'%;background:#EF4444;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;'+
+                 (totalMacros===0?'opacity:0.3':'')+'">'+(totalMacros===0?'':protPct+'%')+'</div>'+
+            '<div style="width:'+carbPct+'%;background:#FBBF24;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;'+
+                 (totalMacros===0?'opacity:0.3':'')+'">'+(totalMacros===0?'':carbPct+'%')+'</div>'+
+            '<div style="width:'+grasPct+'%;background:#A855F7;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;'+
+                 (totalMacros===0?'opacity:0.3':'')+'">'+(totalMacros===0?'':grasPct+'%')+'</div>'+
+          '</div>'+
+          '<div style="display:flex;justify-content:space-around;font-size:10px;color:rgba(200,208,230,0.55)">'+
+            '<div><span style="color:#EF4444;font-weight:700">●</span> Proteína</div>'+
+            '<div><span style="color:#FBBF24;font-weight:700">●</span> Carbos</div>'+
+            '<div><span style="color:#A855F7;font-weight:700">●</span> Grasa</div>'+
+          '</div>'+
+        '</div>'+
+
+        // Agua
+        '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(34,211,238,0.25);border-radius:12px;padding:14px 16px">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+            '<i class="fas fa-glass-water" style="font-size:14px;color:#22D3EE;filter:drop-shadow(0 0 6px rgba(34,211,238,.5))"></i>'+
+            '<span style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);text-transform:uppercase">Agua</span>'+
+          '</div>'+
+          '<div style="font-size:24px;font-weight:800;color:#22D3EE;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px">'+
+            aguaH.toFixed(1)+'<span style="font-size:11px;color:rgba(200,208,230,0.40);font-weight:600;margin-left:4px">/ '+meta.agua+' L</span>'+
+          '</div>'+
+          '<div style="height:4px;background:rgba(6,4,14,0.8);border-radius:2px;overflow:hidden">'+
+            '<div style="height:100%;width:'+(meta.agua>0?Math.min(100,Math.round(aguaH/meta.agua*100)):0)+'%;background:#22D3EE;box-shadow:0 0 6px #22D3EE80;border-radius:2px"></div>'+
+          '</div>'+
+        '</div>'+
+
+        // Ayuno
+        '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(168,85,247,0.25);border-radius:12px;padding:14px 16px">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+            '<i class="fas fa-clock" style="font-size:14px;color:#A855F7"></i>'+
+            '<span style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);text-transform:uppercase">Ayuno</span>'+
+          '</div>'+
+          '<div style="font-size:24px;font-weight:800;color:#A855F7;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px">'+
+            fastH+'<span style="font-size:11px;color:rgba(200,208,230,0.40);font-weight:600;margin-left:4px">h</span>'+
+          '</div>'+
+          '<div style="font-size:10px;color:rgba(200,208,230,0.35)">'+
+            (fastH>=16?'✓ Ayuno largo':fastH>=12?'Ayuno moderado':fastH>0?'Ayuno corto':'Sin registro')+
+          '</div>'+
+        '</div>'+
+
+      '</div>'+
+
+      // Fila 3: Tendencia 7 días
+      '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:14px 16px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
+          '<i class="fas fa-chart-line" style="font-size:14px;color:#4ADE80"></i>'+
+          '<span style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);text-transform:uppercase">Calorías últimos 7 días</span>'+
+          '<span style="margin-left:auto;font-size:11px;color:rgba(200,208,230,0.40)">Meta: '+meta.calorias+' kcal</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:flex-end;gap:6px;height:80px">'+
+        semana.map(function(dia){
+          var h = maxCal>0 ? Math.max(2, Math.round((dia.calorias||0)/maxCal*72)) : 2;
+          var col = (dia.calorias||0) >= meta.calorias*0.8 ? '#4ADE80' : (dia.calorias||0) >= meta.calorias*0.5 ? '#FBBF24' : 'rgba(140,100,220,0.25)';
+          return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">'+
+            '<div style="font-size:10px;font-weight:700;color:'+col+';font-variant-numeric:tabular-nums">'+Math.round(dia.calorias||0)+'</div>'+
+            '<div style="width:100%;height:'+h+'px;background:'+col+';border-radius:3px 3px 0 0;box-shadow:0 0 4px '+col+'66;min-height:2px"></div>'+
+            '<div style="font-size:9px;color:rgba(200,208,230,0.40);font-weight:600">'+dia.fecha+'</div>'+
+          '</div>';
+        }).join('')+
+        '</div>'+
+      '</div>'+
+
+      // Fila 4: Items de hoy
+      '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:14px 16px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+
+          '<i class="fas fa-utensils" style="font-size:14px;color:#FB923C"></i>'+
+          '<span style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);text-transform:uppercase">Comidas de hoy</span>'+
+          '<span style="margin-left:auto;font-size:11px;color:rgba(200,208,230,0.40)">'+itemsHoy.length+' registro'+(itemsHoy.length===1?'':'s')+'</span>'+
+        '</div>'+
+        (itemsHoy.length===0
+          ? '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.30);font-size:12px">'+
+              '<i class="fas fa-leaf" style="font-size:24px;color:rgba(74,222,128,0.25);margin-bottom:8px;display:block"></i>'+
+              'Aún no has registrado comidas hoy.<br><span style="font-size:10px;color:rgba(200,208,230,0.20)">Toca "+ Agregar" arriba para registrar tu primera comida.</span>'+
+            '</div>'
+          : itemsHoy.map(function(it){
+              return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(140,100,220,0.10)">'+
+                '<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.25);color:#4ADE80;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">'+(it.momento||'—')+'</span>'+
+                '<span style="flex:1;font-size:13px;color:rgba(220,220,240,0.90);font-weight:500">'+(it.comida||it.alimento||'—')+'</span>'+
+                (it.calorias||it.cal?'<span style="font-size:11px;font-weight:700;color:#F97316;flex-shrink:0">'+Math.round(it.calorias||it.cal)+' kcal</span>':'')+
+              '</div>';
+            }).join('')
+        )+
+      '</div>'+
+
+    '</div>';
+};
+
+/* v6.061: _syncMobTab ELIMINADO. Sincronizaba la barra de tabs inferior
+   móvil (mob-tabbar), retirada en v6.050. La navegación móvil vive en
+   la barra superior fija; el router _osMostrar ya marca los tabs. */
+
+
 window._formListo = true;
 console.log('[v11-form] E3-D3 · form RAW activo (api extendida: insertarEnRAW/editarFilaRAW y guardar*)');

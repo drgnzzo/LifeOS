@@ -423,3 +423,12 @@ html.en-anillo .nodo:hover .card{animation-play-state:paused}
   text-shadow:0 0 8px var(--c),0 0 18px color-mix(in srgb,var(--c) 60%,transparent),0 1px 3px #000}
 .lbl .ico-img{filter:drop-shadow(0 0 6px var(--c)) drop-shadow(0 0 14px color-mix(in srgb,var(--c) 55%,transparent))}
 .ancla-inner.lbl{transition:transform .18s var(--ease)}
+
+/* ═══ v11.3 E3-D6 — BOARDS HOSPEDADOS EN NIVEL 2 ═══ */
+#sec-cuerpo .board-face.v11-hosted{
+  position:relative !important;inset:auto !important;
+  transform:none !important;opacity:1 !important;visibility:visible !important;
+  display:flex !important;flex-direction:column;
+  width:100% !important;height:100% !important;min-height:0;
+  overflow-y:auto !important;overflow-x:hidden;
+  background:transparent !important;border:none !important;box-shadow:none !important}

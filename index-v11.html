@@ -6,9 +6,9 @@
 <meta name="theme-color" content="#020810">
 <title>LifeOS v11 · ESCENA</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="raw-tokens.css?v=1129">
-<link rel="stylesheet" href="raw-app.css?v=1129">
-<link rel="stylesheet" href="raw-v11.css?v=1129">
+<link rel="stylesheet" href="raw-tokens.css?v=1130">
+<link rel="stylesheet" href="raw-app.css?v=1130">
+<link rel="stylesheet" href="raw-v11.css?v=1130">
 </head>
 <body class="v11-escena">
 <div class="hero" id="hero">
@@ -20,7 +20,7 @@
         <div class="hero-icon"><i class="fas fa-diamond"></i></div>
         <div class="hero-brand-txt">
           <div class="hero-title">Life<span>OS</span></div>
-          <div class="hero-sub">v11.3 · E3-D5</div>
+          <div class="hero-sub">v11.3 · E3-D6</div>
         </div>
       </div>
     </div>
@@ -92,6 +92,32 @@
 <div class="hud" id="hint">[RUEDA/↓] SUMERGIR · [CLIC] SECTOR</div>
 <div class="hud" id="fps">— fps</div>
 
+
+<!-- ═══ E3-D6: BOARDS v9 (se hospedan en nivel 2 de su sector) ═══ -->
+<div id="v11-boards" style="display:none">
+    <div class="board-face panel-nutricion" id="board-nutricion" style="overflow:hidden">
+      <div class="reverso-header" style="flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:0;background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.25);display:flex;align-items:center;justify-content:center;font-size:16px">🥗</div>
+          <div>
+            <div class="reverso-title">Nutrición</div>
+            <div style="font-size:10px;color:var(--m)" id="nut-fecha-lbl"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="window._dialPreset={tab:'nutricion'};abrirFormulario('nueva')" style="padding:5px 12px;border-radius:0;font-size:11px;font-weight:600;background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.25);color:#4ADE80;cursor:pointer;font-family:inherit">
+            <i class="fas fa-plus" style="font-size:9px"></i> Agregar
+          </button>
+          <button class="btn-flip active" onclick="volverAlAnverso()"><i class="fas fa-chevron-left" style="font-size:10px"></i> Volver</button>
+        </div>
+      </div>
+      <div id="nut-panel-body" style="padding-bottom:20px">
+        <div style="padding:40px;text-align:center;color:var(--m)"><i class="fas fa-circle-notch fa-spin" style="font-size:20px;color:#4ADE80"></i></div>
+      </div>
+    </div>
+
+<div class="board-face panel-timers" id="board-timers" style="overflow:hidden"></div>
+</div>
 <!-- ═══ E3-D3: FORM RAW (markup verbatim index.html v9: 553,556-566,586-668) ═══ -->
 <div id="toast" class="toast"><i></i><span id="toast-msg"></span></div>
 <div id="popup-concepto" class="popup-overlay" onclick="cerrarConcepto(event)">
@@ -189,11 +215,12 @@
 
 <!-- GSAP 3.12.5 (local) — motor de animación para transiciones entre niveles -->
 <!-- E3-D4: motor de animación v9 (GSAP + RawAnim: fades, countUp) -->
-<script src="gsap.min.js?v=1129"></script>
-<script src="raw-anim.js?v=1129"></script>
-<script src="three.min.js?v=1129"></script>
-<script src="raw-escena.js?v=1129"></script>
-<script src="raw-v11-form.js?v=1129"></script>
-<script src="raw-v11-nav.js?v=1129"></script>
+<script src="gsap.min.js?v=1130"></script>
+<script src="raw-anim.js?v=1130"></script>
+<script src="three.min.js?v=1130"></script>
+<script src="raw-escena.js?v=1130"></script>
+<script src="raw-v11-form.js?v=1130"></script>
+<script src="raw-timers.js?v=1130"></script>
+<script src="raw-v11-nav.js?v=1130"></script>
 </body>
 </html>
