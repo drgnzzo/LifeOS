@@ -1031,6 +1031,24 @@ function _metricasSector(d){
     var diaKey=['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
     var hoy=hp.concat(he).filter(function(h){return h.checks&&h.checks[diaKey]}).length;
     m.activity={reg:hp.length+he.length,ult:hoy+' hoy',n:hp.length+he.length};}catch(e){}
+  try{var pe2=(d.pensamientos&&d.pensamientos.items)||[];
+    m.pensamiento={reg:pe2.length,ult:(pe2[0]&&String(pe2[0].fecha||'—').slice(0,10))||'—',n:pe2.length};}catch(e){}
+  try{var bk=(d.patrimonio&&d.patrimonio.banco&&d.patrimonio.banco.items)||[];
+    var bt=0;bk.forEach(function(x){bt+=Number(x.monto||x.valor||0)});
+    m.bancos={reg:bk.length,ult:_fmtMXN(bt),n:bk.length};}catch(e){}
+  try{var ap=(d.apartados&&d.apartados.items)||[];
+    m.apartado={reg:ap.length,ult:_fmtMXN((d.apartados&&d.apartados.totalApartado)||0),n:ap.length};}catch(e){}
+  try{var en=(d.entrenamiento&&d.entrenamiento.items)||[];
+    m.entrenamiento={reg:en.length,ult:(en[0]&&String(en[0].fecha||'—').slice(0,10))||'—',n:en.length};}catch(e){}
+  try{var nu=(d.nutricion&&d.nutricion.items)||[];var cal=0;
+    nu.slice(0,12).forEach(function(x){cal+=Number(x.cal||x.calorias||0)});
+    m.nutricion={reg:nu.length,ult:cal?cal+' kcal':'—',n:nu.length};}catch(e){}
+  try{var re2=(d.relaciones&&d.relaciones.items)||[];
+    m.persona={reg:re2.length,ult:re2.filter(function(x){return x.sos}).length+' SOS',n:re2.length};}catch(e){}
+  try{var sa=(d.salud&&d.salud.items)||[];var px=(d.salud&&d.salud.proximas)||[];
+    m.salud={reg:sa.length,ult:px.length+' próximas',n:sa.length};}catch(e){}
+  m.timer={reg:'—',ult:'—',n:0};
+  try{m.editar={reg:Object.keys(d.catalogos||{}).length,ult:'catálogos',n:0};}catch(e){}
   return m;
 }
 function poblarCards(d){
@@ -1060,6 +1078,107 @@ function _marcarSync(txt){
 var DIAS7=['L','M','W','J','V','S','D'];
 function _r11Filas(html){return html||'<div class="v11-vacio">SIN REGISTROS</div>'}
 var _v11Render={
+  bancos:function(d){
+    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+    var p=d.patrimonio||{},bk=(p.banco&&p.banco.items)||[],bt=0;
+    bk.forEach(function(x){bt+=Number(x.monto||x.valor||0)});
+    var fm=(d.financieroAvanzado&&d.financieroAvanzado.metricas)||{};
+    var fe=fm.fondoEmergenciaPct!=null?fm.fondoEmergenciaPct:(fm.fondoEmergencia!=null?fm.fondoEmergencia:null);
+    return '<div class="v11-grid">'+
+      kpi('TOTAL',_fmtMXN(p.total||0))+
+      kpi('BANCO',_fmtMXN(bt),p.total?Math.round(100*bt/p.total)+'%':'')+
+      (fe!=null?kpi('FONDO EMERGENCIA',fe+'%',(fm.mesesEmergencia||fm.meses||'')+(fm.mesesEmergencia||fm.meses?' meses':'')):'')+
+      '</div><div class="v11-sub">CUENTAS</div>'+
+      (bk.length?bk.map(function(c){
+        return '<div class="v11-fila"><span class="txt">'+_esc(c.nombre||c.cuenta||c.banco||'—')+'</span>'+
+          '<span class="num">'+_fmtMXN(Number(c.monto||c.valor||0))+'</span></div>'}).join('')
+        :'<div class="v11-vacio">SIN CUENTAS</div>');
+  },
+  apartado:function(d){
+    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+    var a=d.apartados||{},it=a.items||[];
+    return '<div class="v11-grid">'+kpi('TOTAL APARTADO',_fmtMXN(a.totalApartado||0),it.length+' metas')+'</div>'+
+      '<div class="v11-sub">METAS</div>'+
+      (it.length?it.map(function(x){
+        return '<div class="v11-fila"><span class="txt">'+_esc(x.nombre||'—')+
+          (x.categoria?' <span class="tag">'+_esc(x.categoria)+'</span>':'')+'</span>'+
+          '<span class="num">'+_fmtMXN(Number(x.monto||x.total||0))+'</span></div>'}).join('')
+        :'<div class="v11-vacio">SIN METAS</div>');
+  },
+  nutricion:function(d){
+    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+    var n=d.nutricion||{},it=n.items||[];
+    var hoyStr=new Date().toISOString().slice(0,10),cal=0,hoyN=0;
+    it.forEach(function(x){if(String(x.fecha||'').slice(0,10)===hoyStr){cal+=Number(x.cal||x.calorias||0);hoyN++}});
+    return '<div class="v11-grid">'+kpi('HOY',cal+' kcal',hoyN+' comidas')+
+      kpi('REGISTROS',it.length)+'</div><div class="v11-sub">ÚLTIMAS COMIDAS</div>'+
+      (it.length?it.slice(0,10).map(function(x){
+        return '<div class="v11-fila"><span class="fecha">'+_esc(String(x.fecha||'').slice(5,10))+'</span>'+
+          '<span class="txt">'+(x.momento?'<span class="tag">'+_esc(x.momento)+'</span> ':'')+_esc(x.alimento||x.comida||'—')+'</span>'+
+          '<span class="num">'+(x.cal||x.calorias||0)+' kcal</span></div>'}).join('')
+        :'<div class="v11-vacio">SIN REGISTROS</div>');
+  },
+  entrenamiento:function(d){
+    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+    var it=(d.entrenamiento&&d.entrenamiento.items)||[];
+    return '<div class="v11-grid">'+kpi('SESIONES',it.length,(it[0]&&('última '+String(it[0].fecha||'').slice(0,10)))||'')+'</div>'+
+      '<div class="v11-sub">ÚLTIMAS SESIONES</div>'+
+      (it.length?it.slice(0,10).map(function(x){
+        var det=x.series?(x.series+'×'+(x.reps||'—')+(x.peso?' · '+x.peso+'kg':'')):(x.duracion?x.duracion+' min':'');
+        return '<div class="v11-fila"><span class="fecha">'+_esc(String(x.fecha||'').slice(5,10))+'</span>'+
+          '<span class="txt">'+(x.tipo?'<span class="tag">'+_esc(x.tipo)+'</span> ':'')+_esc(x.ejercicio||'—')+'</span>'+
+          '<span class="num">'+_esc(det||'—')+'</span></div>'}).join('')
+        :'<div class="v11-vacio">SIN SESIONES</div>');
+  },
+  persona:function(d){
+    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+    var it=(d.relaciones&&d.relaciones.items)||[];
+    var sos=it.filter(function(x){return x.sos}).length;
+    return '<div class="v11-grid">'+kpi('RELACIONES',it.length)+kpi('RED SOS',sos)+'</div>'+
+      '<div class="v11-sub">PERSONAS</div>'+
+      (it.length?it.slice(0,14).map(function(x){
+        return '<div class="v11-fila"><span class="txt">'+_esc(x.nombre||'—')+
+          (x.tipo?' <span class="tag">'+_esc(x.tipo)+'</span>':'')+(x.sos?' <span class="tag" style="color:var(--hud-err)">SOS</span>':'')+'</span>'+
+          '<span class="fecha">'+_esc(x.ultimaVez||x.frecuencia||'—')+'</span></div>'}).join('')
+        :'<div class="v11-vacio">SIN RELACIONES</div>');
+  },
+  salud:function(d){
+    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+    var s2=d.salud||{},it=s2.items||[],px=s2.proximas||[];
+    return '<div class="v11-grid">'+kpi('PRÓXIMAS',px.length)+kpi('REGISTROS',it.length)+'</div>'+
+      (px.length?'<div class="v11-sub">PRÓXIMAS CITAS</div>'+px.map(function(x){
+        return '<div class="v11-fila"><span class="fecha">'+_esc(String(x.fecha||'').slice(0,10))+'</span>'+
+          '<span class="txt">'+_esc(x.tipo||x.descripcion||'—')+(x.doctor?' · '+_esc(x.doctor):'')+'</span>'+
+          '<span class="tag">'+_esc(x.estado||'')+'</span></div>'}).join(''):'')+
+      '<div class="v11-sub">HISTORIAL</div>'+
+      (it.length?it.slice(0,10).map(function(x){
+        return '<div class="v11-fila"><span class="fecha">'+_esc(String(x.fecha||'').slice(0,10))+'</span>'+
+          '<span class="txt">'+_esc(x.tipo||'—')+(x.descripcion?' · '+_esc(x.descripcion):'')+'</span></div>'}).join('')
+        :'<div class="v11-vacio">SIN REGISTROS</div>');
+  },
+  timer:function(d){
+    setTimeout(function(){
+      api.getTimers().then(function(t){
+        var cu=document.getElementById('sec-cuerpo');
+        if(!cu||SEC[idx].id!=='timer')return;
+        var ts=(t&&t.timers)||[];
+        cu.innerHTML='<div class="v11-sub">CRONÓMETROS</div>'+
+          (ts.length?ts.map(function(x){
+            return '<div class="v11-fila"><span class="txt">'+_esc(x.timer||x.clave||'—')+
+              (x.tipo?' <span class="tag">'+_esc(x.tipo)+'</span>':'')+'</span>'+
+              '<span class="num">'+_esc(x.transcurrido||x.mejorTiempo||'—')+'</span>'+
+              '<span class="tag">'+_esc(x.estado||'')+'</span></div>'}).join('')
+          :'<div class="v11-vacio">SIN TIMERS</div>');
+      }).catch(function(){});
+    },0);
+    return '<div class="v11-vacio">CARGANDO TIMERS…</div>';
+  },
+  editar:function(d){
+    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+    var cat=Object.keys((d&&d.catalogos)||{});
+    return '<div class="v11-grid">'+kpi('CATÁLOGOS',cat.length)+'</div>'+
+      '<div class="v11-vacio">LA CAPTURA DE DATOS LLEGA EN E4 — MIENTRAS, USA RAW EN LA BARRA SUPERIOR</div>';
+  },
   bitacora:function(d){
     var it=((d.pensamientos||{}).items)||[];
     return _r11Filas(it.map(function(p){
