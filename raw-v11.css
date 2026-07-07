@@ -391,3 +391,29 @@ body.v11-escena{position:fixed;inset:0}
 #estado{bottom:84px !important;z-index:196}
 /* #sec-cuerpo hospeda los paneles v9 (alto completo, scroll propio) */
 #sec-cuerpo{display:flex;flex-direction:column;min-height:0}
+
+/* ═══ v11.3 E3-D4 — VIDA: breathing, hovers, entradas suaves ═══ */
+/* cards del anillo respiran (keyframe hudBreath de raw-tokens.css),
+   con el stagger --dly que colocar() ya asigna por distancia */
+html.en-anillo .nodo .card{
+  --pc-glow:color-mix(in srgb,var(--c) 22%,transparent);
+  animation:hudBreath 4s ease-in-out infinite;
+  animation-delay:var(--dly,0ms)}
+html.en-anillo .nodo:hover .card{animation-play-state:paused}
+/* panel de inmersión (nivel 2) respira con el acento del sector */
+#seccion .panel{
+  --pc-glow:color-mix(in srgb,var(--sc,#8B5CF6) 20%,transparent);
+  animation:hudBreath 5s ease-in-out infinite}
+/* contenido del nivel 2 entra suave, por bloques */
+#sec-cuerpo>div{animation:hudValIn .45s var(--ease) both}
+#sec-cuerpo>div:nth-child(2){animation-delay:.06s}
+#sec-cuerpo>div:nth-child(3){animation-delay:.12s}
+#sec-cuerpo>div:nth-child(4){animation-delay:.18s}
+#sec-cuerpo>div:nth-child(5){animation-delay:.24s}
+/* filas y kpis reaccionan al cursor */
+.v11-fila{transition:background .15s var(--ease),transform .15s var(--ease)}
+.v11-fila:hover{background:rgba(255,255,255,.045);transform:translateX(2px)}
+.v11-kpi{transition:border-color .18s var(--ease),box-shadow .18s var(--ease)}
+.v11-kpi:hover{border-color:var(--hud-border-hov);box-shadow:0 0 14px var(--hud-glow)}
+/* mini-dial: pulso de vida sutil */
+#v11-minidial.on{animation:hudDotPulse 3.2s ease-in-out infinite}

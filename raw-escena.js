@@ -284,8 +284,8 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:color,fog:false,
       size:size,transparent:true,opacity:op,sizeAttenuation:true,depthWrite:false})));
   }
-  nube(1600,0xA7B4FA,2.6,.85);
-  nube(130,0xFCD377,3.1,.6);
+  nube(2600,0xA7B4FA,3.0,.95);   /* E3-D4: cosmos con presencia v9 */
+  nube(220,0xFCD377,3.4,.75);
 })();
 
 /* ═══ v11.2R E3-A — COSMOS RICO (look v9 en la MISMA escena 3D) ═══
@@ -305,29 +305,29 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     c.fillStyle=g;c.fillRect(0,0,64,64);
     return new THREE.CanvasTexture(cv);
   }
-  for(var q=0;q<22;q++){
+  for(var q=0;q<64;q++){
     var col=PAL[q%PAL.length];
     var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow(col,.18),fog:false,
-      transparent:true,opacity:rnd(.5,.9),blending:THREE.AdditiveBlending,
+      transparent:true,opacity:rnd(.6,1),blending:THREE.AdditiveBlending,
       depthWrite:false}));
     var r=rnd(2200,3600),th=Math.random()*Math.PI*2,ph=Math.acos(rnd(-1,1));
     sp.position.set(r*Math.sin(ph)*Math.cos(th),r*Math.cos(ph),r*Math.sin(ph)*Math.sin(th));
-    var e=rnd(34,92);sp.scale.set(e,e,1);sp.renderOrder=-2;
+    var e=rnd(40,110);sp.scale.set(e,e,1);sp.renderOrder=-2;
     scene.add(sp);
   }
   /* — nebulosas: manchas suaves enormes, aditivas, muy tenues — */
-  for(var n=0;n<9;n++){
+  for(var n=0;n<14;n++){
     var coln=PAL[(n*2+1)%PAL.length];
     var neb=new THREE.Sprite(new THREE.SpriteMaterial({map:texGlow(coln,.5),fog:false,
-      transparent:true,opacity:rnd(.10,.16),blending:THREE.AdditiveBlending,
+      transparent:true,opacity:rnd(.16,.26),blending:THREE.AdditiveBlending,
       depthWrite:false}));
     var rn=rnd(2600,3800),tn=Math.random()*Math.PI*2,pn=Math.acos(rnd(-1,1));
     neb.position.set(rn*Math.sin(pn)*Math.cos(tn),rn*Math.cos(pn),rn*Math.sin(pn)*Math.sin(tn));
-    var en=rnd(1200,2200);neb.scale.set(en,en*rnd(.55,.9),1);neb.renderOrder=-3;
+    var en=rnd(1400,2600);neb.scale.set(en,en*rnd(.55,.9),1);neb.renderOrder=-3;
     scene.add(neb);
   }
   /* — constelaciones: cúmulos conectados por líneas tenues — */
-  for(var k=0;k<16;k++){
+  for(var k=0;k<26;k++){
     var rc=rnd(2300,3400),tc=Math.random()*Math.PI*2,pc=Math.acos(rnd(-1,1));
     var cx=rc*Math.sin(pc)*Math.cos(tc),cy=rc*Math.cos(pc),cz=rc*Math.sin(pc)*Math.sin(tc);
     var pts=[],np=3+Math.floor(Math.random()*4);
@@ -337,12 +337,12 @@ rim.position.set(-620,-180,-420);scene.add(rim);
     for(var m2=0;m2<pts.length-1;m2++){vs.push(pts[m2],pts[m2+1]);}
     var lg=new THREE.BufferGeometry().setFromPoints(vs);
     var ln=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({fog:false,
-      color:PAL[k%PAL.length],transparent:true,opacity:.22,
+      color:PAL[k%PAL.length],transparent:true,opacity:.34,
       blending:THREE.AdditiveBlending,depthWrite:false}));
     ln.renderOrder=-2;scene.add(ln);
     var pg=new THREE.BufferGeometry().setFromPoints(pts);
     scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:PAL[k%PAL.length],fog:false,
-      size:5.5,transparent:true,opacity:.95,sizeAttenuation:true,depthWrite:false})));
+      size:6.5,transparent:true,opacity:.95,sizeAttenuation:true,depthWrite:false})));
   }
   /* — meteoros: rayas fugaces ocasionales (1 a la vez, barato) — */
   var met=null;
@@ -361,7 +361,7 @@ rim.position.set(-620,-180,-420);scene.add(rim);
       var p=(performance.now()-met.t0)/met.dur;
       if(p>=1){scene.remove(met.l);met.l.geometry.dispose();met=null;}
       else met.l.material.opacity=Math.sin(Math.PI*p)*.85;
-    } else if(Math.random()<0.012) lanzarMeteoro();   /* ~cada 6-10s */
+    } else if(Math.random()<0.022) lanzarMeteoro();   /* E3-D4: ~cada 3-5s */
     requestAnimationFrame(pasoMeteoro);
   }
   pasoMeteoro();

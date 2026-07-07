@@ -845,23 +845,34 @@ addEventListener('wheel',function(e){
   window._V11_EXPAND = _EXPAND_CONFIG;
 
 /* ── mapa sector → panel v9 (evidencia: presets "Ver sección" v9) ── */
+/* E3-D4: los números COMPUTAN al entrar (RawAnim.countUp, patrón v9) */
+function _countUpSeccion(cu){
+  if(!cu || !window.RawAnim || !window.RawAnim.countUp) return;
+  var nums = cu.querySelectorAll('.num, .v11-kpi .v');
+  for(var i=0;i<Math.min(nums.length,24);i++) window.RawAnim.countUp(nums[i]);
+}
 var _MAPA_PANEL = {
-  patrimonio:'hud-patrimonio', bancos:'hud-patrimonio', apartado:'hud-patrimonio',
-  pensamiento:'hud-bitacora', persona:'hud-bitacora', salud:'hud-bitacora',
-  entrenamiento:'hud-bitacora', activity:'hud-activity'
+  patrimonio:'hud-patrimonio',      /* Centro Patrimonial COMPLETO: aquí
+                                       viven bancos y apartados — las cards
+                                       bancos/apartado muestran SU dato
+                                       propio (E3-B), sin duplicar esto */
+  pensamiento:'hud-bitacora',       /* Bitácora agrupa salud/relaciones/
+                                       nutrición/entrena en mini-tableros;
+                                       esas cards conservan su vista propia */
+  activity:'hud-activity'
 };
-/* nutricion/timer/editar conservan su render E3-B hasta que sus
-   tableros v9 (boards) entren en D3. */
+/* CERO DUPLICADOS: un panel agrupador vive en UNA sola card. */
 var _renderBase = window._v11RenderSeccion;
 window._v11RenderSeccion = function(i){
   var id = window.SEC[i].id, key = _MAPA_PANEL[id];
   var cu = document.getElementById('sec-cuerpo');
-  if(!key || !cu || !window._capa1Data){ _renderBase(i); return; }
+  if(!key || !cu || !window._capa1Data){ _renderBase(i); _countUpSeccion(cu); return; }
   var cfg = _EXPAND_CONFIG[key];
   try{
     cu.innerHTML = cfg.html();
     cfg.hydrate();
     cu.scrollTop = 0;
+    _countUpSeccion(cu);
   }catch(e){
     console.error('[v11-nav] hydrate '+key+':', e);
     _renderBase(i);
@@ -934,5 +945,5 @@ window.colocar = function(){
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D3 activo · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D4 activo · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
