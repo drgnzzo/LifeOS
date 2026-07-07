@@ -383,6 +383,7 @@ window._v11Cosmos=_cosmosG;   /* E3-D5: deriva lenta (v9) desde nav */
   var mat=new THREE.LineBasicMaterial({color:0x9BB0FA,fog:false,transparent:true,
     opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
   var warp=new THREE.LineSegments(g,mat);warp.renderOrder=-1;scene.add(warp);
+  window._v11Rayas=warp;   /* E3-D12: nav las retira — el warp bueno es el vórtice joseph del cosmos v9 */
   (function pasoWarp(){
     var target=(typeof enTransicion!=='undefined'&&enTransicion)?0.42:0;
     mat.opacity+=(target-mat.opacity)*0.14;

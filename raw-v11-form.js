@@ -2353,5 +2353,577 @@ function _sosInyectarCSS(){
     };
   }
 
+/* ── FIJOS y VARIABLES expandidos — matrices concepto×mes con KPIs y
+   tendencias (verbatim raw-dashboard.js:907-1475, autocontenidos) ── */
+function renderFijosExpandido(data, containerId){
+  var body=document.getElementById(containerId||'hud-fijos-tabla');
+  if(!body) return;
+  if(!data||!data.ok||!data.grupos||!data.grupos.length){
+    body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(220,224,235,.4);font-size:12px">Sin datos de gastos fijos</div>';
+    return;
+  }
+  var FC='#67E8F9'; // acento del panel Fijos
+  var grupos=data.grupos;
+  var claves=[];
+  grupos.forEach(function(g){(g.items||[]).forEach(function(it){
+    if(claves.indexOf(it.clave)<0) claves.push(it.clave);
+  });});
+  var mesActual=MESES_ES[new Date().getMonth()];
+  var fmt=function(v){
+    if(v===null||v===undefined) return '—';
+    return '$ '+Math.abs(v).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  };
+
+  // ── Resolver estado por grupo (backend o derivado) ──
+  grupos.forEach(function(g){
+    g._estado=_fijosNormEstado(g.estado)||_fijosEstadoDerivado(g);
+  });
+
+  // ── Metricas del panel de analisis (derivadas) ──
+  var idxMesAct=claves.findIndex(function(c){return c.toUpperCase()===mesActual.toUpperCase();});
+  if(idxMesAct<0) idxMesAct=claves.length-1;
+  function totalMes(ci){
+    if(ci<0) return 0;
+    var clave=claves[ci]; var t=0;
+    grupos.forEach(function(g){
+      var it=(g.items||[]).find(function(x){return x.clave===clave;});
+      if(it&&it.monto) t+=Math.abs(it.monto);
+    });
+    return t;
+  }
+  var totalActual=totalMes(idxMesAct);
+  var totalPrev=totalMes(idxMesAct-1);
+  var nActivos=grupos.filter(function(g){return g._estado==='activo';}).length;
+  var variacion=totalPrev>0?((totalActual-totalPrev)/totalPrev*100):0;
+  var varColor=variacion>0?'#EF4444':variacion<0?'#4ADE80':'#94A3B8';
+  var varSigno=variacion>0?'+':'';
+
+  // ── CSS de la vista (scoped con prefijo .fjx-) ──
+  var css='<style>'+
+    '.fjx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:var(--font-ui)}'+
+    '.fjx-main{flex:1.35;min-width:0;display:flex;flex-direction:column}'+
+    '.fjx-side{flex:0.95;min-width:0;display:flex;flex-direction:column;gap:14px}'+
+    '.fjx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:var(--rad-lg);padding-bottom:8px}'+
+    '.fjx-tbl{width:100%;border-collapse:collapse;font-size:12px}'+
+    '.fjx-tbl th{padding:10px 12px;background:rgba(255,255,255,.03);font-size:9px;font-weight:800;'+
+      'letter-spacing:.07em;text-transform:uppercase;color:rgba(220,224,235,.6);'+
+      'border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap;text-align:center}'+
+    '.fjx-tbl th:first-child,.fjx-tbl th:nth-child(2){text-align:left}'+
+    '.fjx-tbl td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);'+
+      'white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}'+
+    '.fjx-tbl tr:hover td{background:rgba(255,255,255,.02)}'+
+    // v8.8 — COLUMNA CONGELADA: la 1ª columna (concepto) queda fija al hacer
+    // scroll horizontal. position:sticky + left:0 + fondo OPACO (si fuera
+    // translúcido se vería el contenido pasar por debajo). z-index sobre las
+    // demás celdas; las cabeceras sticky van un nivel más alto.
+    '.fjx-tbl th:first-child,.fjx-tbl td:first-child{position:sticky;left:0;z-index:2;'+
+      'background:#0c0a18;box-shadow:1px 0 0 rgba(255,255,255,.06)}'+
+    '.fjx-tbl th:first-child{z-index:3}'+
+    '.fjx-tbl tr:hover td:first-child{background:#141027}'+
+    '.fjx-tot-row td:first-child{background:#0a1417 !important}'+
+    '.fjx-concepto{display:flex;align-items:center;gap:9px;text-align:left;font-weight:700;color:#fff;font-size:12.5px}'+
+    '.fjx-concepto i{width:26px;height:26px;display:flex;align-items:center;justify-content:center;'+
+      'border-radius:var(--rad-card);background:rgba(255,255,255,.05);font-size:11px;flex-shrink:0;color:'+FC+'}'+
+    '.fjx-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--rad-pill);'+
+      'font-size:9.5px;font-weight:800;letter-spacing:.03em;border:1px solid}'+
+    '.fjx-badge i{font-size:6px}'+
+    '.fjx-mes-amt{font-weight:700;font-size:11.5px}'+
+    '.fjx-check{font-size:13px}'+
+    '.fjx-dash{color:rgba(220,224,235,.25)}'+
+    '.fjx-tot-row td{background:rgba(103,232,249,.06);border-top:2px solid rgba(103,232,249,.25);'+
+      'font-weight:800;border-bottom:none}'+
+    '.fjx-tot-row td:first-child{text-align:left;font-size:9px;letter-spacing:.10em;'+
+      'text-transform:uppercase;color:'+FC+'}'+
+    '.fjx-tot-amt{color:'+FC+';font-size:11.5px}'+
+    '.fjx-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:var(--rad-lg);padding:13px 14px}'+
+    '.fjx-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}'+
+    '.fjx-stat{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:var(--rad-lg);padding:12px 11px;display:flex;flex-direction:column;gap:5px}'+
+    '.fjx-stat-top{display:flex;align-items:center;gap:7px}'+
+    '.fjx-stat-ico{width:24px;height:24px;border-radius:var(--rad-chip);display:flex;align-items:center;'+
+      'justify-content:center;font-size:10px;flex-shrink:0}'+
+    '.fjx-stat-lbl{font-size:7.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.5);line-height:1.3}'+
+    '.fjx-stat-v{font-size:19px;font-weight:800;font-family:JetBrains Mono,monospace;line-height:1}'+
+    '.fjx-stat-sub{font-size:9px;color:rgba(220,224,235,.45);font-weight:600}'+
+    '.fjx-sec-t{font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.65);margin-bottom:10px}'+
+    '.fjx-leg{display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:10px}'+
+    '.fjx-leg-it{display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600;'+
+      'color:rgba(220,224,235,.7)}'+
+    '.fjx-leg-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}'+
+    '.fjx-foot{font-size:10px;color:rgba(220,224,235,.4);padding:10px 2px 0;font-weight:600}'+
+  '</style>';
+
+  // ── Tabla principal ──
+  var thead='<tr><th>Concepto</th><th>Estado</th>'+
+    claves.map(function(c){
+      var esA=c.toUpperCase()===mesActual.toUpperCase();
+      return '<th'+(esA?' style="color:'+FC+'"':'')+'>'+c+'</th>';
+    }).join('')+'</tr>';
+
+  var tbody=grupos.map(function(g){
+    var est=_FIJOS_ESTADOS[g._estado]||_FIJOS_ESTADOS.inactivo;
+    var apagado=(g._estado==='inactivo'||g._estado==='cancelado');
+    var badge='<span class="fjx-badge" style="color:'+est.color+';border-color:'+est.color+'40;'+
+      'background:'+est.color+'14"><i class="fas '+est.dot+'"></i>'+est.lbl+'</span>';
+    var celdas=claves.map(function(clave){
+      var it=(g.items||[]).find(function(x){return x.clave===clave;});
+      if(!it||it.monto===null||it.monto===undefined){
+        return '<td><span class="fjx-dash">—</span></td>';
+      }
+      var pag=(it.pagado==='Sí'||it.pagado==='Si'||it.pagado==='sí');
+      var mesIdx=claves.indexOf(clave);
+      // Mes futuro: muestra monto tenue. Mes <= actual: check o reloj.
+      if(mesIdx>idxMesAct){
+        return '<td><span class="fjx-dash">—</span></td>';
+      }
+      if(g._estado==='pendiente'&&mesIdx===idxMesAct){
+        return '<td><i class="fas fa-clock fjx-check" style="color:#F59E0B"></i></td>';
+      }
+      if(it.monto&&pag){
+        return '<td><i class="fas fa-circle-check fjx-check" style="color:#4ADE80"></i></td>';
+      }
+      if(it.monto&&!pag){
+        return '<td><span class="fjx-mes-amt" style="color:#F59E0B">'+fmt(it.monto)+'</span></td>';
+      }
+      return '<td><span class="fjx-dash">—</span></td>';
+    }).join('');
+    // Primera celda de monto = mes actual con su valor visible
+    var itAct=(g.items||[]).find(function(x){return x.clave&&x.clave.toUpperCase()===mesActual.toUpperCase();});
+    var montoActual=itAct&&itAct.monto?fmt(itAct.monto):'—';
+    return '<tr style="opacity:'+(apagado?'.5':'1')+'">'+
+      '<td><div class="fjx-concepto"><i class="fas '+_fijosIcono(g.concepto)+'"></i>'+g.concepto+'</div></td>'+
+      '<td style="text-align:left">'+badge+'</td>'+
+      celdas+'</tr>';
+  }).join('');
+
+  // Fila de totales
+  var totRow='<tr class="fjx-tot-row"><td>Totales</td><td></td>'+
+    claves.map(function(c,ci){
+      var t=totalMes(ci);
+      return '<td><span class="fjx-tot-amt">'+(t>0?fmt(t):'—')+'</span></td>';
+    }).join('')+'</tr>';
+
+  var tablaHTML='<div class="fjx-tbl-wrap"><table class="fjx-tbl">'+
+    '<thead>'+thead+'</thead><tbody>'+tbody+totRow+'</tbody></table></div>';
+
+  // ── Panel de analisis (derecha) ──
+  var statsHTML='<div class="fjx-stats">'+
+    '<div class="fjx-stat">'+
+      '<div class="fjx-stat-top">'+
+        '<div class="fjx-stat-ico" style="background:'+FC+'1e;color:'+FC+'"><i class="fas fa-coins"></i></div>'+
+        '<div class="fjx-stat-lbl">Total fijo<br>mensual</div>'+
+      '</div>'+
+      '<div class="fjx-stat-v" style="color:'+FC+'">'+fmt(totalActual)+'</div>'+
+      '<div class="fjx-stat-sub">en '+mesActual+'</div>'+
+    '</div>'+
+    '<div class="fjx-stat">'+
+      '<div class="fjx-stat-top">'+
+        '<div class="fjx-stat-ico" style="background:#3B82F61e;color:#60A5FA"><i class="fas fa-list-check"></i></div>'+
+        '<div class="fjx-stat-lbl">Servicios<br>activos</div>'+
+      '</div>'+
+      '<div class="fjx-stat-v" style="color:#60A5FA">'+nActivos+' <span style="font-size:12px;opacity:.4">/ '+grupos.length+'</span></div>'+
+      '<div class="fjx-stat-sub">'+Math.round(nActivos/grupos.length*100)+'% del total</div>'+
+    '</div>'+
+    '<div class="fjx-stat">'+
+      '<div class="fjx-stat-top">'+
+        '<div class="fjx-stat-ico" style="background:'+varColor+'1e;color:'+varColor+'"><i class="fas fa-arrow-trend-up"></i></div>'+
+        '<div class="fjx-stat-lbl">Variación<br>mensual</div>'+
+      '</div>'+
+      '<div class="fjx-stat-v" style="color:'+varColor+'">'+varSigno+variacion.toFixed(1)+'%</div>'+
+      '<div class="fjx-stat-sub">vs. mes anterior</div>'+
+    '</div>'+
+  '</div>';
+
+  // Contenedores de graficas (Chart.js los llena en hydrate)
+  var graficasHTML=
+    '<div class="fjx-card">'+
+      '<div class="fjx-sec-t">Composición mensual por categoría</div>'+
+      '<div style="height:200px"><canvas id="fjx-bars-canvas"></canvas></div>'+
+      '<div class="fjx-leg" id="fjx-bars-leg"></div>'+
+    '</div>'+
+    '<div class="fjx-card">'+
+      '<div class="fjx-sec-t">Tendencia total ('+claves.length+' meses)</div>'+
+      '<div style="height:120px"><canvas id="fjx-trend-canvas"></canvas></div>'+
+    '</div>';
+
+  var _hdr = (typeof window._expHeader==='function')
+    ? window._expHeader('GASTOS FIJOS', 'Servicios y suscripciones', 'fas fa-thumbtack', FC)
+    : '';
+  body.innerHTML=css+
+    '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+    _hdr+
+    '<div class="fjx" style="flex:1;min-height:0">'+
+      '<div class="fjx-main">'+
+        tablaHTML+
+        '<div class="fjx-foot">Activo (se cobra) · Pendiente (próximo cobro) · '+
+          'Inactivo (pausado) · Cancelado</div>'+
+      '</div>'+
+      '<div class="fjx-side">'+
+        statsHTML+
+        graficasHTML+
+      '</div>'+
+    '</div>'+
+    '</div>';
+
+  // Guardar contexto para que las graficas se pinten en hydrate
+  window._fjxCtx={grupos:grupos,claves:claves,FC:FC};
+}
+
+// Pinta las dos graficas Chart.js de la vista expandida de Fijos.
+function renderFijosGraficas(){
+  var ctx=window._fjxCtx;
+  if(!ctx||!window.Chart) return;
+  var grupos=ctx.grupos, claves=ctx.claves, FC=ctx.FC;
+  var PAL=['#34D399','#3B82F6','#8B5CF6','#EF4444','#F59E0B','#EC4899',
+           '#06B6D4','#FB923C','#A78BFA','#FACC15','#4ADE80','#67E8F9'];
+
+  // ── Barras apiladas: cada servicio = una serie ──
+  var bc=document.getElementById('fjx-bars-canvas');
+  if(bc){
+    var dsets=grupos.map(function(g,i){
+      var color=PAL[i%PAL.length];
+      return {
+        label:g.concepto,
+        data:claves.map(function(clave){
+          var it=(g.items||[]).find(function(x){return x.clave===clave;});
+          return it&&it.monto?Math.abs(it.monto):0;
+        }),
+        backgroundColor:color,
+        borderRadius:2,
+        stack:'fijos'
+      };
+    });
+    if(window._fjxBarsChart){try{window._fjxBarsChart.destroy();}catch(e){}}
+    window._fjxBarsChart=new Chart(bc,{
+      type:'bar',
+      data:{labels:claves.map(function(c){return c.slice(0,3);}),datasets:dsets},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'rgba(15,23,42,.95)',borderColor:'rgba(103,232,249,.3)',
+            borderWidth:1,titleColor:'#fff',bodyColor:'#94A3B8',padding:9,
+            callbacks:{label:function(c){return ' '+c.dataset.label+': $ '+
+              Math.abs(c.raw).toLocaleString('es-MX',{minimumFractionDigits:2});}}}},
+        scales:{x:{stacked:true,grid:{display:false},
+            ticks:{color:'#64748B',font:{size:9}}},
+          y:{stacked:true,grid:{color:'rgba(255,255,255,.05)'},
+            ticks:{color:'#64748B',font:{size:9},
+              callback:function(v){return '$'+(v/1000).toFixed(0)+'k';}}}}}
+    });
+    var leg=document.getElementById('fjx-bars-leg');
+    if(leg){
+      leg.innerHTML=grupos.map(function(g,i){
+        var color=PAL[i%PAL.length];
+        return '<div class="fjx-leg-it"><div class="fjx-leg-dot" style="background:'+color+'"></div>'+g.concepto+'</div>';
+      }).join('');
+    }
+  }
+
+  // ── Tendencia: total mensual ──
+  var tc=document.getElementById('fjx-trend-canvas');
+  if(tc){
+    var totales=claves.map(function(clave){
+      var t=0;
+      grupos.forEach(function(g){
+        var it=(g.items||[]).find(function(x){return x.clave===clave;});
+        if(it&&it.monto) t+=Math.abs(it.monto);
+      });
+      return t;
+    });
+    if(window._fjxTrendChart){try{window._fjxTrendChart.destroy();}catch(e){}}
+    window._fjxTrendChart=new Chart(tc,{
+      type:'line',
+      data:{labels:claves.map(function(c){return c.slice(0,3);}),
+        datasets:[{data:totales,borderColor:FC,borderWidth:2,
+          pointRadius:3,pointHoverRadius:5,pointBackgroundColor:FC,
+          fill:true,backgroundColor:'rgba(103,232,249,.08)',tension:.35}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'rgba(15,23,42,.95)',borderColor:'rgba(103,232,249,.3)',
+            borderWidth:1,titleColor:'#fff',bodyColor:'#94A3B8',padding:9,
+            callbacks:{label:function(c){return ' Total: $ '+
+              Math.abs(c.raw).toLocaleString('es-MX',{minimumFractionDigits:2});}}}},
+        scales:{x:{grid:{display:false},ticks:{color:'#64748B',font:{size:9}}},
+          y:{grid:{color:'rgba(255,255,255,.05)'},
+            ticks:{color:'#64748B',font:{size:9},
+              callback:function(v){return '$'+(v/1000).toFixed(0)+'k';}}}}}
+    });
+  }
+}
+
+window.renderFijosExpandido=renderFijosExpandido;
+window.renderFijosGraficas=renderFijosGraficas;
+
+// ══════════════════════════════════════════════════════════════════
+//  VARIABLES — VISTA EXPANDIDA (mockup v5.200)
+//  Rediseño de la card expandida de Variables. Consume datosMes
+//  (meses[] + grupos[mes][] con {ente, monto}). NO reemplaza
+//  renderGastos (usado en la vista no-expandida).
+//
+//  ─── CONTRATO DE DATOS (lo que el GAS deberia entregar) ───
+//  datosMes = {
+//    meses: ["Enero","Febrero",...]              // ya existe
+//    grupos: { "Enero": [ {ente:string, monto:number}, ... ], ... }
+//  }
+//  Campos NUEVOS opcionales por ente (si el GAS los provee se usan,
+//  si no se derivan):
+//    - categoria: string  // agrupacion del ente; si falta = el ente
+//    - icono: string      // clase FontAwesome; si falta = heuristica
+//  Stat-cards (gasto total, mayor aumento, tendencia, mayor categoria)
+//  se DERIVAN de meses+grupos.
+//
+//  REGLAS DE NEGOCIO (de LifeOS):
+//   - Inicio, Final, Rectificacion, Bancos: se EXCLUYEN de los
+//     calculos de stats (no son gasto real).
+//   - BW: siempre ingreso.
+// ══════════════════════════════════════════════════════════════════
+
+// Entes que no cuentan como gasto variable real.
+var _VAR_EXCLUIR=['inicio','final','rectificacion','rectificación','bancos'];
+function _varEsExcluido(ente){
+  var e=String(ente||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return _VAR_EXCLUIR.indexOf(e)>=0;
+}
+function _varEsIngreso(ente){
+  return String(ente||'').toUpperCase()==='BW';
+}
+
+// Icono FontAwesome por ente (heuristico, decorativo).
+function _varIcono(ente){
+  var c=(ente||'').toLowerCase();
+  if(/inicio/.test(c)) return 'fa-flag';
+  if(/final/.test(c)) return 'fa-flag-checkered';
+  if(/^bw$/.test(c)) return 'fa-money-bill-trend-up';
+  if(/foodies|comida|rest/.test(c)) return 'fa-utensils';
+  if(/blue|agua/.test(c)) return 'fa-droplet';
+  if(/espiritu|espíritu/.test(c)) return 'fa-heart';
+  if(/ciencia/.test(c)) return 'fa-flask';
+  if(/aseo|limpieza/.test(c)) return 'fa-broom';
+  if(/suscrip/.test(c)) return 'fa-credit-card';
+  if(/servicio/.test(c)) return 'fa-wrench';
+  if(/^p$/.test(c)) return 'fa-user';
+  if(/^m$/.test(c)) return 'fa-m';
+  return 'fa-circle-dot';
+}
+
+// Paleta por ente — consistente con GRAF_COLORS donde existe.
+function _varColor(ente, idx){
+  if(typeof GRAF_COLORS!=='undefined' && GRAF_COLORS[ente]) return GRAF_COLORS[ente].line;
+  var PAL=['#3B82F6','#06B6D4','#8B5CF6','#F59E0B','#4ADE80','#EF4444',
+           '#EC4899','#FB923C','#A78BFA','#34D399','#67E8F9','#FBBF24'];
+  return PAL[idx%PAL.length];
+}
+
+function renderVariablesExpandido(data, containerId){
+  var body=document.getElementById(containerId||'hud-var-tabla');
+  if(!body) return;
+  if(!data||!data.meses||!data.meses.length){
+    body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(220,224,235,.4);font-size:12px">Sin datos de movimientos variables</div>';
+    return;
+  }
+  var VC='#A5B4FC'; // acento del panel Variables
+  var meses=data.meses;
+  var mesActual=MESES_ES[new Date().getMonth()];
+  var fmt=function(v){
+    if(v===null||v===undefined) return '—';
+    return (v<0?'− ':'')+'$ '+Math.abs(v).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  };
+
+  // Lista de entes (en orden de aparicion) + indice mes→ente→monto.
+  var entes=[];
+  var idx={};
+  meses.forEach(function(mes){
+    idx[mes]={};
+    (data.grupos[mes]||[]).forEach(function(e){
+      if(entes.indexOf(e.ente)<0) entes.push(e.ente);
+      idx[mes][e.ente]=e.monto;
+    });
+  });
+
+  // ── Metricas derivadas (excluyendo Inicio/Final/Rect/Bancos) ──
+  var idxMesAct=meses.findIndex(function(m){return m.toUpperCase()===mesActual.toUpperCase();});
+  if(idxMesAct<0) idxMesAct=meses.length-1;
+  function gastoMes(mi){
+    if(mi<0||mi>=meses.length) return 0;
+    var mes=meses[mi], t=0;
+    entes.forEach(function(ente){
+      if(_varEsExcluido(ente)||_varEsIngreso(ente)) return;
+      var v=idx[mes][ente];
+      if(typeof v==='number') t+=Math.abs(v);
+    });
+    return t;
+  }
+  // Gasto total del rango visible.
+  var gastoTotal=0;
+  meses.forEach(function(_,mi){ gastoTotal+=gastoMes(mi); });
+  // Mayor aumento mes a mes (por ente).
+  var mayorAumento={ente:'—',delta:0,de:'',a:''};
+  for(var mi=1; mi<meses.length; mi++){
+    entes.forEach(function(ente){
+      if(_varEsExcluido(ente)) return;
+      var prev=idx[meses[mi-1]][ente], cur=idx[meses[mi]][ente];
+      if(typeof prev==='number'&&typeof cur==='number'){
+        var d=Math.abs(cur)-Math.abs(prev);
+        if(d>mayorAumento.delta){
+          mayorAumento={ente:ente,delta:d,de:meses[mi-1],a:meses[mi]};
+        }
+      }
+    });
+  }
+  // Tendencia del mes actual vs anterior.
+  var gAct=gastoMes(idxMesAct), gPrev=gastoMes(idxMesAct-1);
+  var tendDelta=gAct-gPrev;
+  // Mayor categoria (ente con mayor gasto acumulado).
+  var acumPorEnte={};
+  entes.forEach(function(ente){
+    if(_varEsExcluido(ente)||_varEsIngreso(ente)) return;
+    var t=0;
+    meses.forEach(function(mes){
+      var v=idx[mes][ente];
+      if(typeof v==='number') t+=Math.abs(v);
+    });
+    acumPorEnte[ente]=t;
+  });
+  var mayorCat={ente:'—',total:0};
+  Object.keys(acumPorEnte).forEach(function(ente){
+    if(acumPorEnte[ente]>mayorCat.total) mayorCat={ente:ente,total:acumPorEnte[ente]};
+  });
+
+  // ── CSS scoped (.vrx-) ──
+  var css='<style>'+
+    '.vrx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:var(--font-ui)}'+
+    '.vrx-main{flex:1.2;min-width:0;display:flex;flex-direction:column}'+
+    '.vrx-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}'+
+    '.vrx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:var(--rad-lg)}'+
+    '.vrx-tbl{width:100%;border-collapse:collapse;font-size:12px}'+
+    '.vrx-tbl th{padding:10px 12px;background:rgba(255,255,255,.03);font-size:9px;font-weight:800;'+
+      'letter-spacing:.07em;text-transform:uppercase;color:rgba(220,224,235,.6);'+
+      'border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap;text-align:center}'+
+    '.vrx-tbl th:first-child{text-align:left}'+
+    '.vrx-tbl td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);'+
+      'white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:11.5px}'+
+    '.vrx-tbl td:first-child{text-align:left}'+
+    '.vrx-tbl tr:hover td{background:rgba(255,255,255,.02)}'+
+    // v8.8 — COLUMNA CONGELADA (misma técnica que Fijos): 1ª columna fija al
+    // hacer scroll horizontal, con fondo opaco para tapar lo que pasa debajo.
+    '.vrx-tbl th:first-child,.vrx-tbl td:first-child{position:sticky;left:0;z-index:2;'+
+      'background:#0c0a18;box-shadow:1px 0 0 rgba(255,255,255,.06)}'+
+    '.vrx-tbl th:first-child{z-index:3}'+
+    '.vrx-tbl tr:hover td:first-child{background:#141027}'+
+    '.vrx-ente{display:flex;align-items:center;gap:9px;font-weight:700;color:#fff;font-size:12.5px}'+
+    '.vrx-ente i{width:24px;height:24px;display:flex;align-items:center;justify-content:center;'+
+      'border-radius:var(--rad-chip);background:rgba(255,255,255,.05);font-size:10px;flex-shrink:0}'+
+    '.vrx-th-act{color:'+VC+'!important}'+
+    '.vrx-pos{color:#4ADE80}.vrx-neg{color:#EF4444}.vrx-zero{color:rgba(220,224,235,.3)}'+
+    '.vrx-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}'+
+    '.vrx-stat{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:var(--rad-lg);padding:12px 12px;display:flex;flex-direction:column;gap:5px}'+
+    '.vrx-stat-lbl{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.5)}'+
+    '.vrx-stat-v{font-size:18px;font-weight:800;font-family:JetBrains Mono,monospace;line-height:1}'+
+    '.vrx-stat-sub{font-size:9px;color:rgba(220,224,235,.45);font-weight:600}'+
+    '.vrx-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:var(--rad-lg);padding:13px 14px}'+
+    '.vrx-sec-t{font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.65);margin-bottom:10px}'+
+    '.vrx-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}'+
+    '.vrx-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:var(--rad-pill);'+
+      'font-size:10px;font-weight:700;border:1px solid}'+
+    '.vrx-chip-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}'+
+    '.vrx-foot{font-size:10px;color:rgba(220,224,235,.4);padding:10px 2px 0;font-weight:600}'+
+  '</style>';
+
+  // ── Tabla principal ──
+  var thead='<tr><th>Concepto</th>'+
+    meses.map(function(m){
+      var esA=m.toUpperCase()===mesActual.toUpperCase();
+      return '<th'+(esA?' class="vrx-th-act"':'')+'>'+m+'</th>';
+    }).join('')+'</tr>';
+
+  var tbody=entes.map(function(ente,ei){
+    var celdas=meses.map(function(mes){
+      var v=idx[mes][ente];
+      if(v===null||v===undefined) return '<td><span class="vrx-zero">—</span></td>';
+      var cls=v>0?'vrx-pos':v<0?'vrx-neg':'vrx-zero';
+      return '<td><span class="'+cls+'">'+fmt(v)+'</span></td>';
+    }).join('');
+    return '<tr>'+
+      '<td><div class="vrx-ente"><i class="fas '+_varIcono(ente)+'" style="color:'+_varColor(ente,ei)+'"></i>'+ente+'</div></td>'+
+      celdas+'</tr>';
+  }).join('');
+
+  var tablaHTML='<div class="vrx-tbl-wrap"><table class="vrx-tbl">'+
+    '<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+
+  // ── Stat-cards ──
+  var tendColor=tendDelta>0?'#EF4444':tendDelta<0?'#4ADE80':'#94A3B8';
+  var tendSigno=tendDelta>0?'▲':tendDelta<0?'▼':'—';
+  var statsHTML='<div class="vrx-stats">'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Gasto total ('+meses.length+' meses)</div>'+
+      '<div class="vrx-stat-v" style="color:#EF4444">'+fmt(gastoTotal)+'</div>'+
+      '<div class="vrx-stat-sub">'+meses[0]+' – '+meses[meses.length-1]+'</div>'+
+    '</div>'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Mayor aumento</div>'+
+      '<div class="vrx-stat-v" style="color:#F59E0B">'+(mayorAumento.delta>0?'+ '+fmt(mayorAumento.delta).replace('− ',''):'—')+'</div>'+
+      '<div class="vrx-stat-sub">'+mayorAumento.ente+(mayorAumento.de?' ('+mayorAumento.de.slice(0,3)+'→'+mayorAumento.a.slice(0,3)+')':'')+'</div>'+
+    '</div>'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Tendencia ('+mesActual.slice(0,3)+')</div>'+
+      '<div class="vrx-stat-v" style="color:'+tendColor+'">'+tendSigno+' '+fmt(Math.abs(tendDelta)).replace('− ','')+'</div>'+
+      '<div class="vrx-stat-sub">vs. mes anterior</div>'+
+    '</div>'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Mayor categoría</div>'+
+      '<div class="vrx-stat-v" style="color:'+VC+'">'+mayorCat.ente+'</div>'+
+      '<div class="vrx-stat-sub">'+fmt(mayorCat.total)+'</div>'+
+    '</div>'+
+  '</div>';
+
+  // ── Chips de categorias (entes) ──
+  var chipsHTML='<div class="vrx-card">'+
+    '<div class="vrx-sec-t">Categorías</div>'+
+    '<div class="vrx-chips">'+
+      entes.map(function(ente,ei){
+        var color=_varColor(ente,ei);
+        var ico=_varEsExcluido(ente)?' <i class="fas fa-eye-slash" style="font-size:7px;opacity:.6"></i>':'';
+        return '<span class="vrx-chip" style="color:'+color+';border-color:'+color+'44;background:'+color+'12">'+
+          '<span class="vrx-chip-dot" style="background:'+color+'"></span>'+ente+ico+'</span>';
+      }).join('')+
+    '</div>'+
+  '</div>';
+
+  // ── Grafica de tendencia ──
+  var graficaHTML='<div class="vrx-card">'+
+    '<div class="vrx-sec-t">Tendencia de gasto</div>'+
+    '<div style="height:210px"><canvas id="vrx-trend-canvas"></canvas></div>'+
+  '</div>';
+
+  var _hdrV = (typeof window._expHeader==='function')
+    ? window._expHeader('GASTOS VARIABLES', 'Movimientos del periodo', 'fas fa-chart-column', VC)
+    : '';
+  body.innerHTML=css+
+    '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+    _hdrV+
+    '<div class="vrx" style="flex:1;min-height:0">'+
+      '<div class="vrx-main">'+
+        tablaHTML+
+        '<div class="vrx-foot">Inicio · Final · Rectificación · Bancos se excluyen de los cálculos. BW es ingreso.</div>'+
+      '</div>'+
+      '<div class="vrx-side">'+
+        statsHTML+
+        graficaHTML+
+        chipsHTML+
+      '</div>'+
+    '</div>'+
+    '</div>';
+
+  window._vrxCtx={meses:meses,entes:entes,idx:idx,VC:VC};
+}
+
+
 window._formListo = true;
 console.log('[v11-form] E3-D3 · form RAW activo (api extendida: insertarEnRAW/editarFilaRAW y guardar*)');

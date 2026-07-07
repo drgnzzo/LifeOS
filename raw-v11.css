@@ -483,3 +483,13 @@ html{background:#020810}
 #sec-cuerpo .board-face.v11-hosted{height:auto !important;min-height:100%;
   overflow:visible !important}
 #sec-cuerpo #act-container{overflow-x:auto}
+
+/* ═══ v11.3 E3-D12 — TIPOGRAFÍA CANÓNICA + ANTI-CORTE ═══
+   Base Helvetica Neue en toda la interfaz; las CIFRAS conservan el
+   mono JetBrains (canon v9 en raw-tokens: datos = mono). */
+:root{--font-ui:"Helvetica Neue",Helvetica,-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,Arial,sans-serif}
+body.v11-escena{font-family:var(--font-ui)}
+#sec-cuerpo,#sec-cuerpo p,#sec-cuerpo div{font-family:inherit}
+/* nada dentro del cuerpo se corta: alto libre + el scroll lo pone sec-cuerpo */
+#sec-cuerpo>*{flex-shrink:0}
+#sec-cuerpo .board-face.v11-hosted [style*="max-height"]{max-height:none !important}

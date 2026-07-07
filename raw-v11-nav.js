@@ -383,6 +383,10 @@ var _rims=[];                          /* {core,halo,inner} por sector */
 /* E3-D8: el anillo decorativo 3D se retira — el cosmos v9 exacto
    (raw-v11-cosmos.js) dibuja SUS anillos de Dyson alrededor del dial */
 if(window._v11Cosmos) window._v11Cosmos.visible=false;   /* E3-A fuera: exacto > interpretado */
+if(window._v11Rayas&&window.scene) window.scene.remove(window._v11Rayas);
+/* E3-D12: el warp canónico es el del cosmos v9 (vórtice joseph,
+   exp(-r×7)) — se dispara espejando las clases niv-* que su director
+   observa. raw-app.css solo las usa sobre .app (inexistente aquí). */
 /* piso v9 de emisivo: envoltura de poblarCards (misma propiedad que la
    capa de datos ya escribe; el motor jamás la toca) */
 function _pisoV9(){
@@ -1248,6 +1252,101 @@ addEventListener('wheel',function(e){
         }
       },
     },
+    'hud-fijos': {
+      // v5.193: vista expandida rediseñada. renderFijosExpandido pinta
+      // tabla + analisis + contenedores de grafica en un solo contenedor.
+      html: function(){
+        return '<div id="hud-fijos-tabla" style="width:100%;min-width:0"></div>';
+      },
+      hydrate: function(){
+        function _pintar(d){
+          // v5.206: api.getGastos() puede devolver {ok, gastos:{grupos}}
+          // — desenvolver. Si ya viene {grupos} directo, usar tal cual.
+          var gd = (d && d.gastos) ? d.gastos : d;
+          window._fijosAnualidadData = gd;
+          if(typeof renderFijosExpandido === 'function'){
+            renderFijosExpandido(gd, 'hud-fijos-tabla');
+            // Las graficas necesitan Chart.js; cargarlo si falta.
+            function _graf(){ if(typeof renderFijosGraficas==='function') renderFijosGraficas(); }
+            if(window.Chart){ setTimeout(_graf, 60); }
+            else {
+              var s=document.createElement('script');
+              s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+              s.onload=function(){ setTimeout(_graf, 80); };
+              document.head.appendChild(s);
+            }
+          }
+        }
+        if(window._fijosAnualidadData){
+          _pintar(window._fijosAnualidadData);
+        } else if(typeof api !== 'undefined' && api.getGastos){
+          var elf = document.getElementById('hud-fijos-tabla');
+          if(elf) elf.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">Cargando…</div>';
+          api.getGastos().then(_pintar).catch(function(){
+            var elf2 = document.getElementById('hud-fijos-tabla');
+            if(elf2) elf2.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">No se pudieron cargar los datos</div>';
+          });
+        } else {
+          var el = document.getElementById('hud-fijos-tabla');
+          if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
+        }
+      },
+    },
+    // ── VARIABLES ──
+    'hud-variables': {
+      // v5.200: vista expandida rediseñada. renderVariablesExpandido pinta
+      // tabla + stats + chips + contenedor de grafica en un contenedor.
+      html: function(){
+        return '<div id="hud-var-tabla" style="width:100%;min-width:0"></div>';
+      },
+      hydrate: function(){
+        function _pintar(d){
+          // v5.206: api.getDatosMes() devuelve {ok, datosMes:{meses,grupos}}
+          // — desenvolver. Si ya viene {meses,grupos} directo, usar tal cual.
+          var dm = (d && d.datosMes) ? d.datosMes : d;
+          if(!dm || !dm.meses || !dm.meses.length){
+            var el0 = document.getElementById('hud-var-tabla');
+            if(el0) el0.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">Sin datos de movimientos variables</div>';
+            return;
+          }
+          window.datosMes = dm;
+          if(typeof renderVariablesExpandido === 'function'){
+            renderVariablesExpandido(dm, 'hud-var-tabla');
+            function _graf(){ if(typeof renderVariablesGrafica==='function') renderVariablesGrafica(); }
+            if(window.Chart){ setTimeout(_graf, 60); }
+            else {
+              var s=document.createElement('script');
+              s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+              s.onload=function(){ setTimeout(_graf, 80); };
+              document.head.appendChild(s);
+            }
+          }
+        }
+        // v5.206: usar la global datosMes SOLO si ya tiene meses cargados
+        // (al inicio es {meses:[],grupos:{}} — vacía). Si no, pedir al API.
+        // v5.208: leer window.datosMes (lo expone onDatosMes). Si ya
+        // tiene meses, pintar directo.
+        var _dm = (typeof window.datosMes !== 'undefined') ? window.datosMes
+                : (typeof datosMes !== 'undefined' ? datosMes : null);
+        if(_dm && _dm.meses && _dm.meses.length){
+          _pintar(_dm);
+        } else if(typeof api !== 'undefined' && api.getAll){
+          // v5.208: fallback vía getAll (getDatosMes no se invoca en el
+          // flujo normal; getAll sí, y trae d.datosMes).
+          var el1 = document.getElementById('hud-var-tabla');
+          if(el1) el1.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">Cargando…</div>';
+          api.getAll().then(function(d){
+            _pintar((d && d.datosMes) ? d.datosMes : d);
+          }).catch(function(){
+            var el2 = document.getElementById('hud-var-tabla');
+            if(el2) el2.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">No se pudieron cargar los datos</div>';
+          });
+        } else {
+          var el = document.getElementById('hud-var-tabla');
+          if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
+        }
+      },
+    },
   };
   window._V11_EXPAND = _EXPAND_CONFIG;
 
@@ -1266,7 +1365,8 @@ var _MAPA_PANEL = {
   pensamiento:'hud-bitacora',       /* Bitácora agrupa salud/relaciones/
                                        nutrición/entrena en mini-tableros;
                                        esas cards conservan su vista propia */
-  financiero:'hud-financiero'   /* E3-D7: panel v9 verbatim (6036-6290) */
+  financiero:'hud-financiero',  /* E3-D7: panel v9 verbatim (6036-6290) */
+  fijos:'hud-fijos', variables:'hud-variables'   /* E3-D12: expandidos v9 */
 };
 /* E3-D11: activity abandona el resumen — su nivel 2 es el Activity
    Check COMPLETO (board v9), todo junto como pediste. */
@@ -1347,6 +1447,7 @@ function _distribuirV9(d){
   if(d.nutricion)     window._nutData        = d.nutricion;
   if(d.entrenamiento) window._entData        = d.entrenamiento;
   if(d.fijos)         window._fijosData      = d.fijos;
+  if(d.gastos)        window._fijosAnualidadData = d.gastos;   /* E3-D12 */
   /* E3-D7: globals que el panel FINANCIERO v9 consume */
   if(d.financieroAvanzado) window._finData = d.financieroAvanzado;
   if(d.flujoPorMes)        window._flujoMensualData = d.flujoPorMes;
@@ -1506,6 +1607,13 @@ colocar();
   /* halo del planeta: se apaga al descender (a alt 172 la cámara queda
      DENTRO del sprite de 560u y su gradiente violeta ahogaba el cosmos) */
   _purgaExtras();
+  var _h=document.documentElement;
+  _h.classList.toggle('niv-warp', !!window.enTransicion);
+  if(!window.enTransicion){
+    _h.classList.toggle('niv-0',window.nivel===0);
+    _h.classList.toggle('niv-1',window.nivel===1);
+    _h.classList.toggle('niv-2',window.nivel===2);
+  }
   _pasoHub();
   _pasoLabelsRadiales();
   /* arcos del dial: viven y mueren CON los gajos (spread) y el nivel */
@@ -1524,5 +1632,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D11 activo · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D12 activo · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
