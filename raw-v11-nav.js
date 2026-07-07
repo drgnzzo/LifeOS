@@ -171,6 +171,7 @@ function _ease(t){var u=1-t;return 1-u*u*u}   /* arranque veloz, frenado largo *
 var _hintEl=document.createElement('div');_hintEl.id='v11-hint';
 document.body.appendChild(_hintEl);
 var _hintT=0;
+window._v11Hint=function(t){_hint(t)};
 function _hint(txt){
   _hintEl.textContent=txt;_hintEl.classList.add('on');
   clearTimeout(_hintT);_hintT=setTimeout(function(){_hintEl.classList.remove('on')},1900);
@@ -239,9 +240,14 @@ function _abrirRing(i){
       ev.stopPropagation();
       if(sb.preset)sb.preset();                       /* verbatim v9 */
       if(/^Ver /.test(sb.label)){ _cerrarRing(); _verSeccion(i); }
-      else {
+      else if(typeof abrirFormulario==='function'){
+        /* E3-D3: el preset ya vive en _dialPreset — el form lo consume
+           (mismo flujo v9: abrirFormulario aplica y limpia el preset) */
+        _cerrarRing(true);
+        abrirFormulario('nueva');
+      } else {
         n.classList.remove('pulso');void n.offsetWidth;n.classList.add('pulso');
-        _hint('PRESET LISTO · '+sb.label.toUpperCase()+' · FORM RAW LLEGA EN E4');
+        _hint('PRESET LISTO · '+sb.label.toUpperCase());
       }
     });
     ringWrap.appendChild(n);ring.nodos.push(n);
@@ -341,14 +347,46 @@ addEventListener('click',function(e){
   var hit=_ray.intersectObjects(window.gajoMeshes,false);
   if(hit.length){
     var i=hit[0].object.userData.i;
+    if(window.SEC[i].id==='editar' && typeof abrirFormulario==='function'){
+      /* v9: editar = accionEspecial → form directo en modo editar */
+      _cerrarRing(true); abrirFormulario('editar'); return;
+    }
     if(ring.abierto&&ring.sector===i)_cerrarRing();
     else _abrirRing(i);                  /* girarA del motor corre en paralelo:
                                             la corona viaja con el sector */
-  } else if(ring.abierto){ _cerrarRing(); }
+  } else {
+    /* ¿clic en el CENTRO (hub RAW)? → el form maestro (v9: centro del dial) */
+    if(typeof abrirFormulario==='function'){
+      window.anclas[0].pt.getWorldPosition(_WA);
+      _W0.set(0,10,0);
+      var C0=_projWorld(_W0), A0=_projWorld(_WA);
+      var rA0=Math.hypot(A0.x-C0.x,A0.y-C0.y);
+      var dC=Math.hypot(e.clientX-C0.x,e.clientY-C0.y);
+      if(rA0>2 && dC < rA0*(172/272)){    /* dentro de R1 proyectado */
+        _cerrarRing(true); abrirFormulario('nueva'); return;
+      }
+    }
+    if(ring.abierto){ _cerrarRing(); }
+  }
 });
 addEventListener('keydown',function(e){
   if(e.key==='Escape'&&ring.abierto)_cerrarRing();
 },{passive:true});
+/* E3-D3 — mientras el FORM está abierto, el motor no debe navegar:
+   fase de captura (corre ANTES que los listeners del motor). Escape
+   cierra el form; el resto de teclas fluye a los inputs intacto. */
+function _formAbierto(){
+  var dd=document.getElementById('entrada-dropdown');
+  return !!(dd && dd.classList.contains('show'));
+}
+addEventListener('keydown',function(e){
+  if(!_formAbierto())return;
+  if(e.key==='Escape'){ if(typeof cerrarEntrada==='function')cerrarEntrada(); }
+  e.stopImmediatePropagation();
+},true);
+addEventListener('wheel',function(e){
+  if(_formAbierto()) e.stopImmediatePropagation();
+},{capture:true,passive:true});
 
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -839,6 +877,9 @@ function _distribuirV9(d){
   if(d.nutricion)     window._nutData        = d.nutricion;
   if(d.entrenamiento) window._entData        = d.entrenamiento;
   if(d.fijos)         window._fijosData      = d.fijos;
+  /* E3-D3: el form consume catálogos y sheetUrl del mismo getAll */
+  if(d.catalogos && typeof onCats==='function'){ try{onCats(d.catalogos);}catch(e){} }
+  if(d.sheetUrl && typeof window._setSheetUrl==='function') window._setSheetUrl(d.sheetUrl);
 }
 
 /* ── "Usar ✓" de apartados — comportamiento rescatado de
@@ -893,5 +934,5 @@ window.colocar = function(){
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D2 activo · sub-anillos + cadenas + mini-dial + paneles v9 nivel 2 + rocola plena');
+console.log('[v11-nav] E3-D3 activo · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
