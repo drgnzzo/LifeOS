@@ -1266,9 +1266,10 @@ var _MAPA_PANEL = {
   pensamiento:'hud-bitacora',       /* Bitácora agrupa salud/relaciones/
                                        nutrición/entrena en mini-tableros;
                                        esas cards conservan su vista propia */
-  activity:'hud-activity',
   financiero:'hud-financiero'   /* E3-D7: panel v9 verbatim (6036-6290) */
 };
+/* E3-D11: activity abandona el resumen — su nivel 2 es el Activity
+   Check COMPLETO (board v9), todo junto como pediste. */
 /* CERO DUPLICADOS: un panel agrupador vive en UNA sola card. */
 /* E3-D6 — BOARDS v9 hospedados en nivel 2 (se MUEVEN, no se clonan:
    conservan estado y listeners — patrón del carrusel v6). Al salir
@@ -1276,7 +1277,7 @@ var _MAPA_PANEL = {
 window.volverAlAnverso = function(){ window._v11Home(); };
 function _devolverBoards(){
   var st=document.getElementById('v11-boards'); if(!st)return;
-  ['board-timers','board-nutricion','board-logros','board-notas','board-sos'].forEach(function(id){
+  ['board-timers','board-nutricion','board-logros','board-notas','board-sos','board-activity'].forEach(function(id){
     var b=document.getElementById(id);
     if(b && b.parentNode && b.parentNode.id==='sec-cuerpo'){
       b.classList.remove('v11-hosted'); st.appendChild(b);
@@ -1284,7 +1285,8 @@ function _devolverBoards(){
   });
 }
 var _BOARD_SEC = { timer:'board-timers', nutricion:'board-nutricion',
-  logros:'board-logros', notas:'board-notas', sos:'board-sos' };
+  logros:'board-logros', notas:'board-notas', sos:'board-sos',
+  activity:'board-activity' };
 var _renderBase = window._v11RenderSeccion;
 window._v11RenderSeccion = function(i){
   var id = window.SEC[i].id, key = _MAPA_PANEL[id];
@@ -1295,6 +1297,12 @@ window._v11RenderSeccion = function(i){
     if(b){
       cu.innerHTML=''; b.classList.add('v11-hosted'); cu.appendChild(b);
       if(id==='timer' && typeof window._timersAlEntrar==='function') window._timersAlEntrar();
+      if(id==='activity' && typeof window.renderActivity==='function'){
+        window.renderActivity();                    /* lee _actData (v9:849) */
+        api.getActivityCheck().then(function(d){ window._actData=d;
+          if(window.nivel===2&&window.SEC[window.idx].id==='activity') window.renderActivity();
+        }).catch(function(){});
+      }
       if(id==='logros'){
         if(typeof renderLogros==='function'){
           if(window._logrosData) renderLogros(window._logrosData);
@@ -1516,5 +1524,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D9 activo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D11 activo · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

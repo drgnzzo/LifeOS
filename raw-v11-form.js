@@ -1591,5 +1591,767 @@ function _sosInyectarCSS(){
 
 
 
+/* ── ACTIVITY CHECK COMPLETO — board v9 (verbatim raw-core.js:2087-2845:
+   columnas, tabs, checks diarios contra api.marcarActivityItem) ── */
+  if(typeof window.renderActivity !== 'function'){
+    window.renderActivity = function(){
+      var d = window._actData; if(!d) return;
+      var WRAP = document.getElementById('act-wrapper') || document.getElementById('board-activity');
+      if(!WRAP) return;
+
+      var CAT = {
+        personal:    { color:'#A855F7', glow:'rgba(168,85,247,0.4)',  icon:'fa-user',      label:'PERSONAL',    dias:['L','M','W','J','V','S','D'] },
+        electronics: { color:'#06B6D4', glow:'rgba(6,182,212,0.4)',   icon:'fa-bolt',      label:'ELECTRONICS', dias:['L','M','W','J','V'] },
+        libro:       { color:'#22D3EE', glow:'rgba(34,211,238,0.4)',   icon:'fa-book-open', label:'LIBROS' },
+        movie:       { color:'#F97316', glow:'rgba(249,115,22,0.4)',   icon:'fa-film',      label:'MOVIES' },
+        norut:       { color:'#EC4899', glow:'rgba(236,72,153,0.4)',   icon:'fa-star',      label:'PENDIENTES' },
+      };
+      var DLBL = {L:'Lun',M:'Mar',W:'Mié',J:'Jue',V:'Vie',S:'Sáb',D:'Dom'};
+      var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
+
+      function countDone(items){ return (items||[]).filter(function(it){ return it.completado===true||it.completado==='Sí'||it.completado==='Si'; }).length; }
+      function countHabDone(habs){ return (habs||[]).filter(function(h){ return h.checks && Object.values(h.checks).some(Boolean); }).length; }
+
+      var totales = {
+        personal:    (d.habitosPersonal||[]).length,    doneP: countHabDone(d.habitosPersonal),
+        electronics: (d.habitosElectronics||[]).length, doneE: countHabDone(d.habitosElectronics),
+        libro:       (d.libros||[]).length,             doneL: countDone(d.libros),
+        movie:       (d.movies||[]).length,             doneM: countDone(d.movies),
+        norut:       (d.noRutinarias||[]).length,       doneN: countDone(d.noRutinarias),
+      };
+      var totalAll  = totales.personal+totales.electronics+totales.libro+totales.movie+totales.norut;
+      var doneAll   = totales.doneP+totales.doneE+totales.doneL+totales.doneM+totales.doneN;
+      var pctGeneral= totalAll>0?Math.round(doneAll/totalAll*100):0;
+      var circ = 2*Math.PI*28;
+
+      function chkCircle(fila, dia, checked, tipo){
+        var c = CAT[tipo]; var esH=(dia===diaKey);
+        var isChecked = checked===true || (checked&&checked.v);
+        var fechaHora = (checked&&checked.fecha) ? checked.fecha : null;
+        var tooltip   = isChecked && fechaHora ? 'title="'+fechaHora+'"' : '';
+        // v5.210: el círculo lleva SOLO el check — nada de fecha embutida
+        // dentro (antes un texto de 5px se amontonaba sobre la esfera). La
+        // hora queda accesible en el tooltip (title).
+        return '<div class="_act-chk" data-fila="'+fila+'" data-dia="'+dia+'" data-tipo="'+tipo+'"'+
+          ' '+tooltip+
+          ' style="position:relative;width:22px;height:22px;min-width:22px;border-radius:50%;cursor:pointer;transition:all 200ms;'+
+          'border:1.5px solid '+(isChecked?c.color:esH?'rgba(255,255,255,.35)':'rgba(100,80,160,0.3)')+';'+
+          'background:'+(isChecked?c.color:'transparent')+';'+
+          'box-shadow:'+(isChecked?'0 0 8px '+c.glow+',0 0 4px '+c.glow:'none')+';'+
+          'display:flex;align-items:center;justify-content:center">'+
+          (isChecked?'<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none"></i>':'')+
+        '</div>';
+      }
+
+      function chkItem(fila, tipo, done){
+        var c = CAT[tipo];
+        // v5.209: la fecha de completado YA se muestra después del texto
+        // del concepto (en itemList). Antes chkItem también la metía DENTRO
+        // del círculo (texto de 5px embutido) — se veía amontonada sobre la
+        // esfera. El círculo ahora lleva solo el check; nada de fecha aquí.
+        var fechaLocal = '';
+        try {
+          fechaLocal = localStorage.getItem('actItemDate:'+tipo+':'+fila) || '';
+        } catch(e){}
+        var tooltip = (done && fechaLocal) ? 'title="'+fechaLocal+'"' : '';
+        return '<div class="_act-item" data-fila="'+fila+'" data-tipo="'+tipo+'" '+tooltip+
+          ' style="width:24px;height:24px;min-width:24px;border-radius:50%;cursor:pointer;transition:all 200ms;flex-shrink:0;'+
+          'border:1.5px solid '+(done?c.color:'#26304A')+';'+
+          'background:'+(done?c.color:'transparent')+';'+
+          'box-shadow:'+(done?'0 0 8px '+c.glow:'none')+';'+
+          'display:flex;align-items:center;justify-content:center">'+
+          (done?'<i class="fas fa-check" style="font-size:10px;color:#fff;pointer-events:none;line-height:1"></i>':'')+
+        '</div>';
+      }
+
+      function kpiPill(tipo, done, total){
+        var c = CAT[tipo];
+        return '<div style="display:flex;align-items:center;gap:7px;padding:0 16px;border-right:1px solid rgba(140,100,220,0.14)">'+
+          '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
+          '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);line-height:1">'+c.label+'</div>'+
+          '<div style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2">'+
+            '<span style="color:'+c.color+'">'+done+'</span>'+
+            '<span style="color:rgba(200,208,230,0.25)"> / '+total+'</span>'+
+          '</div></div>'+
+        '</div>';
+      }
+
+      // ── HEADER BAR ──
+      var header =
+        '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-bottom:1px solid rgba(140,100,220,0.14);'+
+             'height:56px;padding:0 16px;gap:0;flex-shrink:0;overflow:hidden">'+
+          '<div onclick="(typeof volverAlAnverso===\'function\'&&volverAlAnverso())"'+
+               ' style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;'+
+               'background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:8px;cursor:pointer;'+
+               'margin-right:14px;flex-shrink:0;transition:all .15s">'+
+            '<i class="fas fa-arrow-left" style="color:#22D3EE;font-size:13px"></i>'+
+          '</div>'+
+          '<div style="margin-right:24px;flex-shrink:0">'+
+            '<div style="font-size:15px;font-weight:700;letter-spacing:.05em;color:#fff;line-height:1.1">ACTIVITY CHECK</div>'+
+            '<div style="font-size:10px;color:rgba(200,208,230,0.45);margin-top:1px">Tu progreso, tu recompensa</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;flex:1;overflow:hidden">'+
+            kpiPill('personal',    totales.doneP, totales.personal)+
+            kpiPill('electronics', totales.doneE, totales.electronics)+
+            kpiPill('libro',       totales.doneL, totales.libro)+
+            kpiPill('movie',       totales.doneM, totales.movie)+
+            '<div style="display:flex;align-items:center;gap:7px;padding:0 16px">'+
+              '<i class="fas fa-star" style="font-size:14px;color:#EC4899;filter:drop-shadow(0 0 6px rgba(236,72,153,0.4))"></i>'+
+              '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);line-height:1">PENDIENTES</div>'+
+              '<div style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2">'+
+                '<span style="color:#EC4899">'+totales.doneN+'</span>'+
+                '<span style="color:rgba(200,208,230,0.25)"> / '+totales.norut+'</span>'+
+              '</div></div>'+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;padding-left:16px;border-left:1px solid rgba(140,100,220,0.14)">'+
+            '<svg width="48" height="48" viewBox="0 0 64 64">'+
+              '<circle cx="32" cy="32" r="28" fill="none" stroke="#26304A" stroke-width="4"/>'+
+              '<circle cx="32" cy="32" r="28" fill="none" stroke="#3B82F6" stroke-width="4"'+
+                ' stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+(circ*(1-pctGeneral/100)).toFixed(1)+'"'+
+                ' stroke-linecap="round" transform="rotate(-90 32 32)"'+
+                ' style="filter:drop-shadow(0 0 6px rgba(59,130,246,0.6));transition:stroke-dashoffset .8s"/>'+
+              '<text x="32" y="38" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" font-family="system-ui">'+pctGeneral+'%</text>'+
+            '</svg>'+
+            '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);margin-bottom:1px">PROGRESO</div>'+
+            '<div style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1">'+
+              '<span style="color:#3B82F6">'+doneAll+'</span>'+
+              '<span style="color:rgba(200,208,230,0.25)"> / '+totalAll+'</span>'+
+            '</div></div>'+
+          '</div>'+
+        '</div>';
+
+      // ── Filtros por columna ──
+      var _actFilter = window._actFilter || (window._actFilter = {});
+      // v6.072 — por columna: ¿ocultar los completados? Para libro/movie/
+      // norut arranca en TRUE (los completados no se ven; el botón dice
+      // "Mostrar completos"). Las Pendientes se cierran constantemente,
+      // así que por defecto la columna muestra solo lo que falta.
+      var _actOcultarDone = window._actOcultarDone || (window._actOcultarDone = {
+        libro:true, movie:true, norut:true
+      });
+
+      function hexToRgb(hex){
+        var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+        return r+','+g+','+b;
+      }
+
+      function filterBar(tipo){
+        var c = CAT[tipo];
+        var cur = _actFilter[tipo] || 'az';
+        var BTNS = [
+          {k:'az',     ico:'fa-arrow-down-a-z',  tip:'A → Z'},
+          {k:'za',     ico:'fa-arrow-up-z-a',    tip:'Z → A'},
+          {k:'hoy_si', ico:'fa-circle-check',    tip:'Con check hoy'},
+          {k:'hoy_no', ico:'fa-circle',           tip:'Sin check hoy'},
+        ];
+        // v6.072 — botón de mostrar/ocultar completados. Solo en las
+        // columnas libro/movie/norut (las que tienen "completado").
+        var toggleDone = '';
+        if(tipo==='libro' || tipo==='movie' || tipo==='norut'){
+          var oculto = !!_actOcultarDone[tipo];
+          toggleDone =
+            '<button class="_act-done-toggle" data-tipo="'+tipo+'" '+
+            'title="'+(oculto?'Mostrar los completados':'Ocultar los completados')+'" style="'+
+            'margin-left:auto;display:flex;align-items:center;gap:5px;height:26px;padding:0 9px;'+
+            'border-radius:6px;cursor:pointer;flex-shrink:0;font-size:9px;font-weight:700;'+
+            'letter-spacing:.05em;text-transform:uppercase;transition:all .12s;'+
+            'border:1px solid '+(oculto?'#26304A':c.color)+';'+
+            'background:'+(oculto?'transparent':'rgba('+hexToRgb(c.color)+',0.15)')+';'+
+            'color:'+(oculto?'#6A7388':c.color)+';'+
+            'box-shadow:'+(oculto?'none':'0 0 8px '+c.glow)+'">'+
+            '<i class="fas '+(oculto?'fa-eye':'fa-eye-slash')+'" style="pointer-events:none;font-size:10px"></i>'+
+            '<span style="pointer-events:none">'+(oculto?'Mostrar completos':'Ocultar completos')+'</span>'+
+            '</button>';
+        }
+        return '<div class="_act-filter-bar" data-tipo="'+tipo+'" style="'+
+          'display:flex;gap:4px;padding:6px 12px;background:rgba(6,4,14,0.95);border-bottom:1px solid rgba(140,100,220,0.14);align-items:center;flex-shrink:0">'+
+          '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-right:4px;flex-shrink:0">Orden</span>'+
+          BTNS.map(function(b){
+            var on = (cur===b.k);
+            return '<button class="_act-filter-btn" data-tipo="'+tipo+'" data-filter="'+b.k+'" title="'+b.tip+'" style="'+
+              'width:26px;height:26px;border-radius:6px;border:1px solid '+(on?c.color:'#26304A')+';'+
+              'background:'+(on?'rgba('+hexToRgb(c.color)+',0.15)':'transparent')+';'+
+              'color:'+(on?c.color:'#4A5266')+';cursor:pointer;font-size:11px;'+
+              'display:flex;align-items:center;justify-content:center;transition:all .12s;'+
+              'box-shadow:'+(on?'0 0 8px '+c.glow:'none')+';flex-shrink:0">'+
+              '<i class="fas '+b.ico+'" style="pointer-events:none"></i></button>';
+          }).join('')+
+          toggleDone+
+        '</div>';
+      }
+
+      function applyHabFilter(items, tipo){
+        var f = _actFilter[tipo] || 'az';
+        var s = items.slice();
+        if(f==='az') s.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+        else if(f==='za') s.sort(function(a,b){ return b.nombre.localeCompare(a.nombre); });
+        else if(f==='hoy_si') s.sort(function(a,b){
+          var ac=a.checks&&a.checks[diaKey]?1:0, bc=b.checks&&b.checks[diaKey]?1:0;
+          return bc-ac;
+        });
+        else if(f==='hoy_no') s.sort(function(a,b){
+          var ac=a.checks&&a.checks[diaKey]?1:0, bc=b.checks&&b.checks[diaKey]?1:0;
+          return ac-bc;
+        });
+        return s;
+      }
+
+      function applyItemFilter(items, tipo){
+        var f = _actFilter[tipo] || 'az';
+        var s = items.slice();
+        var isDone = function(it){ return it.completado===true||it.completado==='Sí'||it.completado==='Si'; };
+        if(f==='az') s.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+        else if(f==='za') s.sort(function(a,b){ return b.nombre.localeCompare(a.nombre); });
+        else if(f==='hoy_si') s.sort(function(a,b){ return (isDone(b)?1:0)-(isDone(a)?1:0); });
+        else if(f==='hoy_no') s.sort(function(a,b){ return (isDone(a)?1:0)-(isDone(b)?1:0); });
+        // v6.072 — ocultar/mostrar completados por columna.
+        if(_actOcultarDone[tipo]){
+          // Ocultos: se quitan de la lista (siguen en el Sheet, no borrados).
+          s = s.filter(function(it){ return !isDone(it); });
+        } else {
+          // Mostrados: los completados van SIEMPRE al fondo de la columna,
+          // sin perder el orden elegido dentro de cada grupo.
+          s.sort(function(a,b){ return (isDone(a)?1:0)-(isDone(b)?1:0); });
+        }
+        return s;
+      }
+
+      function habTable(items, tipo){
+        var c = CAT[tipo]; var dias = c.dias;
+        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin hábitos</div>';
+        var sorted = applyHabFilter(items, tipo);
+        var h = '<table style="width:100%;border-collapse:collapse">';
+        h += '<tr><th style="text-align:left;padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);border-bottom:1px solid rgba(140,100,220,0.14);position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1">HÁBITO</th>';
+        dias.forEach(function(d){
+          var esH=(d===diaKey);
+          h += '<th style="text-align:center;padding:6px 4px;font-size:10px;font-weight:'+(esH?700:600)+';'+
+               'color:'+(esH?c.color:'#7A8499')+';border-bottom:1px solid rgba(140,100,220,0.14);min-width:26px;'+
+               'position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1;'+
+               (esH?'text-shadow:0 0 8px '+c.glow:'')+'">'+(DLBL[d]||d)+'</th>';
+        });
+        // Columna extra para el botón "limpiar fila"
+        h += '<th style="width:28px;padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14);position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1"></th>';
+        h += '</tr>';
+        sorted.forEach(function(hab){
+          var allDone = dias.every(function(dia){ return hab.checks&&hab.checks[dia]; });
+          var anyDone = dias.some(function(dia){ return hab.checks&&hab.checks[dia]; });
+          h += '<tr class="_hab-row" style="transition:background .15s;cursor:default"'+
+               ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
+               '<td style="padding:8px 10px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+                 (hab.sims||hab.bw?'<div style="font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-bottom:1px">'+(hab.sims||hab.bw)+'</div>':'')+
+                 '<div style="font-size:13px;font-weight:500;color:'+(allDone?c.color:'#C8D0E0')+';'+
+                 'max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+
+                 (allDone?'text-shadow:0 0 8px '+c.glow:'')+'">' + hab.nombre+'</div>'+
+               '</td>';
+          dias.forEach(function(dia){
+            h += '<td style="text-align:center;padding:6px 2px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+                 chkCircle(hab.fila, dia, hab.checks&&hab.checks[dia], tipo)+'</td>';
+          });
+          // Botón limpiar fila — solo activo si hay al menos 1 check
+          h += '<td style="padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14);text-align:center">'+
+                 '<button class="_act-clear-row" data-fila="'+hab.fila+'" data-tipo="'+tipo+'"'+
+                 ' title="Limpiar todos los checks de esta fila"'+
+                 ' style="width:22px;height:22px;border-radius:6px;border:1px solid '+(anyDone?'rgba(239,68,68,0.4)':'rgba(100,80,160,0.15)')+';'+
+                 'background:transparent;color:'+(anyDone?'#EF4444':'rgba(100,80,160,0.4)')+';'+
+                 'cursor:'+(anyDone?'pointer':'not-allowed')+';font-size:10px;'+
+                 'display:flex;align-items:center;justify-content:center;transition:all .12s;margin:0 auto"'+
+                 (anyDone?'':'disabled')+'>'+
+                 '<i class="fas fa-eraser" style="pointer-events:none"></i>'+
+                 '</button>'+
+               '</td>';
+          h += '</tr>';
+        });
+        h += '</table>';
+        return h;
+      }
+
+      function itemList(items, tipo){
+        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
+        var sorted = applyItemFilter(items, tipo);
+        function _fmtFecha(f){
+          if(!f) return '';
+          // formato 'yyyy-MM-dd HH:mm' → 'dd/MMM HH:mm'
+          var m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+          if(!m) return '';
+          var meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+          var d = m[3], mes = meses[parseInt(m[2],10)-1] || '', h = m[4]||'', mm = m[5]||'';
+          return d + '/' + mes + (h ? ' ' + h + ':' + mm : '');
+        }
+        return '<div style="display:flex;flex-direction:column;width:100%">'+
+          sorted.map(function(it){
+            var done=it.completado===true||it.completado==='Sí'||it.completado==='Si';
+            var fechaStr = done && it.fechaCompletado ? _fmtFecha(it.fechaCompletado) : '';
+            return '<div class="_item-row" style="display:flex;align-items:center;gap:10px;padding:8px 16px;'+
+              'transition:background .15s;border-bottom:1px solid rgba(140,100,220,0.14)"'+
+              ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
+              chkItem(it.fila, tipo, done)+
+              '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">'+
+                '<span style="font-size:13px;font-weight:500;color:'+(done?'#4A5266':'#C8D0E0')+';'+
+                'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'+
+                'line-height:1.4;word-break:break-word">'+it.nombre+'</span>'+
+                (fechaStr ? '<span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:rgba(167,139,250,0.65);font-family:JetBrains Mono,monospace">'+fechaStr+'</span>' : '')+
+              '</div>'+
+            '</div>';
+          }).join('')+'</div>';
+      }
+
+      // ── SIDEBAR ──
+      function sidebarBar(tipo, done, total){
+        var c = CAT[tipo];
+        var pct = total>0?Math.round(done/total*100):0;
+        return '<div style="margin-bottom:12px">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
+            '<div style="display:flex;align-items:center;gap:7px">'+
+              '<i class="fas '+c.icon+'" style="font-size:11px;color:'+c.color+'"></i>'+
+              '<span style="font-size:12px;font-weight:500;color:rgba(220,220,240,0.85)">'+c.label.charAt(0)+c.label.slice(1).toLowerCase()+'</span>'+
+            '</div>'+
+            '<span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:rgba(220,220,240,0.85)">'+done+' / '+total+'</span>'+
+          '</div>'+
+          '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
+            '<div style="height:100%;width:'+pct+'%;background:'+c.color+';border-radius:2px;'+
+            'box-shadow:0 0 6px '+c.glow+';transition:width .4s"></div>'+
+          '</div>'+
+        '</div>';
+      }
+
+      var sidebar =
+        '<div style="width:260px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;padding:16px;overflow-y:auto">'+
+          '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:16px;'+
+               'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+              '<i class="fas fa-cube" style="font-size:14px;color:#3B82F6"></i>'+
+              '<span style="font-size:10px;font-weight:700;letter-spacing:.12em;color:rgba(200,208,230,0.45)">RECOMPENSA ACTUAL</span>'+
+            '</div>'+
+            '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">Maestro del progreso</div>'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);margin-bottom:10px">Completa '+totalAll+' actividades para desbloquear</div>'+
+            '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden;margin-bottom:5px">'+
+              '<div style="height:100%;width:'+pctGeneral+'%;background:linear-gradient(90deg,#7C3AED,#A855F7);border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5);transition:width .8s"></div>'+
+            '</div>'+
+            '<div style="display:flex;justify-content:flex-end;font-size:11px;font-weight:600;color:#3B82F6;font-variant-numeric:tabular-nums">'+doneAll+' / '+totalAll+'</div>'+
+          '</div>'+
+          '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:16px;'+
+               'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
+            '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:rgba(200,208,230,0.45);margin-bottom:14px">CATEGORÍAS</div>'+
+            sidebarBar('personal',    totales.doneP, totales.personal)+
+            sidebarBar('electronics', totales.doneE, totales.electronics)+
+            sidebarBar('libro',       totales.doneL, totales.libro)+
+            sidebarBar('movie',       totales.doneM, totales.movie)+
+            sidebarBar('norut',       totales.doneN, totales.norut)+
+          '</div>'+
+          '<div style="background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(168,85,247,0.08));'+
+               'border:1px solid rgba(59,130,246,0.2);border-radius:12px;padding:14px">'+
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+              '<i class="fas fa-chart-line" style="font-size:13px;color:#3B82F6"></i>'+
+              '<span style="font-size:12px;font-weight:700;color:#fff">SIGUE ASÍ</span>'+
+            '</div>'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);line-height:1.5">'+
+              (pctGeneral>=70?'¡Llevas un excelente ritmo! Cada hábito completado te acerca a tu mejor versión.':
+               pctGeneral>=40?'Vas bien. Mantén el ritmo y cierra tus anillos hoy.':
+               'Empieza pequeño. Un hábito a la vez hace la diferencia.')+
+            '</div>'+
+          '</div>'+
+        '</div>';
+
+      // ── PANEL COL CON SCROLL VERTICAL POR COLUMNA ──
+      var colW = {
+        personal:    'flex:2 1 0;min-width:400px',
+        electronics: 'flex:2 1 0;min-width:400px',
+        libro:       'flex:1 1 0;min-width:170px',
+        movie:       'flex:1 1 0;min-width:170px',
+        norut:       'flex:1 1 0;min-width:170px',
+      };
+      function panelCol(tipo, inner){
+        var c = CAT[tipo];
+        var wStyle = colW[tipo] || 'flex:1 1 auto;min-width:200px;max-width:300px';
+        // CADA COLUMNA: header + filterBar fija + inner con scroll vertical propio
+        return '<div data-panel-tipo="'+tipo+'" style="'+wStyle+';background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
+               'display:flex;flex-direction:column;overflow:hidden;height:100%;'+
+               'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
+          '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px;flex-shrink:0">'+
+            '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
+            '<span style="font-size:13px;font-weight:700;letter-spacing:.08em;color:'+c.color+'">'+c.label+'</span>'+
+            '<span style="margin-left:auto;font-size:11px;font-weight:600;color:rgba(200,208,230,0.4);font-variant-numeric:tabular-nums">'+
+              ((tipo==='personal'?totales.doneP:tipo==='electronics'?totales.doneE:tipo==='libro'?totales.doneL:tipo==='movie'?totales.doneM:totales.doneN))+
+              ' / '+
+              ((tipo==='personal'?totales.personal:tipo==='electronics'?totales.electronics:tipo==='libro'?totales.libro:tipo==='movie'?totales.movie:totales.norut))+
+            '</span>'+
+            // v5.209: botón "limpiar TODA la columna" — solo en Personal y
+            // Electronics (las que tienen checks de días). Limpia todos los
+            // checks de todas las filas de golpe.
+            ((tipo==='personal'||tipo==='electronics')
+              ? '<button class="_act-clear-all" data-tipo="'+tipo+'" title="Limpiar todos los checks de esta columna" '+
+                'style="margin-left:8px;background:transparent;border:1px solid rgba(239,68,68,0.35);'+
+                'color:#EF4444;border-radius:6px;width:24px;height:24px;cursor:pointer;flex-shrink:0;'+
+                'display:flex;align-items:center;justify-content:center;font-size:10px">'+
+                '<i class="fas fa-trash-can" style="pointer-events:none"></i></button>'
+              : '')+
+          '</div>'+
+          // ── filterBar FIJA, fuera del scroll ──
+          filterBar(tipo)+
+          '<div data-panel-inner style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0">'+inner+'</div>'+
+        '</div>';
+      }
+
+      // ── FOOTER BAR ──
+      var xpActual = (window._lgr&&window._lgr.xpActual)||0;
+      var xpMax    = (window._lgr&&window._lgr.xpNivel)||500;
+      var nivel    = (window._lgr&&window._lgr.nivel)||1;
+      var xpPct    = xpMax>0?Math.round(xpActual/xpMax*100):0;
+
+      var footer =
+        '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-top:1px solid rgba(140,100,220,0.14);'+
+             'height:48px;padding:0;flex-shrink:0">'+
+          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 18px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(6,4,14,0.95);border:1px solid rgba(140,100,220,0.18);'+
+                 'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+              '<span style="font-size:12px;font-weight:800;color:#A78BFA">'+nivel+'</span>'+
+            '</div>'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;line-height:1">NIVEL '+nivel+
+                ' <span style="font-size:9px;color:rgba(200,208,230,0.45);font-weight:500;font-variant-numeric:tabular-nums">'+xpActual+' / '+xpMax+' XP</span></div>'+
+              '<div style="height:3px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
+                '<div style="height:100%;width:'+xpPct+'%;background:linear-gradient(90deg,#7C3AED,#A855F7);border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5)"></div>'+
+              '</div>'+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:9px;flex:1;padding:0 18px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<i class="fas fa-fire" style="font-size:17px;color:#FB923C;filter:drop-shadow(0 0 8px rgba(251,146,60,0.6))"></i>'+
+            '<div><div style="font-size:9px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);line-height:1">RACHA ACTUAL</div>'+
+            '<div style="font-size:13px;font-weight:700;color:#FB923C;line-height:1.1">'+doneAll+' actividades</div></div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:9px;flex:1;padding:0 18px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<i class="fas fa-bullseye" style="font-size:14px;color:#A855F7"></i>'+
+            '<div><div style="font-size:9px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);line-height:1">PROGRESO HOY</div>'+
+            '<div style="font-size:11px;font-weight:600;color:#fff;margin-top:1px;line-height:1.1">'+
+              doneAll+' / '+totalAll+' <span style="color:#A855F7;font-size:10px;font-weight:700">+50 XP</span>'+
+            '</div></div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:9px;flex:1;padding:0 18px">'+
+            '<div style="width:30px;height:30px;border-radius:7px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);'+
+                 'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+              '<span style="font-size:12px;font-weight:800;color:#A855F7">'+(nivel+1)+'</span>'+
+            '</div>'+
+            '<div><div style="font-size:9px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);line-height:1">PRÓXIMO NIVEL</div>'+
+            '<div style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.85);margin-top:1px;line-height:1.1">'+
+              '<span style="color:#A855F7">+500 XP</span> <span style="color:rgba(200,208,230,0.25)">|</span> <span style="color:#22D3EE">+$250</span>'+
+            '</div></div>'+
+            '<i class="fas fa-box" style="font-size:15px;color:rgba(200,208,230,0.45);margin-left:auto"></i>'+
+          '</div>'+
+        '</div>';
+
+      // ── LAYOUT: respeta el hero/header superior de la página
+      // Calcula la altura disponible restando el offsetTop real del board
+      var board = document.getElementById('board-activity');
+      if(!board) return;
+      board.style.display = 'flex';
+      board.style.flexDirection = 'column';
+      board.style.background = 'rgba(4,4,14,0.97)';
+      board.style.overflow = 'hidden';
+      // Limpiar estilos previos que pudiéramos tener
+      board.style.position = '';
+      board.style.top = board.style.left = board.style.right = board.style.bottom = '';
+      board.style.zIndex = '';
+      // v6.065: NO imponer height con calc(100vh - ...). El board-activity
+      // ya recibe su altura correcta del CSS (height:100% heredado de
+      // .board-wrap, que está dimensionado bajo la barra superior). Antes
+      // este cálculo con 100vh incluía el área de la barra → la sección
+      // se extendía de más y aparecía scroll exterior. El contenedor
+      // interno (flex:1;min-height:0) ya gestiona el espacio.
+      board.style.height = '';
+      board.style.maxHeight = '';
+
+      board.innerHTML =
+        header +
+        // Contenedor principal: flex:1 con min-height:0 para que sus hijos puedan scrollear
+        '<div style="display:flex;gap:8px;padding:8px;flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;align-items:stretch">'+
+          '<div style="display:flex;gap:8px;flex:1;min-width:0;align-items:stretch;height:100%">'+
+            panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
+            panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+
+            panelCol('libro',       itemList(d.libros||[],   'libro'))+
+            panelCol('movie',       itemList(d.movies||[],   'movie'))+
+            panelCol('norut',       itemList(d.noRutinarias||[],'norut'))+
+          '</div>'+
+          sidebar+
+        '</div>'+
+        footer;
+
+      // Event delegation
+      board.addEventListener('click', function(e){
+        // ── Filtros por columna ──
+        var fb = e.target.closest('._act-filter-btn');
+        if(fb){
+          var tipo = fb.dataset.tipo;
+          var filt = fb.dataset.filter;
+          _actFilter[tipo] = filt;
+          var d2 = window._actData;
+          if(!d2) return;
+          var panelEl = fb.closest('[data-panel-tipo]');
+          if(panelEl){
+            // Re-renderizar la filterBar (para actualizar el botón activo)
+            var oldBar = panelEl.querySelector('._act-filter-bar');
+            if(oldBar){
+              var tmp = document.createElement('div');
+              tmp.innerHTML = filterBar(tipo);
+              oldBar.replaceWith(tmp.firstChild);
+            }
+            // Re-renderizar SOLO el inner (no toca la filterBar fija)
+            var inner = panelEl.querySelector('[data-panel-inner]');
+            if(inner){
+              var isHab = (tipo==='personal'||tipo==='electronics');
+              var items = isHab
+                ? (tipo==='personal'?d2.habitosPersonal:d2.habitosElectronics)||[]
+                : (tipo==='libro'?d2.libros:tipo==='movie'?d2.movies:d2.noRutinarias)||[];
+              inner.innerHTML = isHab ? habTable(items, tipo) : itemList(items, tipo);
+            }
+          }
+          return;
+        }
+
+        // ── v6.072: Botón mostrar/ocultar completados por columna ──
+        var dt = e.target.closest('._act-done-toggle');
+        if(dt){
+          var tipoDT = dt.dataset.tipo;
+          _actOcultarDone[tipoDT] = !_actOcultarDone[tipoDT];
+          var d2DT = window._actData;
+          if(!d2DT) return;
+          var panelDT = dt.closest('[data-panel-tipo]');
+          if(panelDT){
+            var oldBarDT = panelDT.querySelector('._act-filter-bar');
+            if(oldBarDT){
+              var tmpDT = document.createElement('div');
+              tmpDT.innerHTML = filterBar(tipoDT);
+              oldBarDT.replaceWith(tmpDT.firstChild);
+            }
+            var innerDT = panelDT.querySelector('[data-panel-inner]');
+            if(innerDT){
+              var itemsDT = (tipoDT==='libro'?d2DT.libros:tipoDT==='movie'?d2DT.movies:d2DT.noRutinarias)||[];
+              innerDT.innerHTML = itemList(itemsDT, tipoDT);
+            }
+          }
+          return;
+        }
+        var clrAll = e.target.closest('._act-clear-all');
+        if(clrAll){
+          var tipoCA = clrAll.dataset.tipo;
+          var d2CA   = window._actData; if(!d2CA) return;
+          var arrCA  = tipoCA==='personal'?d2CA.habitosPersonal:d2CA.habitosElectronics;
+          if(!arrCA || !arrCA.length) return;
+          var diasCA = (CAT[tipoCA].dias||[]);
+          // Contar cuántos checks hay para el mensaje de confirmación.
+          var totalChecks = 0;
+          arrCA.forEach(function(h){
+            diasCA.forEach(function(dia){ if(h.checks && h.checks[dia]) totalChecks++; });
+          });
+          if(totalChecks === 0) return;
+          if(!confirm('¿Limpiar TODOS los checks de la columna '+CAT[tipoCA].label+'? ('+totalChecks+' checks). Esta acción no se puede deshacer.')) return;
+          // Limpiar en datos + API, fila por fila / día por día.
+          arrCA.forEach(function(h){
+            diasCA.forEach(function(dia){
+              if(h.checks && h.checks[dia]){
+                if(typeof api!=='undefined') api.setActivityCheck(tipoCA, h.fila, dia, false);
+                h.checks[dia] = false;
+              }
+            });
+          });
+          // Re-render visual del inner de esa columna.
+          var panelCA = clrAll.closest('[data-panel-tipo]');
+          if(panelCA){
+            var innerCA = panelCA.querySelector('[data-panel-inner]');
+            if(innerCA) innerCA.innerHTML = habTable(arrCA, tipoCA);
+          }
+          return;
+        }
+
+        // ── Botón limpiar fila completa (Personal/Electronics) ──
+        var clr = e.target.closest('._act-clear-row');
+        if(clr && !clr.disabled){
+          var fila = parseInt(clr.dataset.fila);
+          var tipo = clr.dataset.tipo;
+          var d2   = window._actData; if(!d2) return;
+          var arr  = tipo==='personal'?d2.habitosPersonal:d2.habitosElectronics;
+          var hab  = (arr||[]).find(function(x){ return x.fila===fila; });
+          if(!hab) return;
+          // Confirmar
+          if(!confirm('¿Limpiar todos los checks de "'+hab.nombre+'"?')) return;
+          var diasH = (CAT[tipo].dias||[]);
+          // Llamar API para cada día marcado
+          diasH.forEach(function(dia){
+            if(hab.checks && hab.checks[dia]){
+              if(typeof api!=='undefined') api.setActivityCheck(tipo, fila, dia, false);
+              hab.checks[dia] = false;
+            }
+          });
+          // Re-render la fila visualmente
+          var tr = clr.closest('tr');
+          if(tr){
+            tr.querySelectorAll('._act-chk').forEach(function(ch){
+              ch.style.borderColor = 'rgba(100,80,160,0.3)';
+              ch.style.background  = 'transparent';
+              ch.style.boxShadow   = 'none';
+              ch.removeAttribute('title');
+              ch.innerHTML = '';
+            });
+            var td = tr.querySelector('td:first-child div:last-child');
+            if(td){ td.style.color = '#C8D0E0'; td.style.textShadow = 'none'; }
+            // Deshabilitar el botón
+            clr.disabled = true;
+            clr.style.cursor = 'not-allowed';
+            clr.style.color  = 'rgba(100,80,160,0.4)';
+            clr.style.borderColor = 'rgba(100,80,160,0.15)';
+          }
+          return;
+        }
+
+        // ── Click en check de día (hábito) ──
+        var c = e.target.closest('._act-chk');
+        if(c){
+          var ok = !!c.querySelector('.fa-check');
+          var nowChk = !ok;
+          var tipo = c.dataset.tipo;
+          var cat  = CAT[tipo];
+          var ahora = new Date();
+          var horaStr = String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0');
+          c.style.borderColor = nowChk?cat.color:'rgba(100,80,160,0.3)';
+          c.style.background  = nowChk?cat.color:'transparent';
+          c.style.boxShadow   = nowChk?'0 0 8px '+cat.glow+',0 0 4px '+cat.glow:'none';
+          // v5.210: el círculo lleva SOLO el check. La hora queda en el
+          // tooltip (title), no embutida dentro de la esfera.
+          if(nowChk){
+            c.setAttribute('title', horaStr);
+            c.innerHTML = '<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none"></i>';
+          } else {
+            c.removeAttribute('title');
+            c.innerHTML='';
+          }
+          var row = c.closest('tr');
+          if(row){
+            var allChks = row.querySelectorAll('._act-chk');
+            var allDone = Array.prototype.every.call(allChks, function(ch){ return !!ch.querySelector('.fa-check'); });
+            var anyDone = Array.prototype.some.call(allChks, function(ch){ return !!ch.querySelector('.fa-check'); });
+            var td = row.querySelector('td:first-child div:last-child');
+            if(td) td.style.color = allDone?cat.color:'#C8D0E0';
+            if(td) td.style.textShadow = allDone?'0 0 8px '+cat.glow:'none';
+            // Habilitar/deshabilitar botón limpiar fila
+            var clrBtn = row.querySelector('._act-clear-row');
+            if(clrBtn){
+              clrBtn.disabled = !anyDone;
+              clrBtn.style.cursor = anyDone?'pointer':'not-allowed';
+              clrBtn.style.color  = anyDone?'#EF4444':'rgba(100,80,160,0.4)';
+              clrBtn.style.borderColor = anyDone?'rgba(239,68,68,0.4)':'rgba(100,80,160,0.15)';
+            }
+          }
+          // Sincronizar dato local
+          var d2 = window._actData;
+          if(d2){
+            var arr2 = tipo==='personal'?d2.habitosPersonal:d2.habitosElectronics;
+            var hab2 = (arr2||[]).find(function(x){ return x.fila===parseInt(c.dataset.fila); });
+            if(hab2 && hab2.checks) hab2.checks[c.dataset.dia] = nowChk;
+          }
+          if(typeof api!=='undefined') api.setActivityCheck(tipo, parseInt(c.dataset.fila), c.dataset.dia, nowChk);
+          return;
+        }
+
+        // ── Click en item simple (libro/movie/norut) ──
+        var it = e.target.closest('._act-item');
+        if(it){
+          var ok = !!it.querySelector('.fa-check');
+          var nowDone = !ok;
+          var tipo = it.dataset.tipo;
+          var fila = parseInt(it.dataset.fila);
+          var cat  = CAT[tipo];
+          var ahora = new Date();
+          var fechaStr = String(ahora.getDate()).padStart(2,'0')+'/'+String(ahora.getMonth()+1).padStart(2,'0');
+          // v5.148: fecha completa con hora para mostrar en la card
+          var fechaCardStr = fechaStr+' '+String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0');
+          // Guardar fecha en localStorage
+          try {
+            var lsKey = 'actItemDate:'+tipo+':'+fila;
+            if(nowDone) localStorage.setItem(lsKey, fechaStr);
+            else        localStorage.removeItem(lsKey);
+          } catch(e2){}
+          it.style.borderColor = nowDone?cat.color:'#26304A';
+          it.style.background  = nowDone?cat.color:'transparent';
+          it.style.boxShadow   = nowDone?'0 0 8px '+cat.glow:'none';
+          // v5.209: el círculo lleva SOLO el check. La fecha se muestra
+          // después del texto del concepto (en el span de info), no aquí.
+          if(nowDone){
+            it.setAttribute('title', fechaStr);
+            it.innerHTML = '<i class="fas fa-check" style="font-size:10px;color:#fff;pointer-events:none;line-height:1"></i>';
+          } else {
+            it.removeAttribute('title');
+            it.innerHTML = '';
+          }
+          var row = it.parentElement;
+          var sp  = row&&row.querySelector('span');
+          if(sp) sp.style.color = nowDone?'#4A5266':'#C8D0E0';
+
+          // v5.211: actualizar la fecha visual DESPUÉS del nombre del
+          // concepto. BUG corregido: antes infoFlex se obtenía con
+          // row.querySelector(':scope > div'), que devuelve el PRIMER div
+          // hijo de la fila — y ese primer div es el círculo _act-item.
+          // El fechaSpan se metía DENTRO del círculo (amontonado sobre el
+          // check). Ahora se selecciona explícitamente el div de info: el
+          // div hijo que NO es el _act-item.
+          if(row){
+            var infoFlex = null;
+            var hijosDiv = row.querySelectorAll(':scope > div');
+            for(var hi=0; hi<hijosDiv.length; hi++){
+              if(!hijosDiv[hi].classList.contains('_act-item')){
+                infoFlex = hijosDiv[hi]; break;
+              }
+            }
+            if(infoFlex){
+              // El primer span es el nombre; el segundo (si existe) la fecha.
+              var spans = infoFlex.querySelectorAll(':scope > span');
+              var fechaSpan = spans[1];
+              if(nowDone){
+                if(!fechaSpan){
+                  fechaSpan = document.createElement('span');
+                  fechaSpan.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.06em;color:rgba(167,139,250,0.65);font-family:JetBrains Mono,monospace';
+                  infoFlex.appendChild(fechaSpan);
+                }
+                fechaSpan.textContent = fechaCardStr;
+                fechaSpan.style.display = '';
+              } else if(fechaSpan){
+                fechaSpan.style.display = 'none';
+              }
+            }
+          }
+
+          if(row&&row.parentElement){
+            if(nowDone) row.parentElement.appendChild(row);
+            else        row.parentElement.insertBefore(row, row.parentElement.firstChild);
+          }
+          // Sincronizar dato local — incluir fechaCompletado para próximo render
+          var d2 = window._actData;
+          if(d2){
+            var arr2 = tipo==='libro'?d2.libros:tipo==='movie'?d2.movies:d2.noRutinarias;
+            var item2 = (arr2||[]).find(function(x){ return x.fila===fila; });
+            if(item2){
+              item2.completado = nowDone;
+              item2.fechaCompletado = nowDone ? ahora.toISOString() : null;
+            }
+          }
+          if(typeof api!=='undefined') api.marcarActivityItem(tipo, fila, nowDone);
+          // v6.072: si la columna tiene "ocultar completados" activo y el
+          // item se acaba de completar, re-renderizar la columna para que
+          // desaparezca de la vista (sigue en el Sheet, no se borra).
+          if(_actOcultarDone[tipo] && nowDone){
+            var panelIT = it.closest('[data-panel-tipo]');
+            if(panelIT){
+              var innerIT = panelIT.querySelector('[data-panel-inner]');
+              if(innerIT && d2){
+                var itemsIT = (tipo==='libro'?d2.libros:tipo==='movie'?d2.movies:d2.noRutinarias)||[];
+                innerIT.innerHTML = itemList(itemsIT, tipo);
+              }
+            }
+          }
+          return;
+        }
+      });
+    };
+  }
+
 window._formListo = true;
 console.log('[v11-form] E3-D3 · form RAW activo (api extendida: insertarEnRAW/editarFilaRAW y guardar*)');

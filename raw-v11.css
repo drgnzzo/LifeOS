@@ -466,3 +466,20 @@ html{background:#020810}
 
 /* ═══ v11.3 E3-D10 — la pantalla de carga v9 sustituye al boot E3-C ═══ */
 #boot{display:none !important}
+
+/* ═══ v11.3 E3-D11 — NIVEL 2 A PANTALLA COMPLETA (v9) ═══
+   La card expandida ocupa todo el espacio útil, alto dinámico por
+   contenido, scroll vertical propio, tipografía unificada. */
+#seccion .panel{
+  width:calc(100vw - 56px) !important;max-width:none !important;
+  height:calc(100vh - 210px) !important;max-height:none !important;
+  display:flex;flex-direction:column}
+#seccion .panel h1,#seccion .panel .meta{flex-shrink:0}
+#sec-cuerpo{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+  font-family:var(--font-ui);scrollbar-width:thin;
+  scrollbar-color:rgba(167,139,250,.35) transparent}
+#sec-cuerpo::-webkit-scrollbar{width:8px}
+#sec-cuerpo::-webkit-scrollbar-thumb{background:rgba(167,139,250,.3);border-radius:4px}
+#sec-cuerpo .board-face.v11-hosted{height:auto !important;min-height:100%;
+  overflow:visible !important}
+#sec-cuerpo #act-container{overflow-x:auto}
