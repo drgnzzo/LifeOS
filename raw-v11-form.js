@@ -1472,5 +1472,124 @@ window._renderNutLayoutCompleto = window._renderNutLayoutCompleto || function(d)
    la barra superior fija; el router _osMostrar ya marca los tabs. */
 
 
+/* ── SOS — centro de emergencia (verbatim raw-core.js:934-1050) ── */
+window._SOS_TIPOS = [
+  { id:'general',  label:'Ayuda general',   icono:'fa-circle-exclamation', color:'#EF4444',
+    mensaje:'🚨 Necesito ayuda — enviado desde RAW Entry' },
+  { id:'medica',   label:'Emergencia médica', icono:'fa-kit-medical',      color:'#F87171',
+    mensaje:'🚑 Emergencia médica — necesito asistencia' },
+  { id:'seguridad',label:'Seguridad',        icono:'fa-shield-halved',     color:'#FB923C',
+    mensaje:'⚠️ Me siento en peligro — por favor contáctame' },
+  { id:'recoger',  label:'Recógeme',         icono:'fa-car',               color:'#67E8F9',
+    mensaje:'🚗 ¿Pueden venir por mí? Comparto mi ubicación' },
+  { id:'llamada',  label:'Llámame ya',       icono:'fa-phone-volume',      color:'#C4B5FD',
+    mensaje:'📞 Necesito que me llamen lo antes posible' }
+];
+window._sosIdx = 0;
+
+window._montarSOS = function(){
+  var board = document.getElementById('board-sos');
+  if(!board) return;
+  board.innerHTML =
+    '<div class="sos-wrap">'+
+      '<div class="sos-header">'+
+        '<div class="sos-header-l">'+
+          '<i class="fas fa-tower-broadcast sos-header-ico"></i>'+
+          '<div>'+
+            '<div class="sos-header-t">CENTRO SOS</div>'+
+            '<div class="sos-header-s">Elige el tipo de alerta que necesitas enviar</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="sos-grid" id="sos-grid"></div>'+
+      '<div class="sos-msg" id="sos-msg"></div>'+
+    '</div>';
+  _sosInyectarCSS();
+  window._sosRender();
+};
+
+window._sosRender = function(){
+  var tipos = window._SOS_TIPOS;
+  var grid = document.getElementById('sos-grid');
+  if(!grid) return;
+  // TABLERO: todas las tarjetas visibles a la vez. Cada una envía su alerta.
+  grid.innerHTML = tipos.map(function(t, i){
+    return ''+
+      '<button class="sos-card" style="--sos-acc:'+t.color+'" onclick="window._sosEnviar('+i+')">'+
+        '<div class="sos-card-ico"><i class="fas '+t.icono+'"></i></div>'+
+        '<div class="sos-card-label">'+t.label+'</div>'+
+        '<div class="sos-card-msg">'+t.mensaje+'</div>'+
+        '<div class="sos-card-cta"><i class="fas fa-paper-plane"></i> Enviar</div>'+
+      '</button>';
+  }).join('');
+};
+
+window._sosEnviar = function(idx){
+  var t = window._SOS_TIPOS[idx];
+  if(!t) return;
+  var msgEl = document.getElementById('sos-msg');
+  if(msgEl){ msgEl.textContent = 'Enviando '+t.label+'…'; msgEl.className = 'sos-msg activa'; }
+  function done(ubicacion){
+    if(typeof api !== 'undefined' && api.enviarSOS){
+      api.enviarSOS({mensaje:t.mensaje, ubicacion:ubicacion}).then(function(r){
+        if(msgEl){
+          msgEl.textContent = r.ok ? ('✓ Enviado a '+r.enviados+' contacto(s)') : ('Error: '+r.mensaje);
+          msgEl.className = 'sos-msg ' + (r.ok?'ok':'err');
+        }
+        if(typeof showToast==='function') showToast(r.ok?'🚨 SOS enviado':'Error al enviar SOS', r.ok);
+        if(r.ok && typeof window._ondaCosmica === 'function') window._ondaCosmica('#EF4444');
+      }).catch(function(){
+        if(msgEl){ msgEl.textContent='Error al enviar'; msgEl.className='sos-msg err'; }
+      });
+    }
+  }
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ done('https://maps.google.com/?q='+pos.coords.latitude+','+pos.coords.longitude); },
+      function(){ done(''); },
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  } else done('');
+};
+
+function _sosInyectarCSS(){
+  if(document.getElementById('sos-styles')) return;
+  var st = document.createElement('style');
+  st.id = 'sos-styles';
+  st.textContent = [
+    '.sos-wrap{display:flex;flex-direction:column;height:100%;padding:var(--sp-6);gap:var(--sp-5);box-sizing:border-box}',
+    '.sos-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}',
+    '.sos-header-l{display:flex;align-items:center;gap:var(--sp-3)}',
+    '.sos-header-ico{font-size:22px;color:#EF4444;filter:drop-shadow(0 0 8px rgba(239,68,68,.5))}',
+    '.sos-header-t{font-size:var(--fs-lg);font-weight:var(--fw-bold);letter-spacing:.18em;color:var(--hud-text)}',
+    '.sos-header-s{font-size:var(--fs-xs);color:var(--hud-text-dim);letter-spacing:var(--ls-title);margin-top:2px}',
+    '.sos-carrusel{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}',
+    '.sos-grid{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--sp-4);'+
+      'align-content:start;overflow-y:auto;min-height:0;padding:2px}',
+    '.sos-card{border:1px solid color-mix(in srgb,var(--sos-acc) 45%,transparent);'+
+      'background:radial-gradient(circle at 50% 0%,color-mix(in srgb,var(--sos-acc) 10%,transparent),var(--hud-panel-bg));'+
+      'border-radius:var(--rad-lg);padding:var(--sp-5) var(--sp-4);display:flex;flex-direction:column;'+
+      'align-items:center;gap:var(--sp-3);box-shadow:var(--hud-shadow);cursor:pointer;'+
+      'font-family:var(--font-ui);text-align:center;transition:transform .12s,box-shadow .12s,border-color .12s}',
+    '.sos-card:hover{transform:translateY(-2px);border-color:var(--sos-acc);'+
+      'box-shadow:0 0 32px color-mix(in srgb,var(--sos-acc) 30%,transparent),var(--hud-shadow)}',
+    '.sos-card:active{transform:translateY(0)}',
+    '.sos-card-ico{width:56px;height:56px;border-radius:var(--rad-pill);display:flex;align-items:center;justify-content:center;'+
+      'background:color-mix(in srgb,var(--sos-acc) 15%,transparent);border:2px solid var(--sos-acc);'+
+      'font-size:24px;color:var(--sos-acc);box-shadow:0 0 20px color-mix(in srgb,var(--sos-acc) 35%,transparent)}',
+    '.sos-card-label{font-size:var(--fs-base);font-weight:var(--fw-bold);color:var(--hud-text);letter-spacing:.03em}',
+    '.sos-card-msg{font-size:var(--fs-xs);color:var(--hud-text-mid);line-height:1.35}',
+    '.sos-card-cta{margin-top:var(--sp-2);padding:8px 18px;border-radius:var(--rad-card);'+
+      'background:var(--sos-acc);color:#0a0a12;font-size:var(--fs-xs);font-weight:var(--fw-bold);letter-spacing:.06em;'+
+      'text-transform:uppercase;display:flex;align-items:center;gap:6px}',
+    '.sos-msg{text-align:center;font-size:var(--fs-sm);min-height:18px;flex-shrink:0;transition:color .2s}',
+    '.sos-msg.activa{color:var(--hud-text-dim)}',
+    '.sos-msg.ok{color:var(--hud-ok)}',
+    '.sos-msg.err{color:var(--hud-err)}'
+  ].join('');
+  document.head.appendChild(st);
+}
+
+
+
 window._formListo = true;
 console.log('[v11-form] E3-D3 · form RAW activo (api extendida: insertarEnRAW/editarFilaRAW y guardar*)');
