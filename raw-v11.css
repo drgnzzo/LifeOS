@@ -346,3 +346,41 @@ body.v11-escena{position:fixed;inset:0}
 #boot .bfill{height:100%;width:0;background:var(--acc-violet,#8B5CF6);
   box-shadow:0 0 12px var(--acc-violet,#8B5CF6);
   transition:width 1.75s cubic-bezier(.2,0,0,1)}
+
+/* ═══════════════════════════════════════════════════════════════════
+   v11.3 E3-D1 — SUB-ANILLOS + MINI-DIAL + HINT
+   ═══════════════════════════════════════════════════════════════════ */
+/* corona de sub-opciones (nivel 0) — nodos posicionados por JS
+   (proyección por frame, misma técnica que .ancla) */
+#v11-subring{position:fixed;inset:0;z-index:180;pointer-events:none}
+.v11-sub{position:absolute;left:0;top:0;opacity:0;pointer-events:none;
+  will-change:transform,opacity;cursor:pointer}
+.v11-sub-in{transform:translate(-50%,-50%);display:flex;flex-direction:column;
+  align-items:center;gap:5px;transition:transform .18s var(--ease)}
+.v11-sub-in img{width:30px;height:30px;filter:drop-shadow(0 0 8px var(--c))}
+.v11-sub-in .t{font-family:var(--font-mono);font-size:9.5px;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--c);
+  text-shadow:0 0 10px var(--c),0 1px 4px #000;white-space:nowrap}
+.v11-sub:hover .v11-sub-in{transform:translate(-50%,-50%) scale(1.14)}
+.v11-sub.pulso .v11-sub-in{animation:v11pulso .5s var(--ease)}
+@keyframes v11pulso{
+  0%{transform:translate(-50%,-50%) scale(1)}
+  40%{transform:translate(-50%,-50%) scale(1.4)}
+  100%{transform:translate(-50%,-50%) scale(1)}}
+
+/* mini-dial: réplica del dial en niveles 1-2 · clic = emerger a HOME */
+#v11-minidial{position:fixed;left:50%;bottom:70px;margin-left:-46px;
+  width:92px;height:92px;z-index:185;cursor:pointer;
+  opacity:0;pointer-events:none;transition:opacity .5s var(--ease);
+  filter:drop-shadow(0 0 14px rgba(139,92,246,.30))}
+#v11-minidial.on{opacity:.9;pointer-events:auto}
+#v11-minidial.on:hover{opacity:1;filter:drop-shadow(0 0 20px rgba(167,139,250,.55))}
+
+/* hint de confirmación (presets / avisos) */
+#v11-hint{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);
+  z-index:200;font-family:var(--font-mono);font-size:10px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--hud-text-mid);
+  background:var(--hud-form-bg);border:1px solid var(--hud-border);
+  padding:8px 14px;border-radius:6px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .3s var(--ease)}
+#v11-hint.on{opacity:1}
