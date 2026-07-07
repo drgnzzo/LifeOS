@@ -200,6 +200,20 @@ function _verSeccion(i){
   });
 }
 /* Home: emerger pasando por cada nivel, con sus animaciones */
+/* E3-D13 — EL CABLE DEL WARP: en v9 raw-niveles disparaba
+   window._dispararWarp(dir) en cada cambio de nivel; aquí lo dispara
+   la envoltura de irNivel (cubre teclas, rueda, cadenas, mini-dial y
+   home). dir>0 = sumergir (vórtice joseph succiona), dir<0 = emerger. */
+(function(){
+  var _inBase = window.irNivel;
+  window.irNivel = function(n){
+    if(!window.enTransicion && n!==window.nivel && n>=0 && n<=2 &&
+       typeof window._dispararWarp==='function'){
+      window._dispararWarp(n>window.nivel ? 1 : -1);
+    }
+    _inBase(n);
+  };
+})();
 window._v11Home=function(){
   _cadena++; var tok=_cadena;
   _esperarLibre(tok,function(){
@@ -1632,5 +1646,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D12 activo · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D13 activo · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
