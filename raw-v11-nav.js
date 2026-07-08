@@ -467,7 +467,7 @@ function _pasoHub(){
   var o=((1-g.lift)*g.spread*vis);
   _hub.style.transform='translate('+(C.x-rIn)+'px,'+(C.y-rIn)+'px)';
   _hub.style.width=_hub.style.height=(rIn*2)+'px';
-  _hub.style.opacity=o.toFixed(3);
+  _hub.style.opacity=(o*_rev).toFixed(3);
   _hub.style.pointerEvents=(o>0.6)?'auto':'none';
 }
 addEventListener('mousemove',function(e){
@@ -500,6 +500,38 @@ function _pasoLabelsRadiales(){
       inner.style.transform='translate(-50%,-50%) rotate('+ang.toFixed(1)+'deg)';
     }
   }
+}
+
+
+/* ═══ E3-D16 — REVELADO POR CAPAS (proceso v9): al terminar el loading
+   (html.hud-listo) NADA aparece de golpe:
+     t0    · el cosmos ya respira (el loading retiró render-block)
+     +0.4s · hero  → +0.7s banda USER/SIM → +0.9s banda inferior (CSS)
+     +1.2s · EL DIAL entra en fade LENTO (1.9s): factor _rev aplicado
+             por JS paso-a-paso al canvas GL (ley física: jamás
+             transition CSS sobre WebGL), a labels (envoltura de
+             proyectarAnclas), hub y arcos. ═══ */
+var _rev = 0, _revT0 = 0, _revListo = false;
+var _pAnclasBase = window.proyectarAnclas;
+window.proyectarAnclas = function(){
+  _pAnclasBase();
+  if(_rev>=1) return;
+  for(var i=0;i<window.anclas.length;i++){
+    var l=window.anclas[i].lbl;
+    l.style.opacity = (parseFloat(l.style.opacity)||0)*_rev;
+  }
+};
+function _pasoReveal(now){
+  if(_rev>=1) return;
+  if(!_revListo){
+    if(document.documentElement.classList.contains('hud-listo')){
+      _revListo = true; _revT0 = now + 1200;          /* dial: el último */
+    } else return;
+  }
+  if(now < _revT0){ _rev = 0; }
+  else _rev = _ease(Math.min(1,(now-_revT0)/1900));
+  var gl=document.getElementById('gl');
+  if(gl) gl.style.opacity = _rev.toFixed(3);           /* JS por frame, sin transition */
 }
 
 /* ═══ ENTRADAS ═══ */
@@ -558,7 +590,8 @@ addEventListener('wheel',function(e){
   if(_formAbierto()) e.stopImmediatePropagation();
   /* E3-D15: en nivel 2 la rueda es PARA EL CONTENIDO — el motor no
      emerge por scroll; se sale con Escape o el mini-dial */
-  else if(window.nivel===2 && !window.enTransicion) e.stopImmediatePropagation();
+  else if(window.nivel===2 && !window.enTransicion &&
+     e.target.closest && e.target.closest('#seccion .panel')) e.stopImmediatePropagation();
 },{capture:true,passive:true});
 
 
@@ -1694,6 +1727,7 @@ colocar();
   }
   /* halo del planeta: se apaga al descender (a alt 172 la cámara queda
      DENTRO del sprite de 560u y su gradiente violeta ahogaba el cosmos) */
+  _pasoReveal(now);
   _purgaExtras();
   var _h=document.documentElement;
   _h.classList.toggle('niv-warp', !!window.enTransicion);
@@ -1705,7 +1739,7 @@ colocar();
   _pasoHub();
   _pasoLabelsRadiales();
   /* arcos del dial: viven y mueren CON los gajos (spread) y el nivel */
-  var vis = (window.nivel===0||window.enTransicion) ? window.gajos.spread : 0;
+  var vis = ((window.nivel===0||window.enTransicion) ? window.gajos.spread : 0)*_rev;
   for(var ri=0;ri<_rims.length;ri++){
     var rr=_rims[ri], on=(ri===_hov);
     rr.core.material.opacity =(on?1:.85)*vis;
@@ -1720,5 +1754,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D15 activo · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D16 activo · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

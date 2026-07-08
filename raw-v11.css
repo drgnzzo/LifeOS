@@ -503,3 +503,16 @@ html.niv-2 #seccion .panel{height:calc(100vh - 96px) !important}
    absoluto no colapse invisible */
 #sec-cuerpo #board-notas,#sec-cuerpo #board-logros{
   min-height:calc(100vh - 220px);position:relative}
+
+/* ═══ v11.3 E3-D16 — REVELADO POR CAPAS (proceso de arranque v9) ═══ */
+/* estado inicial: el chrome nace apagado; el cosmos (canvas 2D propio)
+   aparece primero al caer el render-block */
+body.v11-escena .hero,#v11-top,#v11-bot{opacity:0;
+  transition:opacity 1s var(--ease)}
+#gl{opacity:0}                       /* lo enciende JS paso a paso */
+html.hud-listo .hero{opacity:1;transition-delay:.4s}
+html.hud-listo #v11-top{opacity:1;transition-delay:.7s}
+html.hud-listo #v11-bot{opacity:1;transition-delay:.9s}
+/* scroll del nivel 2 a prueba de todo: el panel recorta, el cuerpo rueda */
+#seccion .panel{overflow:hidden}
+#sec-cuerpo{max-height:100%}
