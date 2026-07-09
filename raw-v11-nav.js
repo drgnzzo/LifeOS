@@ -461,7 +461,8 @@ function _pasoHub(){
   _W0.set(0,10,0);
   var C=_projWorld(_W0), A=_projWorld(_WA);
   var rA=Math.hypot(A.x-C.x,A.y-C.y);
-  var rIn=rA*(172/272);
+  var rIn=rA*(108/272);   /* E3-D17: proporción v9 (R_IN 90/R_OUT 310)
+                              — el hub deja VER el planeta alrededor */
   var g=window.gajos;
   var vis=(window.nivel===0||window.enTransicion)?1:0;
   var o=((1-g.lift)*g.spread*vis);
@@ -474,7 +475,7 @@ addEventListener('mousemove',function(e){
   if(window.nivel!==0){ if(_hubHov){_hubHov=false;_hub.classList.remove('hov');} return; }
   _W0.set(0,10,0); var C=_projWorld(_W0);
   window.anclas[0].pt.getWorldPosition(_WA); var A=_projWorld(_WA);
-  var rIn=Math.hypot(A.x-C.x,A.y-C.y)*(172/272);
+  var rIn=Math.hypot(A.x-C.x,A.y-C.y)*(108/272);
   var dentro=Math.hypot(e.clientX-C.x,e.clientY-C.y)<rIn;
   if(dentro!==_hubHov){_hubHov=dentro;_hub.classList.toggle('hov',dentro);}
 },{passive:true});
@@ -564,7 +565,7 @@ addEventListener('click',function(e){
       var C0=_projWorld(_W0), A0=_projWorld(_WA);
       var rA0=Math.hypot(A0.x-C0.x,A0.y-C0.y);
       var dC=Math.hypot(e.clientX-C0.x,e.clientY-C0.y);
-      if(rA0>2 && dC < rA0*(172/272)){    /* dentro de R1 proyectado */
+      if(rA0>2 && dC < rA0*(108/272)){    /* dentro del hub v9 */
         _cerrarRing(true); abrirFormulario('nueva'); return;
       }
     }
@@ -1754,5 +1755,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D16 activo · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D17 activo · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
