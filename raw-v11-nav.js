@@ -310,10 +310,16 @@ function _pasoScrub(now){
     if(_scrub.on) return;
     if(!window.enTransicion && n!==window.nivel && n>=0 && n<=2){
       var dir = n>window.nivel ? 1 : -1, t0=performance.now();
+      /* E3-D19: campana calibrada al tramo REAL del motor —
+         0↔1 = 2400ms (viaje planetario, warp pleno) ·
+         1↔2 = 560ms (entrar/salir de la card, soplo breve y tenue) */
+      var esViaje = (window.nivel===0 || n===0);
+      var dur = esViaje ? 2400 : 560;
+      var pico = esViaje ? 0.92 : 0.38;
       if(window._warpNivel){
         (function seguir(t){
-          var p=Math.min(1,(t-t0)/2400);
-          window._warpNivel(dir,_warpP(p)*0.92);
+          var p=Math.min(1,(t-t0)/dur);
+          window._warpNivel(dir,_warpP(p)*pico);
           if(p<1) requestAnimationFrame(seguir);
           else window._warpNivel(dir,0);
         })(t0);
@@ -1858,5 +1864,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D18 activo · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D19 activo · campana de warp por tramo (2400/560ms) · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();
