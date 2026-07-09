@@ -200,16 +200,124 @@ function _verSeccion(i){
   });
 }
 /* Home: emerger pasando por cada nivel, con sus animaciones */
-/* E3-D13 — EL CABLE DEL WARP: en v9 raw-niveles disparaba
-   window._dispararWarp(dir) en cada cambio de nivel; aquí lo dispara
-   la envoltura de irNivel (cubre teclas, rueda, cadenas, mini-dial y
-   home). dir>0 = sumergir (vórtice joseph succiona), dir<0 = emerger. */
+/* ═══ E3-D18 — WARP PROPORCIONAL + SCRUB POR SCROLL ═══
+   (a) El warp deja de ser un destello de 1.6s que muere a medio viaje:
+       su energía sigue el PROGRESO real de la transición (curva campana
+       — máxima intensidad en el cruce, cero en los extremos).
+   (b) El scroll SCRUBBEA la inmersión: el planeta se acerca en proporción
+       a cuánto giraste la rueda; te detienes a medio camino y ahí queda,
+       con el vórtice a media potencia; sigues y entras; giras al revés y
+       sales. Al soltar (140ms sin rueda) actúa el IMÁN: cae al nivel más
+       cercano completando la timeline del motor desde donde estés.
+       Las timelines son las del motor, copiadas literal (pRaw idéntico):
+       0→1 gajos .0-.3125 · alt .10-.55 · look .36-.60 · anillo .58
+       1→0 look .46-.80 · alt .46-.78 → lanzamiento .72-1 · switch .47 */
+var _cam = window.cam, _eF = window.easeFirma, _fase = window.fase;
+var _scrub = { on:false, p:0, dir:1, base:0, tLast:0 };
+function _warpP(p){                       /* campana: 0 → 1 → 0 */
+  return Math.sin(Math.PI*Math.max(0,Math.min(1,p)));
+}
+function _pintarScrub(p){
+  var h=document.documentElement;
+  if(_scrub.dir>0){                       /* 0 → 1 (sumergir) */
+    window.gajos.spread = 1-_eF(_fase(p,0,.3125));
+    _cam.alt = _scrub.base + (172-_scrub.base)*_eF(_fase(p,.10,.55));
+    _cam.look = _eF(_fase(p,.36,.60));
+    var enA = p>=.58;
+    if(enA !== h.classList.contains('en-anillo')){
+      h.classList.toggle('en-anillo',enA); window.colocar();
+    }
+  } else {                                /* 1 → 0 (emerger) */
+    _cam.look = 1-_eF(_fase(p,.46,.80));
+    _cam.alt = 172+88*_eF(_fase(p,.46,.78));
+    var fL=_eF(_fase(p,.72,1)); if(fL>0) _cam.alt = 260+(1500-260)*fL;
+    var fuera = p>=.47;
+    if(fuera === h.classList.contains('en-anillo')){
+      h.classList.toggle('en-anillo',!fuera);
+      h.classList.toggle('holo-out',!fuera);
+      window.colocar();
+    }
+  }
+  if(window._warpNivel) window._warpNivel(_scrub.dir, _warpP(p)*0.92);
+}
+function _abrirScrub(dir){
+  _scrub.on=true; _scrub.p=0; _scrub.dir=dir; _scrub.base=_cam.alt;
+  window.enTransicion=true;
+  var h=document.documentElement;
+  if(dir>0){ h.classList.add('oculta-hud'); window.colocar(); }
+  else h.classList.add('holo-out');
+}
+function _cerrarScrub(){
+  /* IMÁN: completa la timeline del motor desde donde estás */
+  var p=_scrub.p, dir=_scrub.dir, ir=(p>=.5);
+  _scrub.on=false;
+  window.enTransicion=false;
+  if(window._warpNivel) window._warpNivel(dir,0);
+  var h=document.documentElement;
+  if(dir>0){
+    if(ir){ window.nivel=0; h.classList.remove('en-anillo','oculta-hud');
+            _cam.alt=_scrub.base; window.colocar(); window.irNivel(1); }
+    else  { h.classList.remove('en-anillo','oculta-hud');
+            _cam.alt=_scrub.base; window.gajos.spread=1; window.colocar();
+            window.estado(); }
+  } else {
+    if(ir){ window.nivel=1; h.classList.remove('holo-out'); h.classList.add('en-anillo');
+            _cam.alt=172; _cam.look=1; window.colocar(); window.irNivel(0); }
+    else  { h.classList.remove('holo-out'); h.classList.add('en-anillo');
+            _cam.alt=172; _cam.look=1; window.colocar(); window.estado(); }
+  }
+}
+/* rueda: fase de captura — sustituye al salto discreto del motor */
+addEventListener('wheel',function(e){
+  if(_formAbierto()) return;
+  if(window.nivel===2){
+    if(e.target.closest && e.target.closest('#seccion .panel')) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    if(!window.enTransicion && e.deltaY<0) window.irNivel(1);
+    return;
+  }
+  if(window.enTransicion && !_scrub.on) return;
+  var d=e.deltaY;
+  if(!_scrub.on){
+    if(window.nivel===0 && d<=0) return;      /* arriba en órbita: nada */
+    if(window.nivel===1 && d>0){ e.stopImmediatePropagation(); e.preventDefault();
+      window.irNivel(2); return; }            /* 1→2: salto (panel) */
+    e.stopImmediatePropagation(); e.preventDefault();
+    _abrirScrub(window.nivel===0 ? 1 : -1);
+  } else { e.stopImmediatePropagation(); e.preventDefault(); }
+  /* avance proporcional al giro (normalizado; trackpad y rueda) */
+  var paso = Math.max(-.34,Math.min(.34, d/1400));
+  if(_scrub.dir<0) paso = -paso;
+  _scrub.p = Math.max(0, Math.min(1, _scrub.p + paso));
+  _scrub.tLast = performance.now();
+  _pintarScrub(_scrub.p);
+  if(_scrub.p>=1 || _scrub.p<=0) _cerrarScrub();
+},{capture:true,passive:false});
+/* imán al soltar (140ms sin rueda) */
+function _pasoScrub(now){
+  if(!_scrub.on) return;
+  if(now-_scrub.tLast>140){
+    var meta=(_scrub.p>=.5)?1:0;
+    _scrub.p += (meta-_scrub.p)*0.16;         /* asentar suave */
+    _pintarScrub(_scrub.p);
+    if(Math.abs(meta-_scrub.p)<0.012){ _scrub.p=meta; _cerrarScrub(); }
+  }
+}
+/* teclas/cadenas/mini-dial: warp proporcional durante toda la timeline */
 (function(){
   var _inBase = window.irNivel;
   window.irNivel = function(n){
-    if(!window.enTransicion && n!==window.nivel && n>=0 && n<=2 &&
-       typeof window._dispararWarp==='function'){
-      window._dispararWarp(n>window.nivel ? 1 : -1);
+    if(_scrub.on) return;
+    if(!window.enTransicion && n!==window.nivel && n>=0 && n<=2){
+      var dir = n>window.nivel ? 1 : -1, t0=performance.now();
+      if(window._warpNivel){
+        (function seguir(t){
+          var p=Math.min(1,(t-t0)/2400);
+          window._warpNivel(dir,_warpP(p)*0.92);
+          if(p<1) requestAnimationFrame(seguir);
+          else window._warpNivel(dir,0);
+        })(t0);
+      }
     }
     _inBase(n);
   };
@@ -587,13 +695,7 @@ addEventListener('keydown',function(e){
   if(e.key==='Escape'){ if(typeof cerrarEntrada==='function')cerrarEntrada(); }
   e.stopImmediatePropagation();
 },true);
-addEventListener('wheel',function(e){
-  if(_formAbierto()) e.stopImmediatePropagation();
-  /* E3-D15: en nivel 2 la rueda es PARA EL CONTENIDO — el motor no
-     emerge por scroll; se sale con Escape o el mini-dial */
-  else if(window.nivel===2 && !window.enTransicion &&
-     e.target.closest && e.target.closest('#seccion .panel')) e.stopImmediatePropagation();
-},{capture:true,passive:true});
+/* (rueda: gestionada por el scrub de E3-D18) */
 
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1729,6 +1831,7 @@ colocar();
   /* halo del planeta: se apaga al descender (a alt 172 la cámara queda
      DENTRO del sprite de 560u y su gradiente violeta ahogaba el cosmos) */
   _pasoReveal(now);
+  _pasoScrub(now);
   _purgaExtras();
   var _h=document.documentElement;
   _h.classList.toggle('niv-warp', !!window.enTransicion);
@@ -1755,5 +1858,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D17 activo · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E3-D18 activo · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

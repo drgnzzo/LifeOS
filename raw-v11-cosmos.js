@@ -79,6 +79,15 @@ document.body.insertBefore(_dialOverlay, document.body.firstChild);
       _warpDir = (dir < 0) ? -1 : 1;
       _warpEnergia = 1;
     };
+    /* E3-D18 — WARP SOSTENIDO (v11): el disparo v9 decae solo en 1.6s,
+       pero la inmersión dura 2.4s (y con scrub, lo que el usuario tarde).
+       Esta API fija la energía por frame; _warpSostenido apaga el
+       decaimiento automático mientras el nivel la maneje. */
+    window._warpNivel = function(dir, energia){
+      _warpDir = (dir < 0) ? -1 : 1;
+      _warpEnergia = Math.max(0, Math.min(1, energia));
+      window._warpSostenido = (energia > 0.001);
+    };
 
     /* v8.41 — ONDAS EXPANSIVAS (matemática de batcloud: uRings). Cuando
        pasa algo REAL en la app (guardar entrada, completar hábito, SOS),
@@ -2010,7 +2019,7 @@ document.body.insertBefore(_dialOverlay, document.body.firstChild);
 
       // v7.031 — FASE 4A: decaer la energía del warp. Dura ~1.5s en
       // apagarse (subido desde 0.9s) — el destello se siente más.
-      if(_warpEnergia > 0){
+      if(_warpEnergia > 0 && !window._warpSostenido){
         _warpEnergia -= dt / 1.6;
         if(_warpEnergia < 0) _warpEnergia = 0;
       }
