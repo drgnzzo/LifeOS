@@ -1944,11 +1944,9 @@ document.body.insertBefore(_dialOverlay, document.body.firstChild);
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
       // v5.214: si la pestaña está oculta, no dibujar — solo reprogramar.
-      if(document.hidden){
-        lastT = t;
-        animId = requestAnimationFrame(frame);
-        return;
-      }
+      /* E3-D20: SIN PAUSAS — el cosmos corre siempre, como app normal.
+         (Si el navegador estrangula rAF en pestaña oculta, dt viene
+         clampeado a 0.05: al volver no hay salto, continúa.) */
       // v7.066 — Pausa adicional cuando la ventana NO tiene foco (la PWA
       // perdió foco aunque siga "visible" para el navegador). Esto evita
       // que LifeOS siga consumiendo CPU cuando estás usando YouTube u
@@ -1956,21 +1954,14 @@ document.body.insertBefore(_dialOverlay, document.body.firstChild);
       // document.hidden: hidden solo se activa con minimizado/pestaña
       // oculta, hasFocus se activa también cuando la ventana sigue
       // visible pero no es la activa.
-      if(!document.hasFocus()){
-        lastT = t;
-        animId = requestAnimationFrame(frame);
-        return;
-      }
+      /* E3-D20: la pausa por pérdida de foco (v7.066) queda retirada. */
       // v7.065 OPT — En Nivel 2 una sección a pantalla completa (Activity,
       // Logros, etc.) tapa totalmente el cosmos. Seguir pintando 580
       // estrellas/frame que nadie ve es desperdicio. Pausamos hasta
       // que el usuario regrese a Nivel 0 o 1. Cuando regrese, el frame
       // se reanuda y todo sigue en su sitio porque dt se sigue calculando.
-      if(document.documentElement.classList.contains('niv-2')){
-        lastT = t;
-        animId = requestAnimationFrame(frame);
-        return;
-      }
+      /* E3-D20: la pausa de nivel 2 (v7.065) queda retirada — el cosmos
+         sigue vivo detrás de los paneles. */
       // Si no ha pasado el intervalo mínimo, saltar este frame.
       if(lastT && (t - lastT) < _minFrameMs){
         animId = requestAnimationFrame(frame);
