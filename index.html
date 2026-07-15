@@ -27,6 +27,14 @@
   <link rel="stylesheet" href="raw-app.css?v=9090">
   <link rel="stylesheet" href="raw-mobile.css?v=9050">
 
+<style id="e5-fix">
+/* E5-D6 · la barra con 10 tabs no debe wrapear: el salto 1↔2 líneas
+   durante la cascada reposicionaba el dial (rebote Y ~35px del 007) */
+.hero-tabs,#hero-tabs{flex-wrap:nowrap !important;overflow:hidden;min-width:0}
+.hud-tab{white-space:nowrap;flex-shrink:1;min-width:0;padding-left:10px !important;padding-right:10px !important}
+.hud-tab span{letter-spacing:.06em}
+@media (max-width:1500px){.hud-tab{padding-left:7px !important;padding-right:7px !important}.hud-tab span{font-size:10px}}
+</style>
 </head>
 <body>
 <canvas id="bg-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none"></canvas>

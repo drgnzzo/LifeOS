@@ -278,6 +278,49 @@ window._lucyMontar=function(target){
    embebido). Captura SIEMPRE desde el dial o los botones +. ═══ */
 /* E5-D5: puente v9 — el tab MÉDICO entra por el router real
    (_OS_SECCIONES ya lo registra; las flechas lo incluyen) */
+/* E5-D6 · DEFENSA EN PROFUNDIDAD (v9):
+   a) registro runtime en _OS_SECCIONES — MÉDICO existe para el router
+      y las FLECHAS aunque corra un raw-core sin el registro;
+   b) vigía de montaje — si el router muestra 'medico' por cualquier
+      ruta y el board está vacío, se monta solo;
+   c) vigía de HOME — si tras volver a niv-0 el dial quedó invisible
+      (cascada interrumpida), se reabre una vez. */
+(function(){
+  function _blindar(){
+    if(window._OS_SECCIONES && !window._OS_SECCIONES.medico){
+      window._OS_SECCIONES.medico = { board:'board-medico', tab:'btn-medico' };
+      console.log('[e5] medico inyectado en _OS_SECCIONES (core previo)');
+    }
+  }
+  _blindar(); document.addEventListener('DOMContentLoaded', _blindar);
+  setInterval(function(){
+    /* montaje por flechas u otra ruta */
+    if(window._osSeccion==='medico'){
+      var b=document.getElementById('board-medico');
+      if(b && !document.getElementById('e5-medico') &&
+         typeof window._medicoMontar==='function') window._medicoMontar();
+    }
+    /* HOME vacío: niv-0 estable + dial invisible → reabrir una vez */
+    var h=document.documentElement;
+    if(h.classList.contains('niv-0') && !h.classList.contains('niv-warp')){
+      var dc=document.getElementById('dial-canvas');
+      if(dc){
+        var cs=getComputedStyle(dc);
+        var muerto=(cs.display==='none'||parseFloat(cs.opacity)<0.05||dc.getBoundingClientRect().height<10);
+        if(muerto){
+          if(!window.__e5HomeMuerto) window.__e5HomeMuerto=performance.now();
+          else if(performance.now()-window.__e5HomeMuerto>800){
+            window.__e5HomeMuerto=0;
+            if(typeof window.abrirDial==='function'){
+              console.log('[e5] HOME sin dial tras cascada interrumpida → reapertura');
+              window.abrirDial();
+            }
+          }
+        } else window.__e5HomeMuerto=0;
+      }
+    } else window.__e5HomeMuerto=0;
+  }, 400);
+})();
 window.irAMedico = function(){
   if(typeof _osMostrar==='function'){ _osMostrar('medico'); window._medicoMontar(); }
   else window._medicoMontar();
@@ -288,27 +331,47 @@ window._medicoMontar=function(target){
   var host=document.getElementById('e5-medico');
   if(!host){
     host=document.createElement('div'); host.id='e5-medico';
-    host.style.cssText='padding:18px 4vw;display:flex;flex-direction:column;gap:4px';
+    host.style.cssText='padding:18px 3vw 30px;max-width:1500px;margin:0 auto;width:100%;box-sizing:border-box';
+    host.innerHTML =
+      '<div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px">'+
+      '<div style="font-family:var(--font-mono);font-size:16px;font-weight:800;'+
+      'letter-spacing:.18em;color:#F87171;text-shadow:0 0 12px rgba(248,113,113,.55)">'+
+      '<i class="fas fa-heart-pulse"></i> MÉDICO</div>'+
+      '<div style="font-size:11px;color:var(--hud-text-dim);letter-spacing:.08em">'+
+      'Historial clínico · captura desde el dial (gajos MÉDICO y LUCY)</div></div>'+
+      '<div class="e5-sec" id="e5-med-humano" style="--e5c:#F87171"></div>'+
+      '<div class="e5-sec" id="e5-med-lucy" style="--e5c:#F9A8D4;margin-top:14px"></div>';
+    board.appendChild(host);
+  } else if(host.parentNode!==board){ board.appendChild(host); }
+  /* 👤 MI MÉDICO — citas, síntomas, medicamentos, resultados */
+  function pintarHumano(){
+    var h=document.getElementById('e5-med-humano'); if(!h) return;
+    var d=window._saludData;
+    var items=(d&&d.items)||(Array.isArray(d)?d:[]);
+    var filas=items.slice(0,50).map(function(r){
+      return '<tr><td class="num">'+_fmtF(r.fecha)+'</td><td>'+(r.tipo||'')+'</td>'+
+        '<td>'+(r.descripcion||'')+'</td><td>'+(r.doctor||'')+'</td>'+
+        '<td>'+(r.estado||'')+'</td></tr>';
+    }).join('');
+    h.innerHTML='<div class="e5-hdr"><span class="t" style="--e5c:#F87171">👤 Mi médico</span></div>'+
+      (filas
+        ? '<table class="e5-tbl"><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Doctor</th><th>Estado</th></tr>'+filas+'</table>'
+        : '<div class="e5-vacio">Sin registros — captura desde el gajo MÉDICO del dial (Cita, Síntoma, Medicamento, Resultado, Vacuna).</div>');
   }
-  board.appendChild(host);
-  var items=(window._saludData&&window._saludData.items)||window._saludData||[];
-  if(!Array.isArray(items)) items=[];
-  function cel(r,claves){ for(var i=0;i<claves.length;i++){ if(r[claves[i]]!==undefined) return _fmtF(r[claves[i]]); } return ''; }
-  var filas=items.slice(0,40).map(function(r){
-    return '<tr><td>'+cel(r,['fecha','Fecha'])+'</td><td>'+cel(r,['tipo','Tipo'])+'</td>'+
-      '<td>'+cel(r,['descripcion','Descripción','desc'])+'</td>'+
-      '<td>'+cel(r,['doctor','Doctor'])+'</td><td>'+cel(r,['estado','Estado'])+'</td></tr>';
-  }).join('');
-  host.innerHTML=
-    '<div class="e5-sec" style="--e5c:#F87171">'+
-    '<div class="e5-hdr"><span class="t" style="--e5c:#F87171">🩺 Mi médico · citas, síntomas, medicamentos</span>'+
-    '<button class="e5-btn" style="--e5c:#F87171" '+
-      'onclick="window._dialPreset={tab:\'salud\'};abrirFormulario(\'nueva\')">+ Registro</button></div>'+
-    (filas
-      ? '<table class="e5-tbl"><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Doctor</th><th>Estado</th></tr>'+filas+'</table>'
-      : '<div class="e5-vacio">Sin registros médicos — captúralos desde el gajo MÉDICO del dial.</div>')+
-    '</div><div id="e5-medico-lucy"></div>';
-  window._lucyMontar(document.getElementById('e5-medico-lucy'));
+  pintarHumano();
+  if(window.api && typeof api.getSalud==='function'){
+    api.getSalud().then(function(r){
+      window._saludData = (r&&r.items)?r:{items:(Array.isArray(r)?r:[])};
+      pintarHumano();
+    }).catch(function(){});
+  }
+  /* 🐾 LUCY — el carnet completo como paciente */
+  var slot=document.getElementById('e5-med-lucy');
+  if(slot && typeof window._lucyMontar==='function'){
+    var prev=document.getElementById('e5-lucy');
+    if(prev && prev.parentNode && prev.parentNode!==slot) prev.parentNode.removeChild(prev);
+    window._lucyMontar(slot);
+  }
 };
 /* reacomodo: la columna/stat médico salen de BITÁCORA (viven aquí) */
 (function(){
