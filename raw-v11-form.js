@@ -1293,7 +1293,12 @@ function _abrirEntradaLegacy(){ abrirDial(); }
    que aún no viven aquí) ── */
 if(typeof window.renderAnualidad!=='function') window.renderAnualidad=function(){};
 if(typeof window.onDatosMes!=='function')      window.onDatosMes=function(){};
-window.oPanel = function(){ if(window._v11Hint) window._v11Hint('GESTIONAR LISTA LLEGA CON LOS BOARDS'); };
+window.oPanel = function(){
+  /* E5-D: gestionar la lista = abrir tu hoja (comportamiento real,
+     cero botones muertos) */
+  if(typeof irASheet==='function') irASheet();
+  else if(window._v11Hint) window._v11Hint('SHEET NO DISPONIBLE');
+};
 window._setSheetUrl = function(u){ if(u) sheetUrl=u; };
 /* ── NUTRICIÓN — layout completo del board (verbatim raw-core.js:1052-1225:
    macros, agua, ayuno, 7 días, comidas de hoy) ── */

@@ -313,7 +313,7 @@ var _DIAL_ITEMS = [
     ]},
 
   // ── PENSAMIENTO ──
-  { id:'pensamiento', label:'Pensa', accent:'#f0abfc',
+  { id:'pensamiento', label:'Pensamientos', accent:'#f0abfc',
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x-1*k,y-2*k,8*k,Math.PI*.3,Math.PI*2.2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x+5*k,y+8*k,2.5*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.arc(x+9*k,y+13*k,1.5*k,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();},
     subs:[
       {id:'pensamiento', label:'Ver sección', accent:'#f0abfc', draw:_icoTexto('👁'),

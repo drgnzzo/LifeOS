@@ -19,7 +19,8 @@ var EXT = {
   getLucy:      function(){ return EN_GAS?gasRun('getLucy'):apiGet('getLucy'); },
   nuevaLucy:    function(d){ return EN_GAS?gasRun('nuevaLucy',d):apiPost('nuevaLucy',{datos:d}); },
   getAlcohol:   function(){ return EN_GAS?gasRun('getAlcohol'):apiGet('getAlcohol'); },
-  nuevoAlcohol: function(d){ return EN_GAS?gasRun('nuevoAlcohol',d):apiPost('nuevoAlcohol',{datos:d}); }
+  nuevoAlcohol: function(d){ return EN_GAS?gasRun('nuevoAlcohol',d):apiPost('nuevoAlcohol',{datos:d}); },
+  editarLucyFicha: function(d){ return EN_GAS?gasRun('editarLucyFicha',d):apiPost('editarLucyFicha',{datos:d}); }
 };
 Object.keys(EXT).forEach(function(k){ if(!window.api[k]) window.api[k]=EXT[k]; });
 
@@ -212,7 +213,9 @@ function _lucyRender(){
   if(!d){ host.innerHTML='<div class="e5-vacio">Cargando carnet…</div>'; return; }
   var ficha=d.ficha||{};
   var fichaHTML=Object.keys(ficha).map(function(k){
-    return '<div class="it"><div class="l">'+k+'</div><div class="v">'+(_fmtF(ficha[k])||'—')+'</div></div>';
+    return '<div class="it" style="cursor:pointer" title="Clic para editar" '+
+      'onclick="_lucyEditarCampo(\''+k.replace(/'/g,"\\'")+'\')">'+
+      '<div class="l">'+k+' ✎</div><div class="v">'+(_fmtF(ficha[k])||'—')+'</div></div>';
   }).join('')||'<div class="e5-vacio">Llena la pestaña LUCY del Sheet (ficha) — corre setupHojasE5 si no existe.</div>';
   function tabla(rows,cols){
     if(!rows||!rows.length) return '<div class="e5-vacio">Sin registros.</div>';
@@ -247,6 +250,18 @@ function _lucyCargar(){
   api.getLucy().then(function(r){ if(r&&r.ok){ _lucyData=r; _lucyRender(); } })
     .catch(function(){});
 }
+window._lucyEditarCampo=function(campo){
+  var actual=(_lucyData&&_lucyData.ficha&&_lucyData.ficha[campo])||'';
+  _modal('#EC4899','✎ '+campo,
+    '<div class="e5-f"><label>'+campo+'</label><input data-k="valor" value="'+String(actual).replace(/"/g,'&quot;')+'"></div>',
+    function(datos,cerrar,btn){
+      btn.textContent='Guardando…';
+      api.editarLucyFicha({campo:campo, valor:datos.valor}).then(function(r){
+        if(r&&r.ok){ _toast('✓ Ficha actualizada'); cerrar(); _lucyCargar(); }
+        else _toast('Error: '+((r&&r.error)||'?'));
+      }).catch(function(){ _toast('Error de conexión'); });
+    });
+};
 window._lucyMontar=function(target){
   if(!target) return;
   var host=document.getElementById('e5-lucy');
