@@ -160,9 +160,26 @@ function _e5AlcoholCargar(){
   api.getAlcohol().then(function(r){ if(r&&r.ok){ _alcData=r; _e5AlcoholRender(); } })
     .catch(function(){});
 }
+/* E5-D3: SALUD como paraguas — accesos a MÉDICO y LUCY dentro del board */
+function _e5AccesosSalud(body){
+  if(document.getElementById('e5-accesos')) return;
+  var tieneMedico = (typeof window.irABitacora==='function');
+  var sec=document.createElement('div');
+  sec.className='e5-sec'; sec.id='e5-accesos'; sec.style.setProperty('--e5c','#86EFAC');
+  sec.innerHTML='<div class="e5-hdr"><span class="t" style="--e5c:#86EFAC">🌿 Salud · Accesos</span>'+
+    '<span>'+
+    (tieneMedico
+      ? '<button class="e5-btn" style="--e5c:#F87171" onclick="irABitacora()">🩺 Médico</button> '
+      : '')+
+    '<button class="e5-btn" style="--e5c:#F9A8D4" onclick="irALucy()">🐾 Lucy</button>'+
+    '</span></div>';
+  body.appendChild(sec);
+}
 function _e5AlcoholMontar(){
   var body=document.getElementById('nut-panel-body')||document.getElementById('board-nutricion');
-  if(!body || document.getElementById('e5-alcohol')) return;
+  if(!body) return;
+  _e5AccesosSalud(body);
+  if(document.getElementById('e5-alcohol')) return;
   var sec=document.createElement('div');
   sec.className='e5-sec'; sec.id='e5-alcohol'; sec.style.setProperty('--e5c','#F59E0B');
   body.appendChild(sec);
