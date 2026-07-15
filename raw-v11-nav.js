@@ -1115,8 +1115,8 @@ addEventListener('keydown',function(e){
         }
         html += tarjeta('Pensamientos', '#C084FC', 'fa-brain', (window._pensamientosData||{}).items, 'Sin pensamientos');
         html += tarjeta('Relaciones', '#93C5FD', 'fa-users', (window._relacionesData||{}).items, 'Sin relaciones');
-        html += tarjeta('Salud', '#F87171', 'fa-heart-pulse', (window._saludData||{}).items, 'Sin registros');
-        html += tarjeta('Nutrición', '#86EFAC', 'fa-leaf', (window._nutData||{}).items, 'Sin registros');
+        html += tarjeta('Médico', '#F87171', 'fa-heart-pulse', (window._saludData||{}).items, 'Sin registros');
+        html += tarjeta('Salud', '#86EFAC', 'fa-leaf', (window._nutData||{}).items, 'Sin registros');
         html += tarjeta('Entrenamiento', '#FB923C', 'fa-dumbbell', (window._entData||{}).items, 'Sin sesiones');
         html += '</div>';
         dest.innerHTML = html;
@@ -1599,6 +1599,24 @@ function _countUpSeccion(cu){
   var nums = cu.querySelectorAll('.num, .v11-kpi .v');
   for(var i=0;i<Math.min(nums.length,24);i++) window.RawAnim.countUp(nums[i]);
 }
+/* E5-C: métricas reales para las cards extra (solo conteos verificables;
+   el resto queda '—' hasta tener fuente) */
+(function(){
+  var base = window._metricasSector;
+  window._metricasSector = function(d){
+    var m = base(d) || {};
+    try{
+      if(d.logros && d.logros.items)
+        m.logros = m.logros || {reg:d.logros.items.length, ult:(d.logros.completados!==undefined?d.logros.completados+' hechos':'—'), n:1};
+      if(d.fijos)
+        m.fijos = m.fijos || {reg:d.fijos.length, ult:'servicios', n:1};
+      if(d.necesidades && d.necesidades.niveles)
+        m.necesidades = m.necesidades || {reg:d.necesidades.niveles.length, ult:'niveles', n:1};
+      m.sos = m.sos || {reg:5, ult:'tipos de alerta', n:1};
+    }catch(e){}
+    return m;
+  };
+})();
 var _MAPA_PANEL = {
   patrimonio:'hud-patrimonio',      /* Centro Patrimonial COMPLETO: aquí
                                        viven bancos y apartados — las cards
@@ -1879,5 +1897,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E5-B activo · LUCY(12) + alcohol + contactos + renombres · imán consolida (sin replay) + form blinda rueda · campana de warp por tramo (2400/560ms) · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E5-C activo · renombres profundos + métricas extra · LUCY(12) + alcohol + contactos + renombres · imán consolida (sin replay) + form blinda rueda · campana de warp por tramo (2400/560ms) · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

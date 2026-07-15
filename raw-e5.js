@@ -135,6 +135,7 @@ function _e5AlcoholRender(){
     '<div class="e5-kpi"><div class="l">Hoy · ml</div><div class="v">'+d.hoy.ml+'</div></div>'+
     '<div class="e5-kpi"><div class="l">Hoy · alcohol puro</div><div class="v">'+d.hoy.gr+' g</div></div>'+
     '<div class="e5-kpi"><div class="l">Hoy · bebidas</div><div class="v">'+d.hoy.bebidas+'</div></div></div>'+
+    _e5Semana(d.registros||[])+
     (filas
       ? '<table class="e5-tbl"><tr><th>Fecha</th><th>Bebida</th><th>ml</th><th>%</th><th>Puro</th></tr>'+filas+'</table>'
       : '<div class="e5-vacio">Sin registros aún — tu histórico de análisis nace con el primero.</div>');
@@ -304,5 +305,29 @@ function _e5Contactos(){
   setTimeout(function(){clearInterval(espera);},15000);
 })();
 
+
+/* E5-C: últimos 7 días — gramos de alcohol puro por día (barras) */
+function _e5Semana(regs){
+  var dias=[], mapa={};
+  for(var i=6;i>=0;i--){
+    var d=new Date(); d.setDate(d.getDate()-i);
+    var k=('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2);
+    dias.push(k); mapa[k]=0;
+  }
+  regs.forEach(function(r){
+    var f=_fmtF(r['Fecha']);              /* dd/mm/aaaa */
+    var k=f.slice(0,5);
+    if(mapa[k]!==undefined) mapa[k]+=Number(r['Alcohol puro (g)'])||0;
+  });
+  var max=Math.max.apply(null, dias.map(function(k){return mapa[k];}).concat([1]));
+  return '<div style="display:flex;align-items:flex-end;gap:8px;height:64px;margin:4px 2px 14px">'+
+    dias.map(function(k){
+      var v=Math.round(mapa[k]*10)/10, h=Math.max(3, v/max*54);
+      return '<div style="flex:1;text-align:center">'+
+        '<div style="font-family:var(--font-mono);font-size:9px;color:'+(v?'#F59E0B':'var(--hud-text-faint)')+'">'+(v||'')+'</div>'+
+        '<div style="height:'+h+'px;border-radius:3px 3px 0 0;background:'+(v?'linear-gradient(180deg,#F59E0B,#B45309)':'rgba(255,255,255,.06)')+';box-shadow:'+(v?'0 0 8px rgba(245,158,11,.4)':'none')+'"></div>'+
+        '<div style="font-size:8px;letter-spacing:.06em;color:var(--hud-text-dim);margin-top:3px">'+k+'</div></div>';
+    }).join('')+'</div>';
+}
 console.log('[e5] activo · alcohol+lucy+contactos (api extendida: getContactos/getLucy/nuevaLucy/getAlcohol/nuevoAlcohol)');
 })();

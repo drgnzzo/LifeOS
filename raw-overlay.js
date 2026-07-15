@@ -6438,8 +6438,8 @@ function _crearDialOverlay(){
         }
         html += tarjeta('Pensamientos', '#C084FC', 'fa-brain', (window._pensamientosData||{}).items, 'Sin pensamientos');
         html += tarjeta('Relaciones', '#93C5FD', 'fa-users', (window._relacionesData||{}).items, 'Sin relaciones');
-        html += tarjeta('Salud', '#F87171', 'fa-heart-pulse', (window._saludData||{}).items, 'Sin registros');
-        html += tarjeta('Nutrición', '#86EFAC', 'fa-leaf', (window._nutData||{}).items, 'Sin registros');
+        html += tarjeta('Médico', '#F87171', 'fa-heart-pulse', (window._saludData||{}).items, 'Sin registros');
+        html += tarjeta('Salud', '#86EFAC', 'fa-leaf', (window._nutData||{}).items, 'Sin registros');
         html += tarjeta('Entrenamiento', '#FB923C', 'fa-dumbbell', (window._entData||{}).items, 'Sin sesiones');
         html += '</div>';
         dest.innerHTML = html;

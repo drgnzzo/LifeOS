@@ -464,7 +464,7 @@ function setModoEntrada(modo){
   if(paso1) paso1.style.display='none';
   if(paso2) paso2.style.display='block';
 
-  const titulos={nueva:'💸 RAW',editar:'✏️ Editar',pensamiento:'💭 Pensamiento',persona:'👥 Persona',salud:'🏥 Salud',apartado:'💰 Apartado',patrimonio:'🏦 Patrimonio',bancos:'🏛️ Bancos',nutricion:'🥗 Nutrición',entrenamiento:'💪 Entrenamiento',activity:'⚡ Activity',libro:'📚 Libro',movie:'🎬 Movie',norut:'📌 Pendiente'};
+  const titulos={nueva:'💸 RAW',editar:'✏️ Editar',pensamiento:'💭 Pensamiento',persona:'👥 Persona',salud:'🏥 Médico',apartado:'💰 Apartado',patrimonio:'🏦 Patrimonio',bancos:'🏛️ Bancos',nutricion:'🥗 Salud',entrenamiento:'💪 Entrenamiento',activity:'⚡ Activity',libro:'📚 Libro',movie:'🎬 Movie',norut:'📌 Pendiente'};
   const tituloEl=document.getElementById('entrada-paso2-titulo');
   if(tituloEl) tituloEl.textContent=titulos[modo]||modo;
 
