@@ -381,6 +381,12 @@ var _DIAL_ITEMS = [
       [[-5,-4],[0,-6.5],[5,-4]].forEach(function(p){ctx.beginPath();ctx.arc(x+p[0]*k,y+p[1]*k,2.1*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=1.8;ctx.stroke();});
       ctx.beginPath();ctx.ellipse(x,y+3.5*k,4.6*k,3.8*k,0,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();},
     subs:[
+      {id:'lucy', label:'Vacuna',  accent:'#EC4899', draw:_icoTexto('💉'),
+       preset:function(){ window._dialPreset={irA:'irALucyVacuna'}; }},
+      {id:'lucy', label:'Visita',  accent:'#EC4899', draw:_icoTexto('🩺'),
+       preset:function(){ window._dialPreset={irA:'irALucyVisita'}; }},
+      {id:'lucy', label:'Despara', accent:'#EC4899', draw:_icoTexto('🪱'),
+       preset:function(){ window._dialPreset={irA:'irALucyDespara'}; }},
       {id:'lucy', label:'Ver carnet', accent:'#F9A8D4', draw:_icoTexto('🐾'),
        preset:function(){ window._dialPreset={irA:'irALucy'}; }}
     ] },

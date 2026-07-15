@@ -288,6 +288,9 @@ window._lucyMontar=function(target){
   _lucyRender(); _lucyCargar();
 };
 /* v9: acceso directo — pantalla propia sobre todo (patrón modal timers) */
+window.irALucyVacuna =function(){ window._lucyForm('vacuna'); };
+window.irALucyVisita =function(){ window._lucyForm('visita'); };
+window.irALucyDespara=function(){ window._lucyForm('despara'); };
 window.irALucy=function(){
   var ov=document.getElementById('e5-lucy-ov');
   if(!ov){

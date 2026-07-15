@@ -132,14 +132,14 @@ var SUBS = {
      preset:function(){ window._dialPreset={tab:'timer', accion:'nuevo'}; }}
   ],
   lucy: [
-    {id:'lucy', label:'Ver carnet', accent:'#F9A8D4', draw:_icoTexto('🐾'),
-     preset:function(){ window._dialPreset={irA:'irALucy'}; }},
     {id:'lucy', label:'Vacuna',  accent:'#EC4899', draw:_icoTexto('💉'),
      preset:function(){ if(window._lucyForm) window._lucyForm('vacuna'); }},
     {id:'lucy', label:'Visita',  accent:'#EC4899', draw:_icoTexto('🩺'),
      preset:function(){ if(window._lucyForm) window._lucyForm('visita'); }},
     {id:'lucy', label:'Despara', accent:'#EC4899', draw:_icoTexto('🪱'),
-     preset:function(){ if(window._lucyForm) window._lucyForm('despara'); }}
+     preset:function(){ if(window._lucyForm) window._lucyForm('despara'); }},
+    {id:'lucy', label:'Ver carnet', accent:'#F9A8D4', draw:_icoTexto('🐾'),
+     preset:function(){ window._dialPreset={irA:'irALucy'}; }}
   ],
   /* editar: accionEspecial en v9 (abre el form directo) → E4 */
   salud: [
