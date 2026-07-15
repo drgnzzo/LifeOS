@@ -131,6 +131,16 @@ var SUBS = {
     {id:'timer', label:'Nuevo',      accent:'#4ade80', draw:_icoTexto('+'),
      preset:function(){ window._dialPreset={tab:'timer', accion:'nuevo'}; }}
   ],
+  lucy: [
+    {id:'lucy', label:'Ver carnet', accent:'#F9A8D4', draw:_icoTexto('🐾'),
+     preset:function(){ window._dialPreset={irA:'irALucy'}; }},
+    {id:'lucy', label:'Vacuna',  accent:'#EC4899', draw:_icoTexto('💉'),
+     preset:function(){ if(window._lucyForm) window._lucyForm('vacuna'); }},
+    {id:'lucy', label:'Visita',  accent:'#EC4899', draw:_icoTexto('🩺'),
+     preset:function(){ if(window._lucyForm) window._lucyForm('visita'); }},
+    {id:'lucy', label:'Despara', accent:'#EC4899', draw:_icoTexto('🪱'),
+     preset:function(){ if(window._lucyForm) window._lucyForm('despara'); }}
+  ],
   /* editar: accionEspecial en v9 (abre el form directo) → E4 */
   salud: [
     {id:'salud', label:'Ver sección', accent:'#fca5a5', draw:_icoTexto('👁'),
@@ -369,6 +379,7 @@ function _abrirRing(i){
       ev.stopPropagation();
       if(sb.preset)sb.preset();                       /* verbatim v9 */
       if(/^Ver /.test(sb.label)){ _cerrarRing(); _verSeccion(i); }
+      else if(sb.id==='lucy'){ _cerrarRing(true); /* su preset abrió el modal E5 */ }
       else if(typeof abrirFormulario==='function'){
         /* E3-D3: el preset ya vive en _dialPreset — el form lo consume
            (mismo flujo v9: abrirFormulario aplica y limpia el preset) */
@@ -1609,14 +1620,14 @@ var _MAPA_PANEL = {
 window.volverAlAnverso = function(){ window._v11Home(); };
 function _devolverBoards(){
   var st=document.getElementById('v11-boards'); if(!st)return;
-  ['board-timers','board-nutricion','board-logros','board-notas','board-sos','board-activity'].forEach(function(id){
+  ['board-timers','board-nutricion','board-logros','board-notas','board-sos','board-activity','board-lucy'].forEach(function(id){
     var b=document.getElementById(id);
     if(b && b.parentNode && b.parentNode.id==='sec-cuerpo'){
       b.classList.remove('v11-hosted'); st.appendChild(b);
     }
   });
 }
-var _BOARD_SEC = { timer:'board-timers', nutricion:'board-nutricion',
+var _BOARD_SEC = { timer:'board-timers', nutricion:'board-nutricion', lucy:'board-lucy',
   logros:'board-logros', notas:'board-notas', sos:'board-sos',
   activity:'board-activity' };
 var _renderBase = window._v11RenderSeccion;
@@ -1629,6 +1640,9 @@ window._v11RenderSeccion = function(i){
     if(b){
       cu.innerHTML=''; b.classList.add('v11-hosted'); cu.appendChild(b);
       if(id==='timer' && typeof window._timersAlEntrar==='function') window._timersAlEntrar();
+      if(id==='lucy' && typeof window._lucyMontar==='function'){
+        window._lucyMontar(b);
+      }
       if(id==='activity' && typeof window.renderActivity==='function'){
         window.renderActivity();                    /* lee _actData (v9:849) */
         api.getActivityCheck().then(function(d){ window._actData=d;
@@ -1865,5 +1879,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E3-D21 activo · imán consolida (sin replay) + form blinda rueda · campana de warp por tramo (2400/560ms) · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E5-B activo · LUCY(12) + alcohol + contactos + renombres · imán consolida (sin replay) + form blinda rueda · campana de warp por tramo (2400/560ms) · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

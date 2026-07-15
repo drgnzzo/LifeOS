@@ -421,16 +421,16 @@
         '<div class="tm-form-body">'+
           '<label class="tm-field">'+
             '<span class="tm-field-l">Tipo</span>'+
-            '<input class="tm-input" id="tm-f-tipo" placeholder="Salud, Hábito, Mental…" '+
+            '<input class="tm-input" id="tm-f-tipo" '+
               'value="'+escAttr(presetTipo||'')+'" autocomplete="off">'+
           '</label>'+
           '<label class="tm-field">'+
             '<span class="tm-field-l">Nombre del timer</span>'+
-            '<input class="tm-input" id="tm-f-nombre" placeholder="Sin alcohol, Sin THC…" autocomplete="off">'+
+            '<input class="tm-input" id="tm-f-nombre" autocomplete="off">'+
           '</label>'+
           '<label class="tm-field">'+
             '<span class="tm-field-l">Mejor tiempo previo <span class="tm-opt">(opcional)</span></span>'+
-            '<input class="tm-input" id="tm-f-record" placeholder="Ej. 30 (días) — déjalo vacío si es nuevo" '+
+            '<input class="tm-input" id="tm-f-record" '+
               'inputmode="numeric" autocomplete="off">'+
           '</label>'+
           '<div class="tm-form-hint">Empieza a contar desde ahora mismo.</div>'+
@@ -474,9 +474,23 @@
       };
       crear(datos, function(ok, r){
         if(ok && (!r || !r.error)){
-          msg.textContent = '✓ Creado. Actualiza (↻) en Timers para verlo.';
+          /* v9.6 — ARRANQUE REAL: el backend crea la fila 'Inactivo'
+             (Code.gs ignora estado/inicio del payload). Encadenar el
+             REANUDAR canónico para que "Crear y empezar" EMPIECE. */
+          msg.textContent = '✓ Creado. Iniciando…';
           msg.className = 'tm-form-msg tm-form-msg-ok';
-          setTimeout(function(){ close(); }, 1100);
+          var clave = (r && r.clave) ? r.clave : (tipo + '|' + nombre);
+          window.api.actualizarTimer(clave,
+            { estado:'Activo', inicio:new Date().toISOString(), transcurrido:0 }
+          ).then(function(){
+            msg.textContent = '✓ Creado y corriendo.';
+            if(typeof window._timersAlEntrar === 'function'){
+              try { window._timersAlEntrar(); } catch(e){}
+            }
+          }).catch(function(){
+            msg.textContent = '✓ Creado (inicia con Reanudar).';
+          });
+          setTimeout(function(){ close(); }, 1300);
         } else {
           msg.textContent = 'No se pudo crear'+((r&&r.error)?': '+r.error:'')+'.';
           msg.className = 'tm-form-msg tm-form-msg-err';

@@ -283,7 +283,7 @@ var _DIAL_ITEMS = [
     ]},
 
   // ── NUTRICIÓN ──
-  { id:'nutricion', label:'Nutrición', accent:'#86efac',
+  { id:'nutricion', label:'Salud', accent:'#86efac',   /* E5: renombre */
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y+2*k,7*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x,y-5*k);ctx.bezierCurveTo(x,y-12*k,x+7*k,y-11*k,x+6*k,y-5*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();},
     subs:[
       {id:'nutricion', label:'Ver sección', accent:'#86efac', draw:_icoTexto('👁'),
@@ -358,7 +358,7 @@ var _DIAL_ITEMS = [
     accionEspecial:true},
 
   // ── SALUD ──
-  { id:'salud', label:'Salud', accent:'#fca5a5',
+  { id:'salud', label:'Médico', accent:'#fca5a5',   /* E5: renombre */
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x,y+9*k);ctx.bezierCurveTo(x-12*k,y,x-12*k,y-9*k,x,y-4*k);ctx.bezierCurveTo(x+12*k,y-9*k,x+12*k,y,x,y+9*k);ctx.strokeStyle=c;ctx.lineWidth=2.2;ctx.lineJoin='round';ctx.stroke();},
     subs:[
       {id:'salud', label:'Ver sección', accent:'#fca5a5', draw:_icoTexto('👁'),
@@ -373,7 +373,16 @@ var _DIAL_ITEMS = [
        preset:function(){ window._dialPreset={tab:'salud',tipo:'Resultado'}; }},
       {id:'salud', label:'Vacuna',      accent:'#86efac', draw:_icoTexto('💉'),
        preset:function(){ window._dialPreset={tab:'salud',tipo:'Vacuna'}; }},
-    ]},
+    ]},,
+  // ── LUCY (E5: gajo 12 — carnet de mascota) ──
+  { id:'lucy', label:'Lucy', accent:'#F9A8D4',
+    draw:function(ctx,x,y,s,c){var k=s/22;
+      [[-5,-4],[0,-6.5],[5,-4]].forEach(function(p){ctx.beginPath();ctx.arc(x+p[0]*k,y+p[1]*k,2.1*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=1.8;ctx.stroke();});
+      ctx.beginPath();ctx.ellipse(x,y+3.5*k,4.6*k,3.8*k,0,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();},
+    subs:[
+      {id:'lucy', label:'Ver carnet', accent:'#F9A8D4', draw:_icoTexto('🐾'),
+       preset:function(){ window._dialPreset={irA:'irALucy'}; }}
+    ] }
 ];
 
 
