@@ -712,6 +712,7 @@ window._osSeccion = 'home';       // sección lógica actual del router
 var _OS_SECCIONES = {
   home:      { board:null,             tab:'btn-home'      },
   logros:    { board:'board-logros',   tab:'btn-logros'    },
+  medico:    { board:'board-medico',   tab:'btn-medico'    },   /* E5-E */
   bitacora:  { board:'board-bitacora', tab:'btn-maslow'    },
   activity:  { board:'board-activity', tab:'btn-activity'  },
   nutricion: { board:'board-nutricion',tab:'btn-nutricion' },
@@ -722,7 +723,7 @@ var _OS_SECCIONES = {
 };
 // Mapa sección → data-tab de la tabbar móvil legacy
 var _OS_MOBTAB = {
-  home:'entrada', logros:'logros', bitacora:'bitacora',
+  home:'entrada', logros:'logros', medico:'entrada', bitacora:'bitacora',
   activity:'activity', nutricion:'nutricion', notas:'entrada', sos:'entrada', sheets:'entrada'
 };
 
@@ -849,6 +850,12 @@ function _irAPanel(boardId, tabKey){
 
 window.volverAlAnverso = function(){
   _osMostrar('home');
+};
+
+window.irAMedico = function(){
+  if(window._osSeccion === 'medico'){ _osMostrar('home'); return; }
+  if(typeof window._medicoMontar==='function') window._medicoMontar();
+  _osMostrar('medico');
 };
 
 window.irABitacora = function(){

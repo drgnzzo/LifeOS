@@ -160,25 +160,9 @@ function _e5AlcoholCargar(){
   api.getAlcohol().then(function(r){ if(r&&r.ok){ _alcData=r; _e5AlcoholRender(); } })
     .catch(function(){});
 }
-/* E5-D3: SALUD como paraguas — accesos a MÉDICO y LUCY dentro del board */
-function _e5AccesosSalud(body){
-  if(document.getElementById('e5-accesos')) return;
-  var tieneMedico = (typeof window.irABitacora==='function');
-  var sec=document.createElement('div');
-  sec.className='e5-sec'; sec.id='e5-accesos'; sec.style.setProperty('--e5c','#86EFAC');
-  sec.innerHTML='<div class="e5-hdr"><span class="t" style="--e5c:#86EFAC">🌿 Salud · Accesos</span>'+
-    '<span>'+
-    (tieneMedico
-      ? '<button class="e5-btn" style="--e5c:#F87171" onclick="irABitacora()">🩺 Médico</button> '
-      : '')+
-    '<button class="e5-btn" style="--e5c:#F9A8D4" onclick="irALucy()">🐾 Lucy</button>'+
-    '</span></div>';
-  body.appendChild(sec);
-}
 function _e5AlcoholMontar(){
   var body=document.getElementById('nut-panel-body')||document.getElementById('board-nutricion');
   if(!body) return;
-  _e5AccesosSalud(body);
   if(document.getElementById('e5-alcohol')) return;
   var sec=document.createElement('div');
   sec.className='e5-sec'; sec.id='e5-alcohol'; sec.style.setProperty('--e5c','#F59E0B');
@@ -288,6 +272,52 @@ window._lucyMontar=function(target){
   _lucyRender(); _lucyCargar();
 };
 /* v9: acceso directo — pantalla propia sobre todo (patrón modal timers) */
+
+/* ═══ MÉDICO — sección propia (E5-E). MI MÉDICO primero (registros de
+   la hoja Salud, los que vivían en bitácora), LUCY después (carnet
+   embebido). Captura SIEMPRE desde el dial o los botones +. ═══ */
+/* E5-D5: puente v9 — el tab MÉDICO entra por el router real
+   (_OS_SECCIONES ya lo registra; las flechas lo incluyen) */
+window.irAMedico = function(){
+  if(typeof _osMostrar==='function'){ _osMostrar('medico'); window._medicoMontar(); }
+  else window._medicoMontar();
+};
+window._medicoMontar=function(target){
+  var board = target || document.getElementById('board-medico');
+  if(!board) return;
+  var host=document.getElementById('e5-medico');
+  if(!host){
+    host=document.createElement('div'); host.id='e5-medico';
+    host.style.cssText='padding:18px 4vw;display:flex;flex-direction:column;gap:4px';
+  }
+  board.appendChild(host);
+  var items=(window._saludData&&window._saludData.items)||window._saludData||[];
+  if(!Array.isArray(items)) items=[];
+  function cel(r,claves){ for(var i=0;i<claves.length;i++){ if(r[claves[i]]!==undefined) return _fmtF(r[claves[i]]); } return ''; }
+  var filas=items.slice(0,40).map(function(r){
+    return '<tr><td>'+cel(r,['fecha','Fecha'])+'</td><td>'+cel(r,['tipo','Tipo'])+'</td>'+
+      '<td>'+cel(r,['descripcion','Descripción','desc'])+'</td>'+
+      '<td>'+cel(r,['doctor','Doctor'])+'</td><td>'+cel(r,['estado','Estado'])+'</td></tr>';
+  }).join('');
+  host.innerHTML=
+    '<div class="e5-sec" style="--e5c:#F87171">'+
+    '<div class="e5-hdr"><span class="t" style="--e5c:#F87171">🩺 Mi médico · citas, síntomas, medicamentos</span>'+
+    '<button class="e5-btn" style="--e5c:#F87171" '+
+      'onclick="window._dialPreset={tab:\'salud\'};abrirFormulario(\'nueva\')">+ Registro</button></div>'+
+    (filas
+      ? '<table class="e5-tbl"><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Doctor</th><th>Estado</th></tr>'+filas+'</table>'
+      : '<div class="e5-vacio">Sin registros médicos — captúralos desde el gajo MÉDICO del dial.</div>')+
+    '</div><div id="e5-medico-lucy"></div>';
+  window._lucyMontar(document.getElementById('e5-medico-lucy'));
+};
+/* reacomodo: la columna/stat médico salen de BITÁCORA (viven aquí) */
+(function(){
+  var st=document.createElement('style');
+  st.textContent='#board-bitacora [data-tipo="salud"]{display:none !important}\n'+
+    '#board-bitacora .bit-stat:has(.fa-heart-pulse){display:none !important}';
+  document.head.appendChild(st);
+})();
+
 window.irALucyVacuna =function(){ window._lucyForm('vacuna'); };
 window.irALucyVisita =function(){ window._lucyForm('visita'); };
 window.irALucyDespara=function(){ window._lucyForm('despara'); };

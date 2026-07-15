@@ -1640,7 +1640,7 @@ var _MAPA_PANEL = {
 window.volverAlAnverso = function(){ window._v11Home(); };
 function _devolverBoards(){
   var st=document.getElementById('v11-boards'); if(!st)return;
-  ['board-timers','board-nutricion','board-logros','board-notas','board-sos','board-activity','board-lucy','board-bitacora'].forEach(function(id){
+  ['board-timers','board-nutricion','board-logros','board-notas','board-sos','board-activity','board-lucy','board-bitacora','board-medico'].forEach(function(id){
     var b=document.getElementById(id);
     if(b && b.parentNode && b.parentNode.id==='sec-cuerpo'){
       b.classList.remove('v11-hosted'); st.appendChild(b);
@@ -1648,6 +1648,7 @@ function _devolverBoards(){
   });
 }
 var _BOARD_SEC = { timer:'board-timers', nutricion:'board-nutricion', lucy:'board-lucy',
+  salud:'board-medico',           /* E5-E: MÉDICO — mío + Lucy */
   pensamiento:'board-bitacora',   /* E5-D: board completo (evidencia: v9 Ver sección→irABitacora) */
   logros:'board-logros', notas:'board-notas', sos:'board-sos',
   activity:'board-activity' };
@@ -1663,6 +1664,9 @@ window._v11RenderSeccion = function(i){
       if(id==='timer' && typeof window._timersAlEntrar==='function') window._timersAlEntrar();
       if(id==='pensamiento' && typeof window._renderBitacoraPanel==='function'){
         window._renderBitacoraPanel();
+      }
+      if(id==='salud' && typeof window._medicoMontar==='function'){
+        window._medicoMontar(b);
       }
       if(id==='lucy' && typeof window._lucyMontar==='function'){
         window._lucyMontar(b);
@@ -1903,5 +1907,5 @@ colocar();
   requestAnimationFrame(loopNav);
 })(performance.now());
 
-console.log('[v11-nav] E5-D activo · PENSAMIENTOS=board bitácora + cierres · renombres profundos + métricas extra · LUCY(12) + alcohol + contactos + renombres · imán consolida (sin replay) + form blinda rueda · campana de warp por tramo (2400/560ms) · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
+console.log('[v11-nav] E5-E activo · MÉDICO sección real (mío+Lucy) · PENSAMIENTOS=board bitácora + cierres · renombres profundos + métricas extra · LUCY(12) + alcohol + contactos + renombres · imán consolida (sin replay) + form blinda rueda · campana de warp por tramo (2400/560ms) · scrub de inmersión + warp proporcional · hub a proporción v9 (0.29) · revelado por capas v9 + rueda contextual niv2 · necesidades v9 + rueda=scroll en niv2 + fijos auto-fetch · _dispararWarp cableado (hyperdrive+vórtice v9) · warp v9 (vórtice joseph) + fijos/variables expandidos + Helvetica Neue · nivel 2 FULLSCREEN + Activity Check completo · cosmos destapado + tinte v9 real (.08) + arcos protagonistas · cosmos v9 EXACTO + hub RAW + sub-anillo geometría v9 + labels radiales · anillo 18 (financiero/variables/fijos/necesidades/logros/notas/sos) · boards timers+nutrición en nivel 2 · dial v9 (tinte+glow+anillo+hover, clic sin giro) · sub-anillos→FORM + centro RAW + editar + paneles nivel 2');
 })();

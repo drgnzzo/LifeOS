@@ -1351,6 +1351,7 @@
       if(destino === 'notas'  && typeof window._notasMontar === 'function') window._notasMontar();
       if(destino === 'timers' && typeof window._timersAlEntrar === 'function') window._timersAlEntrar();
       if(destino === 'sos'    && typeof window._montarSOS === 'function') window._montarSOS();
+      if(destino === 'medico' && typeof window._medicoMontar === 'function') window._medicoMontar();   /* E5-D5 */
     }
   }
 
