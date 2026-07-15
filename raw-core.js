@@ -373,7 +373,8 @@ var _DIAL_ITEMS = [
        preset:function(){ window._dialPreset={tab:'salud',tipo:'Resultado'}; }},
       {id:'salud', label:'Vacuna',      accent:'#86efac', draw:_icoTexto('💉'),
        preset:function(){ window._dialPreset={tab:'salud',tipo:'Vacuna'}; }},
-    ]},,
+    ]},
+
   // ── LUCY (E5: gajo 12 — carnet de mascota) ──
   { id:'lucy', label:'Lucy', accent:'#F9A8D4',
     draw:function(ctx,x,y,s,c){var k=s/22;
@@ -382,7 +383,7 @@ var _DIAL_ITEMS = [
     subs:[
       {id:'lucy', label:'Ver carnet', accent:'#F9A8D4', draw:_icoTexto('🐾'),
        preset:function(){ window._dialPreset={irA:'irALucy'}; }}
-    ] }
+    ] },
 ];
 
 
