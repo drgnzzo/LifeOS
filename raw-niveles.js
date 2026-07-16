@@ -1314,6 +1314,7 @@
   var _TABS = [
     { id:'btn-home',      sec:'home'     },
     { id:'btn-logros',    sec:'logros'   },
+    { id:'btn-medico',    sec:'medico'   },   /* E5-I */
     { id:'btn-maslow',    sec:'bitacora' },
     { id:'btn-activity',  sec:'activity' },
     { id:'btn-sos',       sec:'sos'      },
