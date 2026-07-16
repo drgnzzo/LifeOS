@@ -442,5 +442,44 @@ function _e5Semana(regs){
         '<div style="font-size:8px;letter-spacing:.06em;color:var(--hud-text-dim);margin-top:3px">'+k+'</div></div>';
     }).join('')+'</div>';
 }
+
+/* ═══ E5-K — DOS DIALES, NO UNO VIAJANDO (orden del usuario):
+   Al sumergirse 0→1, v9 reposiciona EL MISMO dial-canvas hacia abajo
+   con transición → se veía "un dial chiquito viajando desde abajo".
+   Separación por coreografía:
+   · el CSS mata toda transición posicional del dial durante niv-1/warp
+     (solo opacidad puede transicionar);
+   · al entrar a 1: el dial se desvanece ANTES (transition none→op 0),
+     v9 lo teletransporta invisible a su posición mini, y a los 340ms
+     NACE ahí con fade — dos apariciones, cero viaje.
+   La reapertura a 0 ya es fade puro (E5-J). ═══ */
+(function(){
+  var st=document.createElement('style');
+  st.id='e5-minidial';
+  st.textContent=
+    'html.niv-1 #dial-canvas,html.niv-warp #dial-canvas,'+
+    'html.niv-1 #dial-ambient,html.niv-warp #dial-ambient,'+
+    'html.niv-1 #dial-ring-breath,html.niv-warp #dial-ring-breath{'+
+    'transition:opacity .38s ease !important}';   /* posición: INSTANTÁNEA */
+  document.head.appendChild(st);
+  var h=document.documentElement, prev=h.classList.contains('niv-1');
+  new MutationObserver(function(){
+    var ahora=h.classList.contains('niv-1');
+    if(ahora && !prev){
+      var d=document.getElementById('dial-canvas');
+      if(d){
+        d.style.transition='none';
+        d.style.opacity='0';                       /* muere el grande */
+        void d.offsetWidth;
+        setTimeout(function(){
+          d.style.transition='opacity .38s ease';
+          d.style.opacity='1';                     /* nace el mini, en su lugar */
+        },340);
+      }
+    }
+    prev=ahora;
+  }).observe(h,{attributes:true,attributeFilter:['class']});
+})();
+
 console.log('[e5] activo · alcohol+lucy+contactos (api extendida: getContactos/getLucy/nuevaLucy/getAlcohol/nuevoAlcohol)');
 })();
