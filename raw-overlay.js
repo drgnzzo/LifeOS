@@ -8198,12 +8198,12 @@ function abrirDial(){
     if(_dialCanvas){
       _dialCanvas.style.transition = 'none';
       _dialCanvas.style.opacity = '0';
-      _dialCanvas.style.transform = 'scale(0.92)';
+      _dialCanvas.style.transform = 'none';   /* E5-J: reapertura = FADE PURO (orden del usuario) */
     }
     var glowR = document.getElementById('dial-ambient');
     if(glowR){ glowR.style.transition='none'; glowR.style.opacity='0'; }
     var ringR = document.getElementById('dial-ring-breath');
-    if(ringR){ ringR.style.transition='none'; ringR.style.opacity='0'; ringR.style.transform='scale(0.94)'; }
+    if(ringR){ ringR.style.transition='none'; ringR.style.opacity='0'; ringR.style.transform='none'; }   /* E5-J */
     if(window._hudPanels){
       window._hudPanels.forEach(function(hp){
         if(!hp.el) return;
@@ -8213,7 +8213,7 @@ function abrirDial(){
         hp.el.style.opacity = '0';
         // v6.066: desplazamiento inicial algo mayor (14px) para que el
         // deslizamiento acompañe al fundido largo y se sienta calmado.
-        hp.el.style.transform = 'translateY(14px)';
+        hp.el.style.transform = 'none';   /* E5-J: sin deslizamiento — solo fundido */
       });
     }
 
@@ -8229,7 +8229,9 @@ function abrirDial(){
       _dialOverlay.style.opacity = '1';
       if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
       requestAnimationFrame(function(){
-        if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+        /* E5-J: segunda llamada RETIRADA — _reposicionarHUD no es
+           idempotente (regla de piedra): la doble llamada acumulaba
+           offset y producía el salto vertical doble ("flip") */
         // (3) ANIMAR HACIA EL ESTADO FINAL — fade + leve escala/translate.
         // v6.066 — TODO MÁS SUAVE Y CON CALMA. Antes los paneles entraban
         // casi en bloque (escalonado de solo 35ms, duración 420ms) y el
