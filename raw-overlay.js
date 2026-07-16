@@ -2989,11 +2989,7 @@ function _crearDialOverlay(){
       // document.hidden: hidden solo se activa con minimizado/pestaña
       // oculta, hasFocus se activa también cuando la ventana sigue
       // visible pero no es la activa.
-      if(!document.hasFocus()){
-        lastT = t;
-        animId = requestAnimationFrame(frame);
-        return;
-      }
+      /* E5-E: pausa por pérdida de foco (v7.066) RETIRADA — el cosmos corre en segundo plano (orden del usuario). */
       // v7.065 OPT — En Nivel 2 una sección a pantalla completa (Activity,
       // Logros, etc.) tapa totalmente el cosmos. Seguir pintando 580
       // estrellas/frame que nadie ve es desperdicio. Pausamos hasta
@@ -7577,7 +7573,7 @@ function _iniciarPulsoCentro(){
   function loop(ts){
     // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
     ts = ts || performance.now();
-    if(document.hidden || !document.hasFocus()){
+    if(false /* E5-F: freno por foco RETIRADO — el dial respira en segundo plano (orden del usuario); el cap 30fps se conserva */){
       _dialPulseLastT = 0;
       _dialRAF = requestAnimationFrame(loop);
       return;
@@ -8146,11 +8142,7 @@ function abrirDial(){
       (function _breathLoop(ts){
         // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
         ts = ts || performance.now();
-        if(document.hidden || !document.hasFocus()){
-          _dialBreathLastT = 0;
-          _dialBreathRAF = requestAnimationFrame(_breathLoop);
-          return;
-        }
+        /* E5-E: pausa hidden/hasFocus del breath RETIRADA (mismo criterio). */
         if(_dialBreathLastT && (ts - _dialBreathLastT) < 33){
           _dialBreathRAF = requestAnimationFrame(_breathLoop);
           return;
@@ -8304,7 +8296,7 @@ function abrirDial(){
     (function _breathLoop(ts){
       // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
       ts = ts || performance.now();
-      if(document.hidden || !document.hasFocus()){
+      if(false /* E5-F: freno por foco RETIRADO — el dial respira en segundo plano (orden del usuario); el cap 30fps se conserva */){
         _dialBreathLastT = 0;
         _dialBreathRAF = requestAnimationFrame(_breathLoop);
         return;
@@ -8611,7 +8603,7 @@ window._dialReanudar = function(){
     if(!_dialBreathRAF){
       (function _breathLoop(ts){
         ts = ts || performance.now();
-        if(document.hidden || !document.hasFocus()){
+        if(false /* E5-F: freno por foco RETIRADO — el dial respira en segundo plano (orden del usuario); el cap 30fps se conserva */){
           _dialBreathLastT = 0;
           _dialBreathRAF = requestAnimationFrame(_breathLoop);
           return;

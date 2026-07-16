@@ -29,16 +29,11 @@ var GRANO_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
 wrap.innerHTML =
   '<div id="juice-grano" style="position:absolute;inset:-40px;' +
     'background-image:url(&quot;' + GRANO_SVG + '&quot;);background-size:220px 220px;' +
-    'opacity:.035;mix-blend-mode:overlay"></div>' +
+    'opacity:.028"></div>' +   /* E5-F: sin mix-blend — el overlay-blend velaba pestañas y cards */
   '<div id="juice-vig" style="position:absolute;inset:0;' +
-    'background:radial-gradient(ellipse at 50% 46%,transparent 58%,rgba(2,4,12,.34) 100%);' +
+    'background:radial-gradient(ellipse at 50% 46%,transparent 64%,rgba(2,4,12,.20) 100%);' +
     'animation:juiceVig 9s ease-in-out infinite"></div>' +
-  '<div style="position:absolute;inset:0;transform:translateX(1px);' +
-    'background:radial-gradient(ellipse at 50% 50%,transparent 78%,rgba(255,0,60,.045) 100%);' +
-    'mix-blend-mode:screen"></div>' +
-  '<div style="position:absolute;inset:0;transform:translateX(-1px);' +
-    'background:radial-gradient(ellipse at 50% 50%,transparent 78%,rgba(0,220,255,.045) 100%);' +
-    'mix-blend-mode:screen"></div>';
+  '';   /* E5-F: velos cromáticos retirados */
 var st = document.createElement('style');
 st.textContent =
   '@keyframes juiceVig{0%,100%{opacity:.92}50%{opacity:1}}';
