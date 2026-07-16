@@ -300,25 +300,10 @@ window._lucyMontar=function(target){
       if(b && !document.getElementById('e5-medico') &&
          typeof window._medicoMontar==='function') window._medicoMontar();
     }
-    /* HOME vacío: niv-0 estable + dial invisible → reabrir una vez */
-    var h=document.documentElement;
-    if(h.classList.contains('niv-0') && !h.classList.contains('niv-warp')){
-      var dc=document.getElementById('dial-canvas');
-      if(dc){
-        var cs=getComputedStyle(dc);
-        var muerto=(cs.display==='none'||parseFloat(cs.opacity)<0.05||dc.getBoundingClientRect().height<10);
-        if(muerto){
-          if(!window.__e5HomeMuerto) window.__e5HomeMuerto=performance.now();
-          else if(performance.now()-window.__e5HomeMuerto>800){
-            window.__e5HomeMuerto=0;
-            if(typeof window.abrirDial==='function'){
-              console.log('[e5] HOME sin dial tras cascada interrumpida → reapertura');
-              window.abrirDial();
-            }
-          }
-        } else window.__e5HomeMuerto=0;
-      }
-    } else window.__e5HomeMuerto=0;
+    /* E5-G: vigía de HOME RETIRADO — disparaba en el arranque
+       (a 800ms el dial legítimamente aún no es visible), secuestraba
+       el boot con un abrirDial prematuro → cards en display:none y
+       backdrop pegado (el 'blur gigantesco'). */
   }, 400);
 })();
 window.irAMedico = function(){
