@@ -544,8 +544,7 @@ window._contactosMontar=function(target){
     var root=document.createElement('div'); root.id='ct-root';
     root.innerHTML=
       '<div id="ct-izq">'+
-      '<button id="ct-burger" title="Listas" style="position:absolute;left:10px;top:10px;z-index:5" class="e5-btn">☰</button>'+
-      '<div class="e5-hdr" style="margin-bottom:8px;padding-left:34px"><span class="t" style="--e5c:#60A5FA">📇 CONTACTOS</span>'+
+      '<div class="e5-hdr" style="margin-bottom:8px"><span class="t" style="--e5c:#60A5FA">📇 CONTACTOS</span>'+
       '<span><button class="e5-btn" style="--e5c:#93C5FD" id="ct-selbtn">☑ Seleccionar</button> '+
       '<button class="e5-btn" style="--e5c:#60A5FA" onclick="irAContactoForm()">+ Nuevo</button></span></div>'+
       '<input id="ct-busca" placeholder="Buscar en todo…">'+
@@ -553,21 +552,10 @@ window._contactosMontar=function(target){
       '<div id="ct-grupos" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>'+
       '<div id="ct-chips"></div><div id="ct-lista"></div></div>'+
       '<div id="ct-detalle"></div>';
-    root.style.position='relative';
     board.appendChild(root);
-    var cssx=document.createElement('style');
-    cssx.textContent='#ct-root.ct-cerrado{grid-template-columns:0 1fr}'+
-      '#ct-root.ct-cerrado #ct-izq{opacity:0;pointer-events:none;padding:0;border:none;overflow:hidden}'+
-      '#ct-root{transition:grid-template-columns .35s ease}'+
-      '#ct-izq{transition:opacity .25s ease}'+
-      '#ct-root.ct-cerrado #ct-burger{left:10px}';
-    document.head.appendChild(cssx);
     document.getElementById('ct-busca').addEventListener('input',function(){
       _ctQ=this.value; _ctLista();
     });
-    document.getElementById('ct-burger').onclick=function(){
-      document.getElementById('ct-root').classList.toggle('ct-cerrado');
-    };
     document.getElementById('ct-selbtn').onclick=function(){
       _ctModo=!_ctModo; if(!_ctModo)_ctMarcados={};
       this.textContent=_ctModo?'✕ Salir de selección':'☑ Seleccionar';
@@ -762,12 +750,13 @@ window.e5estado=function(){
 };
 /* vigía de montaje (flechas u otras rutas) */
 setInterval(function(){
-  if(window._osSeccion==='contactos'){
-    var b=document.getElementById('board-contactos');
+  if(window._osSeccion==='sos'){
+    var b=document.getElementById('board-sos');
     if(b && !document.getElementById('ct-root') &&
-       typeof window._contactosMontar==='function') window._contactosMontar();
+       typeof window._montarSOS==='function' && window._montarSOS.__e5v)
+      window._montarSOS();
   }
-},500);
+},600);
 
 window.irAMedico = function(){
   if(typeof _osMostrar==='function'){ _osMostrar('medico'); window._medicoMontar(); }
@@ -846,40 +835,38 @@ window.irALucy=function(){
   window._lucyMontar(document.getElementById('e5-lucy-slot'));
 };
 
-/* ═══ CONTACTOS en SOS ═══ */
-function _e5Contactos(){
-  var board=document.getElementById('board-sos');
-  if(!board || document.getElementById('e5-contactos')) return;
-  var sec=document.createElement('div');
-  sec.className='e5-sec';sec.id='e5-contactos';sec.style.setProperty('--e5c','#EF4444');
-  sec.innerHTML='<div class="e5-hdr"><span class="t" style="--e5c:#EF4444">📇 Contactos</span></div>'+
-    '<div class="e5-cont-grid" id="e5-cont-grid"><div class="e5-vacio">Cargando…</div></div>';
-  board.appendChild(sec);
-  api.getContactos().then(function(r){
-    var g=document.getElementById('e5-cont-grid'); if(!g) return;
-    var cs=(r&&r.contactos)||[];
-    if(!cs.length){ g.innerHTML='<div class="e5-vacio">Corre setupHojasE5() y llena la hoja CONTACTOS.</div>'; return; }
-    g.innerHTML=cs.map(function(x){
-      var tels=[x['Teléfono 1'],x['Teléfono 2'],x['Teléfono 3']].filter(Boolean)
-        .map(function(t){return '<a href="tel:'+t+'">'+t+'</a>';}).join(' · ');
-      return '<div class="e5-cont"><div class="n">'+(x['Nombre']||'')+' '+(x['Apellido']||'')+
-        ' <span style="color:var(--hud-text-faint);font-size:10px">'+(x['ID']||'')+'</span></div>'+
-        '<div class="a">'+(x['Afinidad']||'')+'</div>'+
-        '<div class="d">'+tels+(x['Email']?'<br>'+x['Email']:'')+'</div></div>';
-    }).join('');
-  }).catch(function(){});
-}
+/* ═══ E5-V — LA AGENDA COMPLETA VIVE EN SOS (renombrado CONTACTOS):
+   tarjetas de emergencia arriba (intactas), y debajo el sistema entero
+   (maestro-detalle, buscador, listas, selección múltiple, acciones).
+   El grid simple anterior queda eliminado — cero duplicados. ═══ */
 (function(){
+  function montarEnSOS(){
+    var board=document.getElementById('board-sos'); if(!board) return;
+    var slot=document.getElementById('e5-ct-slot');
+    if(!slot){
+      slot=document.createElement('div'); slot.id='e5-ct-slot';
+      slot.style.cssText='margin-top:22px;height:72vh;min-height:420px;position:relative';
+      board.appendChild(slot);
+    }
+    if(!document.getElementById('ct-root')) window._contactosMontar(slot);
+    else window._contactosMontar(slot);
+  }
   var espera=setInterval(function(){
-    if(typeof window._montarSOS==='function' && !window._montarSOS.__e5){
+    if(typeof window._montarSOS==='function' && !window._montarSOS.__e5v){
       var base=window._montarSOS;
-      window._montarSOS=function(){ base(); setTimeout(_e5Contactos,80); };
-      window._montarSOS.__e5=true;
+      window._montarSOS=function(){ base(); setTimeout(montarEnSOS,120); };
+      window._montarSOS.__e5v=true;
       clearInterval(espera);
     }
   },400);
   setTimeout(function(){clearInterval(espera);},15000);
+  /* el gajo 'Ver agenda' y cualquier ruta vieja → SOS */
+  window.irAContactos=function(){
+    if(typeof irASOS==='function') irASOS();
+    else if(typeof _osMostrar==='function'){ _osMostrar('sos'); }
+  };
 })();
+
 
 
 /* E5-C: últimos 7 días — gramos de alcohol puro por día (barras) */

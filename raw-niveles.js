@@ -1318,7 +1318,6 @@
     { id:'btn-maslow',    sec:'bitacora' },
     { id:'btn-activity',  sec:'activity' },
     { id:'btn-sos',       sec:'sos'      },
-    { id:'btn-contactos', sec:'contactos'},   /* E5-N */
     { id:'btn-nutricion', sec:'nutricion'},
     { id:'btn-notas',     sec:'notas'    },
     { id:'btn-timers',    sec:'timers'   },
