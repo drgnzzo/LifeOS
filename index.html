@@ -53,6 +53,12 @@
 .e5-tbl{max-width:100%}
 /* nada dentro de una card puede declarar más ancho que su card */
 .hud-pnl img,.hud-pnl canvas,.hud-pnl table{max-width:100% !important}
+
+/* E5-O · Bitácora sin duplicado: la columna y stat del médico viven
+   ahora en su SECCIÓN — aquí se ocultan (markup intacto: el render
+   sigue pintando en su div oculto sin reventar) */
+.bit-col[data-tipo="salud"]{display:none !important}
+#bit-stat-sal,[id^="bit-stat-sal"]{display:none !important}
 </style>
 </head>
 <body>

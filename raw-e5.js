@@ -320,7 +320,28 @@ if(!window.api.nuevoContacto)
   window.api.nuevoContacto=function(d){return EN_GAS?gasRun('nuevoContacto',d):apiPost('nuevoContacto',{datos:d});};
 
 var _ctData=[], _ctSel=null, _ctQ='', _ctAf='';
-function _ctCampo(x,k){ return String(x[k]||'').trim(); }
+var _CT_ALIAS = {
+  'Nombre':['Nombre','NOMBRE','Name','nombre'],
+  'Apellido':['Apellido','APELLIDO','Apellidos','apellido'],
+  'Teléfono 1':['Teléfono 1','Telefono 1','Tel 1','Teléfono1','Telefono1','Tel1','TELÉFONO 1'],
+  'Teléfono 2':['Teléfono 2','Telefono 2','Tel 2','Tel2'],
+  'Teléfono 3':['Teléfono 3','Telefono 3','Tel 3','Tel3'],
+  'Email':['Email','EMAIL','Correo','Mail','E-mail'],
+  'Redes':['Redes','REDES','Redes sociales','Social'],
+  'Dirección':['Dirección','Direccion','DIRECCIÓN','Domicilio'],
+  'Cumpleaños':['Cumpleaños','Cumpleanos','CUMPLEAÑOS','Cumple'],
+  'Afinidad':['Afinidad','AFINIDAD','Parentesco','Relación','Relacion'],
+  'Notas':['Notas','NOTAS','Nota'],
+  'ID':['ID','Id','id']
+};
+function _ctCampo(x,k){
+  var lista=_CT_ALIAS[k]||[k];
+  for(var i=0;i<lista.length;i++){
+    if(x[lista[i]]!==undefined && String(x[lista[i]]).trim()!=='')
+      return String(x[lista[i]]).trim();
+  }
+  return '';
+}
 function _ctNombre(x){ return (_ctCampo(x,'Nombre')+' '+_ctCampo(x,'Apellido')).trim()||'(sin nombre)'; }
 
 function _ctLista(){
@@ -336,14 +357,14 @@ function _ctLista(){
   el.innerHTML=f.map(function(x){
     var L=_ctNombre(x)[0].toUpperCase(), sep='';
     if(L!==letra){ letra=L; sep='<div class="ct-letra">'+L+'</div>'; }
-    var on=(_ctSel&&_ctSel.ID===x.ID)?' on':'';
-    return sep+'<div class="ct-item'+on+'" data-id="'+x.ID+'">'+
+    var on=(_ctSel&&_ctCampo(_ctSel,'ID')===_ctCampo(x,'ID'))?' on':'';
+    return sep+'<div class="ct-item'+on+'" data-id="'+_ctCampo(x,'ID')+'">'+
       '<div class="ct-n">'+_ctNombre(x)+'</div>'+
       '<div class="ct-a">'+(_ctCampo(x,'Afinidad')||'—')+'</div></div>';
   }).join('');
   el.querySelectorAll('.ct-item').forEach(function(it){
     it.onclick=function(){
-      _ctSel=_ctData.find(function(x){return String(x.ID)===it.dataset.id;})||null;
+      _ctSel=_ctData.find(function(x){return _ctCampo(x,'ID')===it.dataset.id;})||null;
       _ctLista(); _ctDetalle();
     };
   });
@@ -363,7 +384,7 @@ function _ctDetalle(){
   var dir=_ctCampo(x,'Dirección');
   el.innerHTML=
     '<div class="ct-hero"><div class="ct-avatar">'+_ctNombre(x).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase()+'</div>'+
-    '<div><div class="ct-hn">'+_ctNombre(x)+' <span class="ct-id">'+(x.ID||'')+'</span></div>'+
+    '<div><div class="ct-hn">'+_ctNombre(x)+' <span class="ct-id">'+(_ctCampo(x,'ID')||'')+'</span></div>'+
     '<div class="ct-ha">'+(_ctCampo(x,'Afinidad')||'')+'</div></div></div>'+
     '<div class="ct-acciones">'+
       (_ctCampo(x,'tel1')||_ctCampo(x,'Teléfono 1')?'<a class="e5-btn" style="--e5c:#4ADE80" href="tel:'+_ctCampo(x,'Teléfono 1').replace(/\s/g,'')+'">☎ Llamar</a>':'')+
@@ -446,8 +467,19 @@ window._contactosMontar=function(target){
   _ctLista(); _ctDetalle(); _ctChips();
   api.getContactos().then(function(r){
     if(r&&r.ok){ _ctData=r.contactos||[]; _ctChips(); _ctLista();
-      if(_ctSel){ _ctSel=_ctData.find(function(x){return x.ID===_ctSel.ID;})||null; _ctDetalle(); } }
-  }).catch(function(){});
+      if(_ctSel){ _ctSel=_ctData.find(function(x){return _ctCampo(x,'ID')===_ctCampo(_ctSel,'ID');})||null; _ctDetalle(); }
+      if(!_ctData.length){
+        var el=document.getElementById('ct-lista');
+        if(el) el.innerHTML='<div class="e5-vacio">La hoja respondió OK pero sin filas legibles — revisa que los datos empiecen en la fila 2 bajo encabezados en la fila 1.</div>';
+      }
+    } else {
+      var el=document.getElementById('ct-lista');
+      if(el) el.innerHTML='<div class="e5-vacio" style="color:#FCA5A5">⚠ '+((r&&r.error)||'El backend no respondió: ¿desplegaste el Code.gs E5-N con Nueva versión?')+'</div>';
+    }
+  }).catch(function(err){
+    var el=document.getElementById('ct-lista');
+    if(el) el.innerHTML='<div class="e5-vacio" style="color:#FCA5A5">⚠ Sin conexión con el backend.</div>';
+  });
 };
 window.irAContactos=function(){
   if(typeof _osMostrar==='function'){ _osMostrar('contactos'); window._contactosMontar(); }
@@ -617,6 +649,19 @@ function _e5Semana(regs){
         '<div style="font-size:8px;letter-spacing:.06em;color:var(--hud-text-dim);margin-top:3px">'+k+'</div></div>';
     }).join('')+'</div>';
 }
+
+/* E5-O — LEY DEL DIAL (reinstalada REFINADA): el espía probó que el
+   "doble flip" es el canvas aún fixed viajando con transición+overshoot
+   al volver a HOME. Se congela SOLO su geometría (top/left/size/
+   transform instantáneos) permitiendo opacity Y filter — así los
+   blurs/fundidos de v9 quedan intactos (el error de E5-L fue aplicar
+   esto a * con solo-opacity). Alcance: únicamente el trío del dial. */
+(function(){
+  var st=document.createElement('style'); st.id='e5-dial-ley';
+  st.textContent='#dial-canvas,#dial-ambient,#dial-ring-breath{'+
+    'transition-property:opacity,filter !important}';
+  document.head.appendChild(st);
+})();
 
 /* E5-N — REVERT de E5-K/L/M: mis tres capas de coreografía (dos-diales,
    ley de entrada solo-opacidad, ley global del dial) interactuaban mal
