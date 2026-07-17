@@ -39,11 +39,20 @@
    NINGÚN contenido excede su card. La card manda; lo que no quepa
    scrollea ADENTRO con barra fina — jamás se corta ni desborda.
    Válvulas para cada contenedor que recibe contenido dinámico: ═══ */
-/* cards del anillo (nivel 1) expandidas */
+/* E6-G · JAULA RETIRADA: el techo 100vh-250px APLASTABA las cards
+   altas de diseño (Centro Patrimonial y compañía) forzando scroll.
+   La card manda con SU tamaño v9; la válvula overflow ya vive en el
+   propio overlay (3735). Aquí solo queda cosmética de barra. */
 .hud-pnl .hud-expanded-content{
-  max-height:calc(100vh - 250px) !important;
-  overflow-y:auto !important;overflow-x:hidden !important;
   scrollbar-width:thin;scrollbar-color:rgba(167,139,250,.35) transparent}
+/* E6-H · EL CASO ESPEJO (corte inferior): si la CARD entera excede la
+   pantalla, se salía por abajo y la válvula del contenido jamás
+   despertaba. Tope en la CARD (no en el contenido): las cortas ni lo
+   notan (max-height no estira); las más altas que el viewport se
+   ajustan y ENTONCES la válvula v9 (flex min-height:0 + overflow del
+   contenido, overlay:3735) scrollea por dentro. Ambos males, cerrados:
+   ni aplastadas ni cortadas. */
+html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
 .hud-pnl .hud-expanded-content::-webkit-scrollbar{width:7px}
 .hud-pnl .hud-expanded-content::-webkit-scrollbar-thumb{
   background:rgba(167,139,250,.3);border-radius:4px}
