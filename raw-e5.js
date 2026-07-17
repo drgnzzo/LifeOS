@@ -317,7 +317,7 @@ window._lucyMontar=function(target){
    escribe nuevoContacto). El gajo 13 CONTACTO captura vía form propio
    (nombre + 1 teléfono obligatorios; el resto opcional pero presente).
    Scrolls contenidos por el Contrato de Contención. ═══ */
-['editarContacto','eliminarContactos','crearMeet'].forEach(function(fn){
+['editarContacto','eliminarContactos','crearMeet','crearEvento'].forEach(function(fn){
   if(!window.api[fn]) window.api[fn]=function(d){return EN_GAS?gasRun(fn,d):apiPost(fn,{datos:d});};
 });
 if(!window.api.nuevoContacto)
@@ -585,11 +585,49 @@ window.irAContactos=function(){
 };
 window._ctMeet=function(){
   if(!_ctSel) return;
-  var mail=_ctCampo(_ctSel,'Email');
-  _toast('Creando Meet e invitando a '+mail+'…');
-  api.crearMeet({email:mail, titulo:'Reunión con '+_ctNombre(_ctSel)}).then(function(r){
-    _toast(r&&r.ok ? '✓ '+r.nota : 'Error: '+((r&&r.error)||'?'));
-  }).catch(function(){ _toast('Error de conexión'); });
+  var mail=_ctCampo(_ctSel,'Email'), nom=_ctNombre(_ctSel);
+  function pad(n){return ('0'+n).slice(-2);}
+  function fmtF(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+  function fmtH(d){return pad(d.getHours())+':'+pad(d.getMinutes());}
+  var ahora=new Date();
+  var ov=_modal('#F87171','📅 Reunión con '+nom,
+    '<div style="font-size:11px;color:var(--hud-text-dim);margin-bottom:10px">'+
+    'Invitado: <b style="color:#93C5FD">'+mail+'</b> — recibirá la invitación por correo; '+
+    'el evento entra a tu Google Calendar.</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="ev-atajos">'+
+    '<span class="e5-tab" data-min="5">En 5 min</span>'+
+    '<span class="e5-tab" data-min="60">En 1 hora</span>'+
+    '<span class="e5-tab" data-man="1">Mañana 10:00</span>'+
+    '<span class="e5-tab" data-lun="1">Lunes 10:00</span></div>'+
+    _campo('titulo','Título',null,null,'Reunión con '+nom)+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+
+    _campo('fecha','Fecha *','date',null,fmtF(ahora))+
+    _campo('hora','Hora *','time',null,fmtH(new Date(ahora.getTime()+10*60000)))+
+    '<div class="e5-f"><label>Duración</label><select data-k="duracion">'+
+    [15,30,45,60,90,120].map(function(m){return '<option value="'+m+'"'+(m===30?' selected':'')+'>'+m+' min</option>';}).join('')+
+    '</select></div></div>'+
+    _campo('descripcion','Descripción / agenda (opcional)'),
+    function(datos,cerrar,btn){
+      if(!datos.fecha||!datos.hora){ _toast('Fecha y hora obligatorias'); return; }
+      btn.textContent='Creando…';
+      datos.email=mail;
+      api.crearEvento(datos).then(function(r){
+        _toast(r&&r.ok ? '✓ Evento creado · '+r.nota : 'Error: '+((r&&r.error)||'?'));
+        if(r&&r.ok) cerrar(); else btn.textContent='Guardar';
+      }).catch(function(){ _toast('Error de conexión'); btn.textContent='Guardar'; });
+    });
+  /* atajos: rellenan fecha/hora al vuelo */
+  ov.querySelectorAll('#ev-atajos .e5-tab').forEach(function(ch){
+    ch.style.setProperty('--e5c','#F87171');
+    ch.onclick=function(){
+      var d=new Date();
+      if(ch.dataset.min) d=new Date(d.getTime()+Number(ch.dataset.min)*60000);
+      if(ch.dataset.man){ d.setDate(d.getDate()+1); d.setHours(10,0,0,0); }
+      if(ch.dataset.lun){ var dd=(8-d.getDay())%7||7; d.setDate(d.getDate()+dd); d.setHours(10,0,0,0); }
+      ov.querySelector('[data-k="fecha"]').value=fmtF(d);
+      ov.querySelector('[data-k="hora"]').value=fmtH(d);
+    };
+  });
 };
 window._ctEditar=function(){
   if(!_ctSel) return;
