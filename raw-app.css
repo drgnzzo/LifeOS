@@ -3029,9 +3029,9 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
    hacia la horizontal), se hunde… y aterriza — donde el coverflow ya
    está de frente. La conexión conceptual se VE. */
 @keyframes dialAbatir{
-  0%  { transform:perspective(1100px) rotateX(0deg)   scale(1);    filter:none; }
-  45% { transform:perspective(1100px) rotateX(76deg)  scale(.74);  filter:brightness(1.9); }
-  100%{ transform:perspective(1100px) rotateX(0deg)   scale(1);    filter:none; }
+  0%  { transform:scale(1);   opacity:1;   filter:none; }
+  45% { transform:scale(.84); opacity:.35; filter:brightness(1.35); } /* E5-T: sin flip — zoom */
+  100%{ transform:scale(1);   opacity:1;   filter:none; }
 }
 #dial-canvas.dial-anim-down{
   animation:dialAbatir .9s cubic-bezier(.2,0,0,1) both;
@@ -3039,8 +3039,8 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
 }
 /* 1→0 · EMERGER: el dial se levanta del plano de vuelta a vista cenital */
 @keyframes dialEmerger{
-  0%  { transform:perspective(1100px) rotateX(-52deg) scale(.86); opacity:.4; filter:brightness(1.6); }
-  100%{ transform:perspective(1100px) rotateX(0deg)   scale(1);   opacity:1;  filter:none; }
+  0%  { transform:scale(.88); opacity:0;  filter:brightness(1.25); } /* E5-T: sin flip — zoom */
+  100%{ transform:scale(1);   opacity:1;  filter:none; }
 }
 #dial-canvas.dial-anim-up{
   animation:dialEmerger .8s cubic-bezier(.2,0,0,1) both;
