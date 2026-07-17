@@ -306,6 +306,181 @@ window._lucyMontar=function(target){
        backdrop pegado (el 'blur gigantesco'). */
   }, 400);
 })();
+
+/* ═══════════════════════════════════════════════════════════════════
+   E5-N — CONTACTOS: sección de primera clase (patrón Apple Contactos:
+   maestro-detalle). Izquierda: buscador vivo + chips de afinidad +
+   lista scrolleable agrupada. Derecha: la CARD PADRE del contacto con
+   toda su información y ACCIONES ejecutables (☎ tel:, ✉ mailto:,
+   📍 maps, 🎂). Bidireccional con la hoja CONTACTOS (lee getContactos;
+   escribe nuevoContacto). El gajo 13 CONTACTO captura vía form propio
+   (nombre + 1 teléfono obligatorios; el resto opcional pero presente).
+   Scrolls contenidos por el Contrato de Contención. ═══ */
+if(!window.api.nuevoContacto)
+  window.api.nuevoContacto=function(d){return EN_GAS?gasRun('nuevoContacto',d):apiPost('nuevoContacto',{datos:d});};
+
+var _ctData=[], _ctSel=null, _ctQ='', _ctAf='';
+function _ctCampo(x,k){ return String(x[k]||'').trim(); }
+function _ctNombre(x){ return (_ctCampo(x,'Nombre')+' '+_ctCampo(x,'Apellido')).trim()||'(sin nombre)'; }
+
+function _ctLista(){
+  var q=_ctQ.toLowerCase();
+  var f=_ctData.filter(function(x){
+    if(_ctAf && _ctCampo(x,'Afinidad')!==_ctAf) return false;
+    if(!q) return true;
+    return Object.keys(x).some(function(k){ return String(x[k]).toLowerCase().indexOf(q)>=0; });
+  }).sort(function(a,b){ return _ctNombre(a).localeCompare(_ctNombre(b)); });
+  var el=document.getElementById('ct-lista'); if(!el) return;
+  if(!f.length){ el.innerHTML='<div class="e5-vacio">Sin resultados.</div>'; return; }
+  var letra='';
+  el.innerHTML=f.map(function(x){
+    var L=_ctNombre(x)[0].toUpperCase(), sep='';
+    if(L!==letra){ letra=L; sep='<div class="ct-letra">'+L+'</div>'; }
+    var on=(_ctSel&&_ctSel.ID===x.ID)?' on':'';
+    return sep+'<div class="ct-item'+on+'" data-id="'+x.ID+'">'+
+      '<div class="ct-n">'+_ctNombre(x)+'</div>'+
+      '<div class="ct-a">'+(_ctCampo(x,'Afinidad')||'—')+'</div></div>';
+  }).join('');
+  el.querySelectorAll('.ct-item').forEach(function(it){
+    it.onclick=function(){
+      _ctSel=_ctData.find(function(x){return String(x.ID)===it.dataset.id;})||null;
+      _ctLista(); _ctDetalle();
+    };
+  });
+}
+function _ctDetalle(){
+  var el=document.getElementById('ct-detalle'); if(!el) return;
+  var x=_ctSel;
+  if(!x){ el.innerHTML='<div class="e5-vacio" style="padding-top:60px">Selecciona un contacto — o crea uno desde el gajo CONTACTO del dial.</div>'; return; }
+  function fila(icono,label,valor,accion){
+    if(!valor) return '';
+    return '<div class="ct-f"><div class="ct-fl">'+icono+' '+label+'</div>'+
+      '<div class="ct-fv">'+(accion?'<a href="'+accion+'">'+valor+'</a>':valor)+'</div></div>';
+  }
+  var tels=[['Teléfono 1','tel1'],['Teléfono 2','tel2'],['Teléfono 3','tel3']]
+    .map(function(p){ var t=_ctCampo(x,p[0]); return t?fila('☎',p[0],t,'tel:'+t.replace(/\s/g,'')):''; }).join('');
+  var mail=_ctCampo(x,'Email');
+  var dir=_ctCampo(x,'Dirección');
+  el.innerHTML=
+    '<div class="ct-hero"><div class="ct-avatar">'+_ctNombre(x).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase()+'</div>'+
+    '<div><div class="ct-hn">'+_ctNombre(x)+' <span class="ct-id">'+(x.ID||'')+'</span></div>'+
+    '<div class="ct-ha">'+(_ctCampo(x,'Afinidad')||'')+'</div></div></div>'+
+    '<div class="ct-acciones">'+
+      (_ctCampo(x,'tel1')||_ctCampo(x,'Teléfono 1')?'<a class="e5-btn" style="--e5c:#4ADE80" href="tel:'+_ctCampo(x,'Teléfono 1').replace(/\s/g,'')+'">☎ Llamar</a>':'')+
+      (mail?'<a class="e5-btn" style="--e5c:#60A5FA" href="mailto:'+mail+'">✉ Correo</a>':'')+
+      (dir?'<a class="e5-btn" style="--e5c:#F59E0B" target="_blank" href="https://maps.google.com/?q='+encodeURIComponent(dir)+'">📍 Mapa</a>':'')+
+    '</div>'+
+    tels+
+    fila('✉','Email',mail,'mailto:'+mail)+
+    fila('🌐','Redes',_ctCampo(x,'Redes'))+
+    fila('📍','Dirección',dir)+
+    fila('🎂','Cumpleaños',_fmtF(x['Cumpleaños']))+
+    fila('🤝','Afinidad',_ctCampo(x,'Afinidad'))+
+    fila('📝','Notas',_ctCampo(x,'Notas'));
+}
+function _ctChips(){
+  var el=document.getElementById('ct-chips'); if(!el) return;
+  var afs={}; _ctData.forEach(function(x){ var a=_ctCampo(x,'Afinidad'); if(a) afs[a]=1; });
+  el.innerHTML='<span class="e5-tab'+(_ctAf===''?' on':'')+'" data-af="">Todos</span>'+
+    Object.keys(afs).sort().map(function(a){
+      return '<span class="e5-tab'+(_ctAf===a?' on':'')+'" data-af="'+a+'">'+a+'</span>';
+    }).join('');
+  el.querySelectorAll('.e5-tab').forEach(function(ch){
+    ch.onclick=function(){ _ctAf=ch.dataset.af; _ctChips(); _ctLista(); };
+  });
+}
+window._contactosMontar=function(target){
+  var board=target||document.getElementById('board-contactos'); if(!board) return;
+  if(!document.getElementById('ct-root')){
+    var css=document.createElement('style'); css.id='ct-css';
+    css.textContent=[
+    '#ct-root{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:16px;',
+    '  padding:18px 2.5vw 26px;height:100%;box-sizing:border-box;min-height:0}',
+    '#ct-izq{display:flex;flex-direction:column;min-height:0;border:1px solid var(--hud-border);',
+    '  border-radius:var(--rad-lg,12px);background:var(--hud-panel-bg);padding:12px}',
+    '#ct-busca{width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);',
+    '  border:1px solid var(--hud-border);border-radius:8px;color:var(--hud-text);',
+    '  padding:9px 12px;font-size:13px;margin-bottom:8px}',
+    '#ct-busca:focus{outline:none;border-color:#60A5FA}',
+    '#ct-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}',
+    '#ct-lista{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin}',
+    '.ct-letra{font-family:var(--font-mono);font-size:10px;color:#60A5FA;',
+    '  letter-spacing:.2em;padding:8px 6px 3px;border-bottom:1px solid var(--hud-border)}',
+    '.ct-item{padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .15s}',
+    '.ct-item:hover{background:rgba(96,165,250,.08)}',
+    '.ct-item.on{background:rgba(96,165,250,.16);box-shadow:inset 2px 0 0 #60A5FA}',
+    '.ct-n{font-size:13.5px;color:var(--hud-text);font-weight:600}',
+    '.ct-a{font-size:10px;color:var(--hud-text-dim);text-transform:uppercase;letter-spacing:.08em}',
+    '#ct-detalle{border:1px solid var(--hud-border);border-radius:var(--rad-lg,12px);',
+    '  background:var(--hud-panel-bg);padding:20px 26px;overflow-y:auto;min-height:0;scrollbar-width:thin}',
+    '.ct-hero{display:flex;align-items:center;gap:16px;margin-bottom:14px}',
+    '.ct-avatar{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;',
+    '  justify-content:center;font-family:var(--font-mono);font-weight:800;font-size:20px;',
+    '  color:#fff;background:linear-gradient(135deg,#60A5FA,#7C3AED);',
+    '  box-shadow:0 0 18px rgba(96,165,250,.4)}',
+    '.ct-hn{font-size:20px;font-weight:700;color:var(--hud-text)}',
+    '.ct-id{font-family:var(--font-mono);font-size:10px;color:var(--hud-text-faint)}',
+    '.ct-ha{font-size:11px;color:#93C5FD;text-transform:uppercase;letter-spacing:.1em}',
+    '.ct-acciones{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px}',
+    '.ct-acciones a{text-decoration:none}',
+    '.ct-f{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:8px 0;',
+    '  border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}',
+    '.ct-fl{color:var(--hud-text-dim);font-size:11px;letter-spacing:.06em;text-transform:uppercase}',
+    '.ct-fv{color:var(--hud-text)} .ct-fv a{color:#67E8F9;text-decoration:none}',
+    '@media(max-width:1000px){#ct-root{grid-template-columns:1fr;grid-template-rows:minmax(200px,40%) 1fr}}'
+    ].join('\n');
+    document.head.appendChild(css);
+    var root=document.createElement('div'); root.id='ct-root';
+    root.innerHTML=
+      '<div id="ct-izq">'+
+      '<div class="e5-hdr" style="margin-bottom:8px"><span class="t" style="--e5c:#60A5FA">📇 CONTACTOS</span>'+
+      '<button class="e5-btn" style="--e5c:#60A5FA" onclick="irAContactoForm()">+ Nuevo</button></div>'+
+      '<input id="ct-busca" placeholder="Buscar en todo…">'+
+      '<div id="ct-chips"></div><div id="ct-lista"></div></div>'+
+      '<div id="ct-detalle"></div>';
+    board.appendChild(root);
+    document.getElementById('ct-busca').addEventListener('input',function(){
+      _ctQ=this.value; _ctLista();
+    });
+  }
+  _ctLista(); _ctDetalle(); _ctChips();
+  api.getContactos().then(function(r){
+    if(r&&r.ok){ _ctData=r.contactos||[]; _ctChips(); _ctLista();
+      if(_ctSel){ _ctSel=_ctData.find(function(x){return x.ID===_ctSel.ID;})||null; _ctDetalle(); } }
+  }).catch(function(){});
+};
+window.irAContactos=function(){
+  if(typeof _osMostrar==='function'){ _osMostrar('contactos'); window._contactosMontar(); }
+  else window._contactosMontar();
+};
+window.irAContactoForm=function(){
+  _modal('#60A5FA','👤 Nuevo contacto',
+    _campo('nombre','Nombre *')+_campo('apellido','Apellido')+
+    _campo('tel1','Teléfono 1 *','tel')+_campo('tel2','Teléfono 2','tel')+_campo('tel3','Teléfono 3','tel')+
+    _campo('email','Email','email')+_campo('redes','Redes (@usuarios)')+
+    _campo('direccion','Dirección')+_campo('cumple','Cumpleaños','date')+
+    _campo('afinidad','Afinidad (familia, trabajo, de dónde lo conozco)')+
+    _campo('notas','Notas'),
+    function(datos,cerrar,btn){
+      if(!String(datos.nombre||'').trim()){ _toast('El nombre es obligatorio'); return; }
+      if(!String(datos.tel1||'').trim()){ _toast('Al menos un teléfono'); return; }
+      btn.textContent='Guardando…';
+      api.nuevoContacto(datos).then(function(r){
+        if(r&&r.ok){ _toast('✓ Contacto '+r.id+' guardado — también en tu Sheet');
+          cerrar(); window._contactosMontar(); }
+        else _toast('Error: '+((r&&r.error)||'?'));
+      }).catch(function(){ _toast('Error de conexión'); });
+    });
+};
+/* vigía de montaje (flechas u otras rutas) */
+setInterval(function(){
+  if(window._osSeccion==='contactos'){
+    var b=document.getElementById('board-contactos');
+    if(b && !document.getElementById('ct-root') &&
+       typeof window._contactosMontar==='function') window._contactosMontar();
+  }
+},500);
+
 window.irAMedico = function(){
   if(typeof _osMostrar==='function'){ _osMostrar('medico'); window._medicoMontar(); }
   else window._medicoMontar();
@@ -443,68 +618,12 @@ function _e5Semana(regs){
     }).join('')+'</div>';
 }
 
-/* ═══ E5-K — DOS DIALES, NO UNO VIAJANDO (orden del usuario):
-   Al sumergirse 0→1, v9 reposiciona EL MISMO dial-canvas hacia abajo
-   con transición → se veía "un dial chiquito viajando desde abajo".
-   Separación por coreografía:
-   · el CSS mata toda transición posicional del dial durante niv-1/warp
-     (solo opacidad puede transicionar);
-   · al entrar a 1: el dial se desvanece ANTES (transition none→op 0),
-     v9 lo teletransporta invisible a su posición mini, y a los 340ms
-     NACE ahí con fade — dos apariciones, cero viaje.
-   La reapertura a 0 ya es fade puro (E5-J). ═══ */
-(function(){
-  var st=document.createElement('style');
-  st.id='e5-minidial';
-  /* E5-M — LEY GLOBAL DEL DIAL: jamás viaja, solo se funde. El espía
-     probó que el "doble semi-giro" era el canvas AÚN fixed volviendo
-     de nivel 1 con su top/tamaño EN TRANSICIÓN (barrido con overshoot
-     386→246→268) hasta que el ancla v7.103 lo reconciliaba. Con esta
-     ley, TODA geometría del dial (top/left/width/height/transform)
-     cambia instantánea en cualquier nivel; lo único animable es la
-     opacidad. Grande y mini son dos apariciones por fundido. */
-  st.textContent=
-    '#dial-canvas,#dial-ambient,#dial-ring-breath{'+
-    'transition-property:opacity !important;'+
-    'transition-duration:.38s !important;transition-timing-function:ease !important}';
-  document.head.appendChild(st);
-  /* E5-L — LA LEY DE ENTRADA A HOME: durante los primeros 800ms en
-     niv-0, TODA la app solo puede transicionar OPACIDAD. La causa raíz
-     del "flip doble" (007: dialCentro 652→639→660→687) era que el dial
-     vive en flujo y las bandas superiores CRECEN con transición al
-     poblarse → lo empujaban 35px durante su fade. Con esta ley, la
-     geometría salta instantánea mientras el dial sigue invisible, y
-     solo se VE el fundido. Cubre TODAS las rutas (flechas desde
-     LOGROS/RAW, niveles, tabs). */
-  var stFade=document.createElement('style');
-  stFade.textContent='html.e5-fade-only *{transition-property:opacity !important}';
-  document.head.appendChild(stFade);
-  var h=document.documentElement, prev=h.classList.contains('niv-1');
-  var prev0=h.classList.contains('niv-0'), tFade=null;
-  new MutationObserver(function(){
-    var ahora0=h.classList.contains('niv-0');
-    if(ahora0 && !prev0){
-      h.classList.add('e5-fade-only');
-      clearTimeout(tFade);
-      tFade=setTimeout(function(){ h.classList.remove('e5-fade-only'); },800);
-    }
-    prev0=ahora0;
-    var ahora=h.classList.contains('niv-1');
-    if(ahora && !prev){
-      var d=document.getElementById('dial-canvas');
-      if(d){
-        d.style.transition='none';
-        d.style.opacity='0';                       /* muere el grande */
-        void d.offsetWidth;
-        setTimeout(function(){
-          d.style.transition='opacity .38s ease';
-          d.style.opacity='1';                     /* nace el mini, en su lugar */
-        },340);
-      }
-    }
-    prev=ahora;
-  }).observe(h,{attributes:true,attributeFilter:['class']});
-})();
+/* E5-N — REVERT de E5-K/L/M: mis tres capas de coreografía (dos-diales,
+   ley de entrada solo-opacidad, ley global del dial) interactuaban mal
+   con la maquinaria de estados de v9 (blur invertido en cards, giros
+   erráticos, HOME sin cargar). Retiradas ÍNTEGRAS. El comportamiento
+   del dial vuelve al v9 canónico + E5-J (fade puro en reapertura).
+   El mini-dial sin viaje se rehará leyendo su mecanismo real. */
 
 console.log('[e5] activo · alcohol+lucy+contactos (api extendida: getContactos/getLucy/nuevaLucy/getAlcohol/nuevoAlcohol)');
 })();

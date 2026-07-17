@@ -34,6 +34,25 @@
 .hud-tab{white-space:nowrap;flex-shrink:1;min-width:0;padding-left:10px !important;padding-right:10px !important}
 .hud-tab span{letter-spacing:.06em}
 @media (max-width:1500px){.hud-tab{padding-left:7px !important;padding-right:7px !important}.hud-tab span{font-size:10px}}
+
+/* ═══ E5-H · CONTRATO DE CONTENCIÓN (regla nueva, permanente):
+   NINGÚN contenido excede su card. La card manda; lo que no quepa
+   scrollea ADENTRO con barra fina — jamás se corta ni desborda.
+   Válvulas para cada contenedor que recibe contenido dinámico: ═══ */
+/* cards del anillo (nivel 1) expandidas */
+.hud-pnl .hud-expanded-content{
+  max-height:calc(100vh - 250px) !important;
+  overflow-y:auto !important;overflow-x:hidden !important;
+  scrollbar-width:thin;scrollbar-color:rgba(167,139,250,.35) transparent}
+.hud-pnl .hud-expanded-content::-webkit-scrollbar{width:7px}
+.hud-pnl .hud-expanded-content::-webkit-scrollbar-thumb{
+  background:rgba(167,139,250,.3);border-radius:4px}
+/* boards de sección (nivel 2) y sus bloques e5 */
+.board-face{overflow-y:auto !important;overflow-x:hidden}
+.e5-sec{max-width:100%;overflow-x:auto}
+.e5-tbl{max-width:100%}
+/* nada dentro de una card puede declarar más ancho que su card */
+.hud-pnl img,.hud-pnl canvas,.hud-pnl table{max-width:100% !important}
 </style>
 </head>
 <body>
@@ -79,6 +98,9 @@
       </button>
       <button class="hud-tab btn-flip is-sos" id="btn-sos" data-acc="#EF4444" onclick="irASOS()" title="SOS">
         <i class="fas fa-circle-exclamation"></i><span>SOS</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-contactos" data-acc="#60A5FA" onclick="irAContactos()" title="Contactos">
+        <i class="fas fa-address-book"></i><span>CONTACTOS</span>
       </button>
       <button class="hud-tab btn-flip" id="btn-nutricion" data-acc="#4ADE80" onclick="irANutricion()" title="Salud">
         <i class="fas fa-leaf"></i><span>SALUD</span>
@@ -299,6 +321,7 @@
 
     <!-- PANEL BITÁCORA — layout estilo Activity Check -->
     <div class="board-face panel-medico" id="board-medico" style="overflow:hidden"></div>
+    <div class="board-face panel-contactos" id="board-contactos" style="overflow:hidden"></div>
     <div class="board-face panel-bitacora" id="board-bitacora" style="overflow:hidden;display:flex;flex-direction:column">
 
       <!-- HEADER full-width estilo Activity Check -->

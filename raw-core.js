@@ -390,6 +390,18 @@ var _DIAL_ITEMS = [
       {id:'lucy', label:'Ver carnet', accent:'#F9A8D4', draw:_icoTexto('🐾'),
        preset:function(){ window._dialPreset={irA:'irALucy'}; }}
     ] },
+  // ── CONTACTO (E5-N: gajo 13 — agenda) ──
+  { id:'contacto', label:'Contacto', accent:'#60A5FA',
+    draw:function(ctx,x,y,s,c){var k=s/22;
+      ctx.beginPath();ctx.arc(x-2*k,y-4*k,3.4*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();
+      ctx.beginPath();ctx.arc(x-2*k,y+7*k,6.4*k,Math.PI*1.15,Math.PI*1.85);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x+6.5*k,y-6*k);ctx.lineTo(x+6.5*k,y-0.5*k);ctx.moveTo(x+3.8*k,y-3.2*k);ctx.lineTo(x+9.2*k,y-3.2*k);ctx.lineWidth=1.8;ctx.stroke();},
+    subs:[
+      {id:'contacto', label:'Nuevo', accent:'#60A5FA', draw:_icoTexto('👤'),
+       preset:function(){ window._dialPreset={irA:'irAContactoForm'}; }},
+      {id:'contacto', label:'Ver agenda', accent:'#93C5FD', draw:_icoTexto('📇'),
+       preset:function(){ window._dialPreset={irA:'irAContactos'}; }}
+    ] },
 ];
 
 
@@ -712,7 +724,8 @@ window._osSeccion = 'home';       // sección lógica actual del router
 var _OS_SECCIONES = {
   home:      { board:null,             tab:'btn-home'      },
   logros:    { board:'board-logros',   tab:'btn-logros'    },
-  medico:    { board:'board-medico',   tab:'btn-medico'    },   /* E5-E */
+  medico:    { board:'board-medico',   tab:'btn-medico'    },
+  contactos: { board:'board-contactos', tab:'btn-contactos' },   /* E5-N */   /* E5-E */
   bitacora:  { board:'board-bitacora', tab:'btn-maslow'    },
   activity:  { board:'board-activity', tab:'btn-activity'  },
   nutricion: { board:'board-nutricion',tab:'btn-nutricion' },

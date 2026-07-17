@@ -1318,6 +1318,7 @@
     { id:'btn-maslow',    sec:'bitacora' },
     { id:'btn-activity',  sec:'activity' },
     { id:'btn-sos',       sec:'sos'      },
+    { id:'btn-contactos', sec:'contactos'},   /* E5-N */
     { id:'btn-nutricion', sec:'nutricion'},
     { id:'btn-notas',     sec:'notas'    },
     { id:'btn-timers',    sec:'timers'   },
@@ -1353,6 +1354,7 @@
       if(destino === 'timers' && typeof window._timersAlEntrar === 'function') window._timersAlEntrar();
       if(destino === 'sos'    && typeof window._montarSOS === 'function') window._montarSOS();
       if(destino === 'medico' && typeof window._medicoMontar === 'function') window._medicoMontar();   /* E5-D5 */
+      if(destino === 'contactos' && typeof window._contactosMontar === 'function') window._contactosMontar();   /* E5-N */
     }
   }
 
