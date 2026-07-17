@@ -60,7 +60,7 @@ var CSS = [
 'html.tema-ejecutivo .hud-tab{color:rgba(29,29,31,.6)}',
 
 /* ── selector flotante ── */
-'#e6-tema-btn{position:fixed;left:14px;bottom:14px;z-index:9400;',
+'#e6-tema-btn{position:fixed;left:14px;bottom:64px;z-index:9400;',   /* E6-B: sobre el botón de audio — estaban superpuestos */
 '  width:38px;height:38px;border-radius:50%;cursor:pointer;',
 '  background:var(--hud-panel-bg);border:1px solid var(--hud-border);',
 '  color:var(--hud-text);font-size:17px;display:flex;align-items:center;',
@@ -101,7 +101,8 @@ function boton(){
   var b = document.createElement('div');
   b.id = 'e6-tema-btn';
   b.title = 'Cambiar tema';
-  b.textContent = '🎨';
+  b.textContent = '◐';   /* E6-B: icono sobrio en tokens, no emoji */
+  b.style.fontFamily = 'var(--font-mono)';
   b.onclick = function(){
     var actual = TEMAS.filter(function(t){
       return document.documentElement.classList.contains('tema-' + t);
