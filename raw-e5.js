@@ -115,8 +115,9 @@ function _modal(color, titulo, cuerpoHTML, onSave){
   });
   return ov;
 }
-function _campo(k,l,tipo,extra){
-  return '<div class="e5-f"><label>'+l+'</label><input data-k="'+k+'" type="'+(tipo||'text')+'" '+(extra||'')+'></div>';
+function _campo(k,l,tipo,extra,val){
+  var v=(val===undefined||val===null)?'':String(val).replace(/"/g,'&quot;');
+  return '<div class="e5-f"><label>'+l+'</label><input data-k="'+k+'" type="'+(tipo||'text')+'" value="'+v+'" '+(extra||'')+'></div>';
 }
 
 /* ═══ ALCOHOL (dentro de SALUD, ex-Nutrición) ═══ */
@@ -316,10 +317,13 @@ window._lucyMontar=function(target){
    escribe nuevoContacto). El gajo 13 CONTACTO captura vía form propio
    (nombre + 1 teléfono obligatorios; el resto opcional pero presente).
    Scrolls contenidos por el Contrato de Contención. ═══ */
+['editarContacto','eliminarContactos','crearMeet'].forEach(function(fn){
+  if(!window.api[fn]) window.api[fn]=function(d){return EN_GAS?gasRun(fn,d):apiPost(fn,{datos:d});};
+});
 if(!window.api.nuevoContacto)
   window.api.nuevoContacto=function(d){return EN_GAS?gasRun('nuevoContacto',d):apiPost('nuevoContacto',{datos:d});};
 
-var _ctData=[], _ctSel=null, _ctQ='', _ctAf='';
+var _ctData=[], _ctSel=null, _ctQ='', _ctAf='', _ctGrupo='', _ctModo=false, _ctMarcados={};
 var _CT_ALIAS = {
   'Nombre':['Nombre','NOMBRE','Name','nombre'],
   'Apellido':['Apellido','APELLIDO','Apellidos','apellido'],
@@ -347,6 +351,10 @@ function _ctNombre(x){ return (_ctCampo(x,'Nombre')+' '+_ctCampo(x,'Apellido')).
 function _ctLista(){
   var q=_ctQ.toLowerCase();
   var f=_ctData.filter(function(x){
+    if(_ctGrupo){
+      var gs=_ctCampo(x,'Grupos').split(',').map(function(s){return s.trim();});
+      if(gs.indexOf(_ctGrupo)<0) return false;
+    }
     if(_ctAf && _ctCampo(x,'Afinidad')!==_ctAf) return false;
     if(!q) return true;
     return Object.keys(x).some(function(k){ return String(x[k]).toLowerCase().indexOf(q)>=0; });
@@ -358,12 +366,18 @@ function _ctLista(){
     var L=_ctNombre(x)[0].toUpperCase(), sep='';
     if(L!==letra){ letra=L; sep='<div class="ct-letra">'+L+'</div>'; }
     var on=(_ctSel&&_ctCampo(_ctSel,'ID')===_ctCampo(x,'ID'))?' on':'';
-    return sep+'<div class="ct-item'+on+'" data-id="'+_ctCampo(x,'ID')+'">'+
+    var chk=_ctModo?'<span class="ct-chk'+(_ctMarcados[_ctCampo(x,'ID')]?' on':'')+'"></span>':'';
+    return sep+'<div class="ct-item'+on+'" data-id="'+_ctCampo(x,'ID')+'">'+chk+
       '<div class="ct-n">'+_ctNombre(x)+'</div>'+
-      '<div class="ct-a">'+(_ctCampo(x,'Afinidad')||'—')+'</div></div>';
+      ((_ctCampo(x,'Afinidad'))?'<div class="ct-a">'+_ctCampo(x,'Afinidad')+'</div>':'')+'</div>';   /* E5-Q: sin guion */
   }).join('');
   el.querySelectorAll('.ct-item').forEach(function(it){
     it.onclick=function(){
+      if(_ctModo){
+        var id=it.dataset.id;
+        if(_ctMarcados[id]) delete _ctMarcados[id]; else _ctMarcados[id]=1;
+        _ctLista(); _ctBarra(); return;
+      }
       _ctSel=_ctData.find(function(x){return _ctCampo(x,'ID')===it.dataset.id;})||null;
       _ctLista(); _ctDetalle();
     };
@@ -383,14 +397,23 @@ function _ctDetalle(){
   var mail=_ctCampo(x,'Email');
   var dir=_ctCampo(x,'Dirección');
   el.innerHTML=
-    '<div class="ct-hero"><div class="ct-avatar">'+_ctNombre(x).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase()+'</div>'+
+    '<div class="ct-hero"><div class="ct-avatar"><svg viewBox="0 0 24 24" width="30" height="30" fill="rgba(255,255,255,.85)"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7.5 8-7.5s8 3.1 8 7.5"/></svg></div>'+
     '<div><div class="ct-hn">'+_ctNombre(x)+' <span class="ct-id">'+(_ctCampo(x,'ID')||'')+'</span></div>'+
     '<div class="ct-ha">'+(_ctCampo(x,'Afinidad')||'')+'</div></div></div>'+
-    '<div class="ct-acciones">'+
-      (_ctCampo(x,'tel1')||_ctCampo(x,'Teléfono 1')?'<a class="e5-btn" style="--e5c:#4ADE80" href="tel:'+_ctCampo(x,'Teléfono 1').replace(/\s/g,'')+'">☎ Llamar</a>':'')+
+    (function(){
+      var t1=_ctCampo(x,'Teléfono 1').replace(/\s/g,'');
+      var num=t1.replace(/[^0-9+]/g,'');
+      return '<div class="ct-acciones">'+
+      (t1?'<a class="e5-btn" style="--e5c:#4ADE80" href="tel:'+t1+'">☎ Llamar</a>':'')+
+      (t1?'<a class="e5-btn" style="--e5c:#A7F3D0" href="sms:'+t1+'">💬 SMS</a>':'')+
+      (num?'<a class="e5-btn" style="--e5c:#25D366" target="_blank" href="https://wa.me/'+num.replace('+','')+'">🟢 WhatsApp</a>':'')+
+      (num?'<a class="e5-btn" style="--e5c:#29B6F6" target="_blank" href="https://t.me/'+num+'">✈ Telegram</a>':'')+
       (mail?'<a class="e5-btn" style="--e5c:#60A5FA" href="mailto:'+mail+'">✉ Correo</a>':'')+
+      (mail?'<button class="e5-btn" style="--e5c:#F87171" onclick="_ctMeet()">📹 Meet</button>':'')+
       (dir?'<a class="e5-btn" style="--e5c:#F59E0B" target="_blank" href="https://maps.google.com/?q='+encodeURIComponent(dir)+'">📍 Mapa</a>':'')+
-    '</div>'+
+      '<button class="e5-btn" style="--e5c:#C4B5FD" onclick="_ctEditar()">✎ Editar</button>'+
+      '</div>';
+    })()+
     tels+
     fila('✉','Email',mail,'mailto:'+mail)+
     fila('🌐','Redes',_ctCampo(x,'Redes'))+
@@ -401,6 +424,19 @@ function _ctDetalle(){
 }
 function _ctChips(){
   var el=document.getElementById('ct-chips'); if(!el) return;
+  var gps={}; _ctData.forEach(function(x){ _ctCampo(x,'Grupos').split(',').forEach(function(s){ s=s.trim(); if(s) gps[s]=1; }); });
+  var gEl=document.getElementById('ct-grupos');
+  if(gEl){
+    var lgs=Object.keys(gps).sort();
+    gEl.innerHTML = lgs.length
+      ? '<div class="ct-letra" style="border:none;padding-top:0">LISTAS</div>'+
+        '<span class="e5-tab'+(_ctGrupo===''?' on':'')+'" data-g="">Todas</span>'+
+        lgs.map(function(g){return '<span class="e5-tab'+(_ctGrupo===g?' on':'')+'" data-g="'+g+'">'+g+'</span>';}).join('')
+      : '';
+    gEl.querySelectorAll('.e5-tab').forEach(function(ch){
+      ch.onclick=function(){ _ctGrupo=ch.dataset.g; _ctChips(); _ctLista(); };
+    });
+  }
   var afs={}; _ctData.forEach(function(x){ var a=_ctCampo(x,'Afinidad'); if(a) afs[a]=1; });
   el.innerHTML='<span class="e5-tab'+(_ctAf===''?' on':'')+'" data-af="">Todos</span>'+
     Object.keys(afs).sort().map(function(a){
@@ -409,6 +445,56 @@ function _ctChips(){
   el.querySelectorAll('.e5-tab').forEach(function(ch){
     ch.onclick=function(){ _ctAf=ch.dataset.af; _ctChips(); _ctLista(); };
   });
+}
+function _ctBarra(){
+  var el=document.getElementById('ct-barra'); if(!el) return;
+  var n=Object.keys(_ctMarcados).length;
+  if(!_ctModo){ el.innerHTML=''; return; }
+  el.innerHTML='<span style="font-family:var(--font-mono);font-size:10px;color:#93C5FD">'+n+' seleccionados</span> '+
+    '<button class="e5-btn" style="--e5c:#60A5FA" id="ct-alista"'+(n?'':' disabled')+'>+ A lista</button> '+
+    '<button class="e5-btn" style="--e5c:#EF4444" id="ct-borrar"'+(n?'':' disabled')+'>🗑 Eliminar</button> '+
+    '<button class="e5-btn" style="--e5c:#94A3B8" id="ct-cancelar">Cancelar</button>';
+  var ids=Object.keys(_ctMarcados);
+  el.querySelector('#ct-cancelar').onclick=function(){ _ctModo=false; _ctMarcados={}; _ctBarra(); _ctLista();
+    document.getElementById('ct-selbtn').textContent='☑ Seleccionar'; };
+  var aL=el.querySelector('#ct-alista');
+  if(aL) aL.onclick=function(){
+    var gps={}; _ctData.forEach(function(x){ _ctCampo(x,'Grupos').split(',').forEach(function(s){s=s.trim();if(s)gps[s]=1;}); });
+    _modal('#60A5FA','📋 Añadir '+ids.length+' a lista',
+      '<div class="e5-f"><label>Lista (elige o escribe nueva)</label>'+
+      '<input data-k="lista" list="ct-listas-dl"><datalist id="ct-listas-dl">'+
+      Object.keys(gps).sort().map(function(g){return '<option value="'+g+'">';}).join('')+'</datalist></div>',
+      function(datos,cerrar,btn){
+        var L=String(datos.lista||'').trim(); if(!L){ _toast('Nombra la lista'); return; }
+        btn.textContent='Guardando…';
+        var pend=ids.length;
+        ids.forEach(function(id){
+          var x=_ctData.find(function(c){return _ctCampo(c,'ID')===id;});
+          var gs=_ctCampo(x,'Grupos').split(',').map(function(s){return s.trim();}).filter(Boolean);
+          if(gs.indexOf(L)<0) gs.push(L);
+          api.editarContacto({ID:id, grupos:gs.join(', ')}).then(function(){ if(--pend===0){
+            _toast('✓ '+ids.length+' añadidos a "'+L+'" (también en tu Sheet)');
+            cerrar(); _ctModo=false; _ctMarcados={};
+            document.getElementById('ct-selbtn').textContent='☑ Seleccionar';
+            window._contactosMontar(); } });
+        });
+      });
+  };
+  var bR=el.querySelector('#ct-borrar');
+  if(bR) bR.onclick=function(){
+    _modal('#EF4444','🗑 Eliminar '+ids.length+' contacto(s)',
+      '<div style="font-size:13px;color:var(--hud-text-mid)">Se borrarán de la app Y de tu Sheet. Sin deshacer.</div>',
+      function(datos,cerrar,btn){
+        btn.textContent='Eliminando…';
+        api.eliminarContactos({ids:ids}).then(function(r){
+          if(r&&r.ok){ _toast('✓ '+r.eliminados+' eliminados'); cerrar();
+            _ctModo=false; _ctMarcados={}; _ctSel=null;
+            document.getElementById('ct-selbtn').textContent='☑ Seleccionar';
+            window._contactosMontar(); }
+          else _toast('Error: '+((r&&r.error)||'?'));
+        });
+      });
+  };
 }
 window._contactosMontar=function(target){
   var board=target||document.getElementById('board-contactos'); if(!board) return;
@@ -430,6 +516,10 @@ window._contactosMontar=function(target){
     '.ct-item{padding:8px 8px;border-radius:8px;cursor:pointer;transition:background .15s}',
     '.ct-item:hover{background:rgba(96,165,250,.08)}',
     '.ct-item.on{background:rgba(96,165,250,.16);box-shadow:inset 2px 0 0 #60A5FA}',
+    '.ct-item{display:flex;align-items:center;gap:8px}',
+    '.ct-item>div{min-width:0}',
+    '.ct-chk{width:16px;height:16px;border-radius:50%;border:1.5px solid #60A5FA;flex-shrink:0}',
+    '.ct-chk.on{background:#60A5FA;box-shadow:0 0 8px rgba(96,165,250,.6)}',
     '.ct-n{font-size:13.5px;color:var(--hud-text);font-weight:600}',
     '.ct-a{font-size:10px;color:var(--hud-text-dim);text-transform:uppercase;letter-spacing:.08em}',
     '#ct-detalle{border:1px solid var(--hud-border);border-radius:var(--rad-lg,12px);',
@@ -455,14 +545,22 @@ window._contactosMontar=function(target){
     root.innerHTML=
       '<div id="ct-izq">'+
       '<div class="e5-hdr" style="margin-bottom:8px"><span class="t" style="--e5c:#60A5FA">📇 CONTACTOS</span>'+
-      '<button class="e5-btn" style="--e5c:#60A5FA" onclick="irAContactoForm()">+ Nuevo</button></div>'+
+      '<span><button class="e5-btn" style="--e5c:#93C5FD" id="ct-selbtn">☑ Seleccionar</button> '+
+      '<button class="e5-btn" style="--e5c:#60A5FA" onclick="irAContactoForm()">+ Nuevo</button></span></div>'+
       '<input id="ct-busca" placeholder="Buscar en todo…">'+
+      '<div id="ct-barra" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"></div>'+
+      '<div id="ct-grupos" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>'+
       '<div id="ct-chips"></div><div id="ct-lista"></div></div>'+
       '<div id="ct-detalle"></div>';
     board.appendChild(root);
     document.getElementById('ct-busca').addEventListener('input',function(){
       _ctQ=this.value; _ctLista();
     });
+    document.getElementById('ct-selbtn').onclick=function(){
+      _ctModo=!_ctModo; if(!_ctModo)_ctMarcados={};
+      this.textContent=_ctModo?'✕ Salir de selección':'☑ Seleccionar';
+      _ctBarra(); _ctLista();
+    };
   }
   _ctLista(); _ctDetalle(); _ctChips();
   api.getContactos().then(function(r){
@@ -484,6 +582,41 @@ window._contactosMontar=function(target){
 window.irAContactos=function(){
   if(typeof _osMostrar==='function'){ _osMostrar('contactos'); window._contactosMontar(); }
   else window._contactosMontar();
+};
+window._ctMeet=function(){
+  if(!_ctSel) return;
+  var mail=_ctCampo(_ctSel,'Email');
+  _toast('Creando Meet e invitando a '+mail+'…');
+  api.crearMeet({email:mail, titulo:'Reunión con '+_ctNombre(_ctSel)}).then(function(r){
+    _toast(r&&r.ok ? '✓ '+r.nota : 'Error: '+((r&&r.error)||'?'));
+  }).catch(function(){ _toast('Error de conexión'); });
+};
+window._ctEditar=function(){
+  if(!_ctSel) return;
+  var x=_ctSel;
+  _modal('#C4B5FD','✎ Editar · '+_ctNombre(x),
+    _campo('nombre','Nombre *',null,null,_ctCampo(x,'Nombre'))+
+    _campo('apellido','Apellido',null,null,_ctCampo(x,'Apellido'))+
+    _campo('tel1','Teléfono 1 *','tel',null,_ctCampo(x,'Teléfono 1'))+
+    _campo('tel2','Teléfono 2','tel',null,_ctCampo(x,'Teléfono 2'))+
+    _campo('tel3','Teléfono 3','tel',null,_ctCampo(x,'Teléfono 3'))+
+    _campo('email','Email','email',null,_ctCampo(x,'Email'))+
+    _campo('redes','Redes',null,null,_ctCampo(x,'Redes'))+
+    _campo('direccion','Dirección',null,null,_ctCampo(x,'Dirección'))+
+    _campo('cumple','Cumpleaños','date',null,'')+
+    _campo('afinidad','Afinidad',null,null,_ctCampo(x,'Afinidad'))+
+    _campo('grupos','Listas (separadas por coma)',null,null,_ctCampo(x,'Grupos'))+
+    _campo('notas','Notas',null,null,_ctCampo(x,'Notas')),
+    function(datos,cerrar,btn){
+      if(!String(datos.nombre||'').trim()){ _toast('El nombre es obligatorio'); return; }
+      if(!String(datos.tel1||'').trim()){ _toast('Al menos un teléfono'); return; }
+      btn.textContent='Guardando…';
+      datos.ID=_ctCampo(x,'ID');
+      api.editarContacto(datos).then(function(r){
+        if(r&&r.ok){ _toast('✓ Actualizado — también en tu Sheet'); cerrar(); window._contactosMontar(); }
+        else _toast('Error: '+((r&&r.error)||'?'));
+      }).catch(function(){ _toast('Error de conexión'); });
+    });
 };
 window.irAContactoForm=function(){
   _modal('#60A5FA','👤 Nuevo contacto',
