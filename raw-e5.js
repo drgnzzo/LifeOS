@@ -675,6 +675,41 @@ window.irAContactoForm=function(){
       }).catch(function(){ _toast('Error de conexión'); });
     });
 };
+/* E5-S — bitácora sin médico, por CONTENIDO (independiente del index):
+   localiza la columna cuyo header dice MÉDICO/SALUD-clínica y el stat
+   MÉDICO, y los oculta. Corre al montar bitácora y en el vigía. */
+function _e5BitLimpia(){
+  var b=document.getElementById('board-bitacora'); if(!b) return;
+  b.querySelectorAll('[data-tipo="salud"]').forEach(function(col){ col.style.display='none'; });
+  b.querySelectorAll('*').forEach(function(el){
+    if(el.children.length===0 && /^(MÉDICO|MEDICO)$/.test(el.textContent.trim())){
+      var caja=el.closest('[class*="col"],[class*="stat"]')||el.parentElement;
+      if(caja && caja!==b) caja.style.display='none';
+    }
+  });
+}
+if(typeof window._renderBitacoraPanel==='function' && !window._renderBitacoraPanel.__e5b){
+  var _rbBase=window._renderBitacoraPanel;
+  window._renderBitacoraPanel=function(){ _rbBase(); _e5BitLimpia(); };
+  window._renderBitacoraPanel.__e5b=true;
+}
+setInterval(function(){
+  if(window._osSeccion==='bitacora') _e5BitLimpia();
+},700);
+
+/* E5-S — BALIZAS: window.e5estado() reporta qué corre realmente */
+window.e5estado=function(){
+  var r={
+    'raw-e5':'E5-S (agenda+eventos+ley dial+bit-limpia)',
+    'ley dial (css)': !!document.getElementById('e5-dial-ley'),
+    'medico en router': !!(window._OS_SECCIONES&&window._OS_SECCIONES.medico),
+    'contactos en router': !!(window._OS_SECCIONES&&window._OS_SECCIONES.contactos),
+    'dial items': (window._DIAL_ITEMS||[]).length,
+    'api E5': ['getContactos','nuevoContacto','editarContacto','crearEvento','getLucy','getAlcohol']
+      .filter(function(f){return !(window.api&&window.api[f]);}).join(',')||'completa'
+  };
+  console.table(r); return '✓';
+};
 /* vigía de montaje (flechas u otras rutas) */
 setInterval(function(){
   if(window._osSeccion==='contactos'){
@@ -841,5 +876,5 @@ function _e5Semana(regs){
    del dial vuelve al v9 canónico + E5-J (fade puro en reapertura).
    El mini-dial sin viaje se rehará leyendo su mecanismo real. */
 
-console.log('[e5] activo · alcohol+lucy+contactos (api extendida: getContactos/getLucy/nuevaLucy/getAlcohol/nuevoAlcohol)');
+console.log('[e5] E5-S activo · e5estado() para diagnóstico · alcohol+lucy+contactos (api extendida: getContactos/getLucy/nuevaLucy/getAlcohol/nuevoAlcohol)');
 })();
