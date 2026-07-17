@@ -462,8 +462,27 @@ function _e5Semana(regs){
     'html.niv-1 #dial-ring-breath,html.niv-warp #dial-ring-breath{'+
     'transition:opacity .38s ease !important}';   /* posición: INSTANTÁNEA */
   document.head.appendChild(st);
+  /* E5-L — LA LEY DE ENTRADA A HOME: durante los primeros 800ms en
+     niv-0, TODA la app solo puede transicionar OPACIDAD. La causa raíz
+     del "flip doble" (007: dialCentro 652→639→660→687) era que el dial
+     vive en flujo y las bandas superiores CRECEN con transición al
+     poblarse → lo empujaban 35px durante su fade. Con esta ley, la
+     geometría salta instantánea mientras el dial sigue invisible, y
+     solo se VE el fundido. Cubre TODAS las rutas (flechas desde
+     LOGROS/RAW, niveles, tabs). */
+  var stFade=document.createElement('style');
+  stFade.textContent='html.e5-fade-only *{transition-property:opacity !important}';
+  document.head.appendChild(stFade);
   var h=document.documentElement, prev=h.classList.contains('niv-1');
+  var prev0=h.classList.contains('niv-0'), tFade=null;
   new MutationObserver(function(){
+    var ahora0=h.classList.contains('niv-0');
+    if(ahora0 && !prev0){
+      h.classList.add('e5-fade-only');
+      clearTimeout(tFade);
+      tFade=setTimeout(function(){ h.classList.remove('e5-fade-only'); },800);
+    }
+    prev0=ahora0;
     var ahora=h.classList.contains('niv-1');
     if(ahora && !prev){
       var d=document.getElementById('dial-canvas');
