@@ -65,7 +65,10 @@ var CSS = [
 '  background:var(--hud-panel-bg);border:1px solid var(--hud-border);',
 '  color:var(--hud-text);font-size:17px;display:flex;align-items:center;',
 '  justify-content:center;transition:all .2s ease;user-select:none}',
-'#e6-tema-btn:hover{border-color:var(--hud-border-strong);transform:scale(1.08)}'
+'#e6-tema-btn:hover{border-color:var(--hud-border-strong);transform:scale(1.08)}',
+/* E6-C: los acentos de módulos e5 (--e5c inline) obedecen al tema */
+'html.tema-echo *{--e5c:#D8DEE0 !important}',
+'html.tema-ejecutivo *{--e5c:#0071E3 !important}'
 ].join('\n');
 
 var st = document.createElement('style');
@@ -73,6 +76,61 @@ st.id = 'e6-temas';
 st.textContent = CSS;
 document.head.appendChild(st);
 
+/* ── E6-C · ACENTOS TEMÁTICOS ──
+   El dial dibuja desde _DIAL_ITEMS[i].accent (JS): se remapea el DATO
+   guardando el original en __acc0, y el canvas lo relee por frame.
+   echo: escala de grises por luminancia (radiografía — los gajos se
+   distinguen por brillo). ejecutivo: mismo matiz, saturación domada
+   (HSL) — cohesión Apple. cosmico: originales restaurados. */
+function _hex2rgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c;}).join('');
+  return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+function _rgb2hex(r,g,b){return '#'+[r,g,b].map(function(x){
+  return ('0'+Math.max(0,Math.min(255,Math.round(x))).toString(16)).slice(-2);}).join('');}
+function _mapear(tema, hex){
+  if(!hex || hex[0]!=='#') return hex;
+  var c=_hex2rgb(hex), r=c[0],g=c[1],b=c[2];
+  if(tema==='echo'){
+    var y=0.2126*r+0.7152*g+0.0722*b;
+    var v=Math.round(140+ (y/255)*115);           /* 140-255: siempre legible en negro */
+    return _rgb2hex(v,v,Math.round(v*0.99));
+  }
+  if(tema==='ejecutivo'){
+    /* HSL: saturación al 45%, luz centrada 46-60% */
+    var mx=Math.max(r,g,b)/255, mn=Math.min(r,g,b)/255, l=(mx+mn)/2, d=mx-mn;
+    var h2=0, s=d===0?0:d/(1-Math.abs(2*l-1));
+    if(d!==0){
+      if(mx===r/255) h2=((g-b)/255/d)%6;
+      else if(mx===g/255) h2=(b-r)/255/d+2;
+      else h2=(r-g)/255/d+4;
+      h2*=60; if(h2<0)h2+=360;
+    }
+    s=Math.min(s,0.5); l=0.46+Math.min(Math.max(l-0.5,0),0.14);
+    var C=(1-Math.abs(2*l-1))*s, X=C*(1-Math.abs((h2/60)%2-1)), m=l-C/2, R,G,B;
+    if(h2<60){R=C;G=X;B=0;}else if(h2<120){R=X;G=C;B=0;}else if(h2<180){R=0;G=C;B=X;}
+    else if(h2<240){R=0;G=X;B=C;}else if(h2<300){R=X;G=0;B=C;}else{R=C;G=0;B=X;}
+    return _rgb2hex((R+m)*255,(G+m)*255,(B+m)*255);
+  }
+  return hex;
+}
+function acentos(tema){
+  var its = window._DIAL_ITEMS;
+  if(its && its.forEach){
+    its.forEach(function(it){
+      if(!it) return;
+      if(!it.__acc0) it.__acc0 = it.accent;
+      it.accent = (tema==='cosmico') ? it.__acc0 : _mapear(tema, it.__acc0);
+      (it.subs||[]).forEach(function(sb){
+        if(!sb.__acc0) sb.__acc0 = sb.accent;
+        sb.accent = (tema==='cosmico') ? sb.__acc0 : _mapear(tema, sb.__acc0);
+      });
+    });
+  }
+  /* tabs de la barra: data-acc */
+  document.querySelectorAll('[data-acc]').forEach(function(el){
+    if(!el.dataset.acc0) el.dataset.acc0 = el.dataset.acc;
+    el.dataset.acc = (tema==='cosmico') ? el.dataset.acc0 : _mapear(tema, el.dataset.acc0);
+  });
+}
 function capas(tema){
   /* cosmos (canvas hijo directo de body, sin id fiable) + juice */
   var esconder = (tema !== 'cosmico');
@@ -90,6 +148,8 @@ function aplicar(tema, avisar){
   h.classList.add('tema-' + tema);
   try{ localStorage.setItem('lifeos-tema', tema); }catch(e){}
   capas(tema);
+  acentos(tema);
+  setTimeout(function(){ acentos(tema); }, 1500);  /* por si core llegó después */
   /* el cosmos se auto-muda a body después: re-aplicar capas al rato */
   setTimeout(function(){ capas(tema); }, 1200);
   setTimeout(function(){ capas(tema); }, 4000);
