@@ -544,7 +544,8 @@ window._contactosMontar=function(target){
     var root=document.createElement('div'); root.id='ct-root';
     root.innerHTML=
       '<div id="ct-izq">'+
-      '<div class="e5-hdr" style="margin-bottom:8px"><span class="t" style="--e5c:#60A5FA">📇 CONTACTOS</span>'+
+      '<button id="ct-burger" title="Listas" style="position:absolute;left:10px;top:10px;z-index:5" class="e5-btn">☰</button>'+
+      '<div class="e5-hdr" style="margin-bottom:8px;padding-left:34px"><span class="t" style="--e5c:#60A5FA">📇 CONTACTOS</span>'+
       '<span><button class="e5-btn" style="--e5c:#93C5FD" id="ct-selbtn">☑ Seleccionar</button> '+
       '<button class="e5-btn" style="--e5c:#60A5FA" onclick="irAContactoForm()">+ Nuevo</button></span></div>'+
       '<input id="ct-busca" placeholder="Buscar en todo…">'+
@@ -552,10 +553,21 @@ window._contactosMontar=function(target){
       '<div id="ct-grupos" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>'+
       '<div id="ct-chips"></div><div id="ct-lista"></div></div>'+
       '<div id="ct-detalle"></div>';
+    root.style.position='relative';
     board.appendChild(root);
+    var cssx=document.createElement('style');
+    cssx.textContent='#ct-root.ct-cerrado{grid-template-columns:0 1fr}'+
+      '#ct-root.ct-cerrado #ct-izq{opacity:0;pointer-events:none;padding:0;border:none;overflow:hidden}'+
+      '#ct-root{transition:grid-template-columns .35s ease}'+
+      '#ct-izq{transition:opacity .25s ease}'+
+      '#ct-root.ct-cerrado #ct-burger{left:10px}';
+    document.head.appendChild(cssx);
     document.getElementById('ct-busca').addEventListener('input',function(){
       _ctQ=this.value; _ctLista();
     });
+    document.getElementById('ct-burger').onclick=function(){
+      document.getElementById('ct-root').classList.toggle('ct-cerrado');
+    };
     document.getElementById('ct-selbtn').onclick=function(){
       _ctModo=!_ctModo; if(!_ctModo)_ctMarcados={};
       this.textContent=_ctModo?'✕ Salir de selección':'☑ Seleccionar';
@@ -675,14 +687,52 @@ window.irAContactoForm=function(){
       }).catch(function(){ _toast('Error de conexión'); });
     });
 };
+/* E5-U — SALTO DIRECTO 2→HOME: volverAlAnverso desde nivel 2 encadena
+   2→1→0 y reproducía las DOS animaciones ("dos parpadeos"). Aquí: si
+   partimos de niv-2, se instala un silenciador (sin animación, dial
+   oculto) durante el tránsito, y al asentarse niv-0 se reproduce UN
+   solo dialEmerger limpio. */
+(function(){
+  var st=document.createElement('style'); st.id='e5-salto';
+  st.textContent='html.e5-saltando #dial-canvas,html.e5-saltando #dial-ambient,'+
+    'html.e5-saltando #dial-ring-breath{animation:none !important;opacity:0 !important}';
+  document.head.appendChild(st);
+  function instalar(){
+    if(typeof window.volverAlAnverso!=='function' || window.volverAlAnverso.__e5u) return;
+    var base=window.volverAlAnverso;
+    window.volverAlAnverso=function(){
+      var h=document.documentElement;
+      var desde2 = h.classList.contains('niv-2');
+      if(desde2){
+        h.classList.add('e5-saltando');
+        var fin=function(){
+          if(!h.classList.contains('niv-0')){ setTimeout(fin,80); return; }
+          setTimeout(function(){
+            h.classList.remove('e5-saltando');
+            var d=document.getElementById('dial-canvas');
+            if(d){ d.classList.remove('dial-anim-up'); void d.offsetWidth;
+                   d.classList.add('dial-anim-up'); }
+          },60);
+        };
+        setTimeout(fin,120);
+        setTimeout(function(){ h.classList.remove('e5-saltando'); },2600); /* red de seguridad */
+      }
+      return base.apply(this,arguments);
+    };
+    window.volverAlAnverso.__e5u=true;
+  }
+  instalar(); document.addEventListener('DOMContentLoaded',instalar);
+  setTimeout(instalar,1500);
+})();
+
 /* E5-S — bitácora sin médico, por CONTENIDO (independiente del index):
    localiza la columna cuyo header dice MÉDICO/SALUD-clínica y el stat
    MÉDICO, y los oculta. Corre al montar bitácora y en el vigía. */
 function _e5BitLimpia(){
   var b=document.getElementById('board-bitacora'); if(!b) return;
-  b.querySelectorAll('[data-tipo="salud"]').forEach(function(col){ col.style.display='none'; });
+  b.querySelectorAll('[data-tipo="salud"],[data-tipo="nutricion"]').forEach(function(col){ col.style.display='none'; });
   b.querySelectorAll('*').forEach(function(el){
-    if(el.children.length===0 && /^(MÉDICO|MEDICO)$/.test(el.textContent.trim())){
+    if(el.children.length===0 && /^(MÉDICO|MEDICO|SALUD)$/.test(el.textContent.trim())){
       var caja=el.closest('[class*="col"],[class*="stat"]')||el.parentElement;
       if(caja && caja!==b) caja.style.display='none';
     }

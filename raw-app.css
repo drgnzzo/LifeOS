@@ -3034,7 +3034,7 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
   100%{ transform:scale(1);   opacity:1;   filter:none; }
 }
 #dial-canvas.dial-anim-down{
-  animation:dialAbatir .9s cubic-bezier(.2,0,0,1) both;
+  animation:dialAbatir 1.25s cubic-bezier(.2,0,0,1) both;
   transform-origin:50% 60%;
 }
 /* 1→0 · EMERGER: el dial se levanta del plano de vuelta a vista cenital */
@@ -3043,7 +3043,7 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
   100%{ transform:scale(1);   opacity:1;  filter:none; }
 }
 #dial-canvas.dial-anim-up{
-  animation:dialEmerger .8s cubic-bezier(.2,0,0,1) both;
+  animation:dialEmerger 1.35s cubic-bezier(.2,0,0,1) both;
   transform-origin:50% 60%;
 }
 
