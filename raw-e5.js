@@ -456,11 +456,17 @@ function _e5Semana(regs){
 (function(){
   var st=document.createElement('style');
   st.id='e5-minidial';
+  /* E5-M — LEY GLOBAL DEL DIAL: jamás viaja, solo se funde. El espía
+     probó que el "doble semi-giro" era el canvas AÚN fixed volviendo
+     de nivel 1 con su top/tamaño EN TRANSICIÓN (barrido con overshoot
+     386→246→268) hasta que el ancla v7.103 lo reconciliaba. Con esta
+     ley, TODA geometría del dial (top/left/width/height/transform)
+     cambia instantánea en cualquier nivel; lo único animable es la
+     opacidad. Grande y mini son dos apariciones por fundido. */
   st.textContent=
-    'html.niv-1 #dial-canvas,html.niv-warp #dial-canvas,'+
-    'html.niv-1 #dial-ambient,html.niv-warp #dial-ambient,'+
-    'html.niv-1 #dial-ring-breath,html.niv-warp #dial-ring-breath{'+
-    'transition:opacity .38s ease !important}';   /* posición: INSTANTÁNEA */
+    '#dial-canvas,#dial-ambient,#dial-ring-breath{'+
+    'transition-property:opacity !important;'+
+    'transition-duration:.38s !important;transition-timing-function:ease !important}';
   document.head.appendChild(st);
   /* E5-L — LA LEY DE ENTRADA A HOME: durante los primeros 800ms en
      niv-0, TODA la app solo puede transicionar OPACIDAD. La causa raíz
