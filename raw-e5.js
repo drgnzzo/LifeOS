@@ -138,6 +138,7 @@ function _e5AlcoholRender(){
     '<div class="e5-kpi"><div class="l">Hoy · alcohol puro</div><div class="v">'+d.hoy.gr+' g</div></div>'+
     '<div class="e5-kpi"><div class="l">Hoy · bebidas</div><div class="v">'+d.hoy.bebidas+'</div></div></div>'+
     _e5Semana(d.registros||[])+
+    _e5Ocho(d.registros||[])+
     (filas
       ? '<table class="e5-tbl"><tr><th>Fecha</th><th>Bebida</th><th>ml</th><th>%</th><th>Puro</th></tr>'+filas+'</table>'
       : '<div class="e5-vacio">Sin registros aún — tu histórico de análisis nace con el primero.</div>');
@@ -545,7 +546,8 @@ window._contactosMontar=function(target){
     root.innerHTML=
       '<div id="ct-izq">'+
       '<div class="e5-hdr" style="margin-bottom:8px"><span class="t" style="--e5c:#60A5FA">📇 CONTACTOS</span>'+
-      '<span><button class="e5-btn" style="--e5c:#93C5FD" id="ct-selbtn">☑ Seleccionar</button> '+
+      '<span><button class="e5-btn" style="--e5c:#60A5FA" id="ct-panelbtn" title="Mostrar/ocultar listas">◧</button> '+
+      '<button class="e5-btn" style="--e5c:#93C5FD" id="ct-selbtn">☑ Seleccionar</button> '+
       '<button class="e5-btn" style="--e5c:#60A5FA" onclick="irAContactoForm()">+ Nuevo</button></span></div>'+
       '<input id="ct-busca" placeholder="Buscar en todo…">'+
       '<div id="ct-barra" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"></div>'+
@@ -556,6 +558,15 @@ window._contactosMontar=function(target){
     document.getElementById('ct-busca').addEventListener('input',function(){
       _ctQ=this.value; _ctLista();
     });
+    document.getElementById('ct-panelbtn').onclick=function(){
+      /* E5-X: colapso simple y sólido — display, sin transiciones de
+         grid ni absolutos (lo que rompió la hamburguesa) */
+      var g=document.getElementById('ct-grupos'), c=document.getElementById('ct-chips');
+      var oculto = g.style.display==='none';
+      g.style.display = oculto?'flex':'none';
+      c.style.display = oculto?'flex':'none';
+      this.style.opacity = oculto?'1':'.5';
+    };
     document.getElementById('ct-selbtn').onclick=function(){
       _ctModo=!_ctModo; if(!_ctModo)_ctMarcados={};
       this.textContent=_ctModo?'✕ Salir de selección':'☑ Seleccionar';
@@ -790,7 +801,21 @@ window._medicoMontar=function(target){
         '<td>'+(r.descripcion||'')+'</td><td>'+(r.doctor||'')+'</td>'+
         '<td>'+(r.estado||'')+'</td></tr>';
     }).join('');
-    h.innerHTML='<div class="e5-hdr"><span class="t" style="--e5c:#F87171">👤 Mi médico</span></div>'+
+    /* E5-X: KPIs — total, próximas (fecha futura), último registro */
+    var hoy=new Date(); hoy.setHours(0,0,0,0);
+    var prox=0, ult=null;
+    items.forEach(function(r){
+      var f=(r.fecha instanceof Date)?r.fecha:new Date(String(r.fecha).split('/').reverse().join('-'));
+      if(!isNaN(f)){
+        if(f>=hoy) prox++;
+        if(!ult||f>ult) ult=f;
+      }
+    });
+    var kpis='<div class="e5-kpis">'+
+      '<div class="e5-kpi" style="--e5c:#F87171"><div class="l">Registros</div><div class="v">'+items.length+'</div></div>'+
+      '<div class="e5-kpi" style="--e5c:#F87171"><div class="l">Próximas</div><div class="v">'+prox+'</div></div>'+
+      '<div class="e5-kpi" style="--e5c:#F87171"><div class="l">Último</div><div class="v" style="font-size:14px">'+(ult?ult.toLocaleDateString('es-MX'):'—')+'</div></div></div>';
+    h.innerHTML='<div class="e5-hdr"><span class="t" style="--e5c:#F87171">👤 Mi médico</span></div>'+kpis+
       (filas
         ? '<table class="e5-tbl"><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Doctor</th><th>Estado</th></tr>'+filas+'</table>'
         : '<div class="e5-vacio">Sin registros — captura desde el gajo MÉDICO del dial (Cita, Síntoma, Medicamento, Resultado, Vacuna).</div>');
@@ -869,6 +894,32 @@ window.irALucy=function(){
 
 
 
+/* E5-X: 8 semanas — gramos de alcohol puro por semana (tendencia) */
+function _e5Ocho(regs){
+  var sem=[], hoy=new Date();
+  for(var i=7;i>=0;i--){
+    var fin=new Date(hoy); fin.setDate(fin.getDate()-i*7);
+    var ini=new Date(fin); ini.setDate(ini.getDate()-6);
+    sem.push({ini:ini,fin:fin,g:0,
+      k:('0'+ini.getDate()).slice(-2)+'/'+('0'+(ini.getMonth()+1)).slice(-2)});
+  }
+  regs.forEach(function(r){
+    var f=r['Fecha'];
+    var d=(f instanceof Date)?f:new Date(String(_fmtF(f)).split('/').reverse().join('-'));
+    if(isNaN(d)) return;
+    sem.forEach(function(s){ if(d>=s.ini&&d<=s.fin) s.g+=Number(r['Alcohol puro (g)'])||0; });
+  });
+  var max=Math.max.apply(null,sem.map(function(s){return s.g;}).concat([1]));
+  return '<div style="font-size:9px;letter-spacing:.12em;color:var(--hud-text-dim);margin:2px 2px 4px">8 SEMANAS · g/semana</div>'+
+    '<div style="display:flex;align-items:flex-end;gap:8px;height:52px;margin:0 2px 14px">'+
+    sem.map(function(s){
+      var v=Math.round(s.g), h=Math.max(3,v/max*42);
+      return '<div style="flex:1;text-align:center">'+
+        '<div style="font-family:var(--font-mono);font-size:9px;color:'+(v?'#FBBF24':'var(--hud-text-faint)')+'">'+(v||'')+'</div>'+
+        '<div style="height:'+h+'px;border-radius:3px 3px 0 0;background:'+(v?'linear-gradient(180deg,#FBBF24,#92400E)':'rgba(255,255,255,.05)')+'"></div>'+
+        '<div style="font-size:8px;color:var(--hud-text-dim);margin-top:3px">'+s.k+'</div></div>';
+    }).join('')+'</div>';
+}
 /* E5-C: últimos 7 días — gramos de alcohol puro por día (barras) */
 function _e5Semana(regs){
   var dias=[], mapa={};
