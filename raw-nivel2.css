@@ -1,114 +1,42 @@
-/* LifeOS — raw-nivel2.css (E6-K · SISTEMA EDITORIAL DEL NIVEL 2)
+/* LifeOS — raw-nivel2.css (E6-L · SISTEMA EDITORIAL v2 — QUIRÚRGICO)
    ═══════════════════════════════════════════════════════════════════
-   Normalización rigurosa de TODAS las pestañas (board-face): un solo
-   ritmo de espaciado, una escala tipográfica, contenedores del mismo
-   ancho, tablas/botones/inputs/checks unificados en tokens. Carga
-   DESPUÉS de raw-app.css: gana la cascada donde toca corregir.
-   Principios: 4/8/12/16/24 de ritmo · mono para cifras y labels ·
-   ancho editorial 1520px centrado · un solo lenguaje de controles.
+   La v1 fue demasiado agresiva: carril de ancho fijo + márgenes auto +
+   min-width:0 universal ESTRANGULARON los layouts propios de cada
+   board (todo estrecho, logros sin scroll, notas invisible).
+   v2 = CERO reglas dimensionales. Cada board conserva SU ancho, SU
+   scroll y SU estructura. Solo se normaliza lo inofensivo: controles,
+   checks, cifras, estados vacíos y desbordes de medios.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── 1 · CONTENEDOR EDITORIAL: mismas márgenes y ancho en TODAS ── */
-.board-face{
-  padding: 26px clamp(18px, 3vw, 52px) 48px !important;
-}
-/* hijos directos al mismo ancho máximo, centrados (parejo entre
-   pestañas: se acabaron los contenedores de anchos distintos) */
-.board-face > div,
-.board-face > section,
-.board-face > table{
-  max-width: 1520px;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-/* módulos e5 dentro de boards: ancho completo del carril editorial */
-.board-face .e5-sec{ width: 100%; box-sizing: border-box; }
-
-/* ── 2 · ESCALA TIPOGRÁFICA (jerarquía consistente) ── */
-.board-face h1, .board-face h2,
-.board-face .sec-titulo, .board-face [class*="-titulo"]{
+/* ── cifras en mono con dígitos tabulares (solo tipografía) ── */
+.board-face td.num, .board-face .num{
   font-family: var(--font-mono);
-  font-size: 16px; font-weight: 800;
-  letter-spacing: .18em; text-transform: uppercase;
-  margin: 0 0 6px 0;
-}
-.board-face h3{
-  font-family: var(--font-mono);
-  font-size: 12px; font-weight: 800;
-  letter-spacing: .14em; text-transform: uppercase;
-  color: var(--hud-text-mid);
-  margin: 18px 0 10px;
-}
-.board-face .sub, .board-face [class*="-sub"]{
-  font-size: 11px; letter-spacing: .08em;
-  color: var(--hud-text-dim);
-}
-/* cifras SIEMPRE en mono */
-.board-face td.num, .board-face .num,
-.board-face [class*="-monto"], .board-face [class*="-valor"],
-.board-face [class*="kpi"] b{
-  font-family: var(--font-mono) !important;
   font-variant-numeric: tabular-nums;
 }
 
-/* ── 3 · TABLAS: un solo lenguaje en todos los tableros ── */
-.board-face table{
-  width: 100%; border-collapse: collapse; font-size: 12.5px;
-}
-.board-face th{
-  font-family: var(--font-mono); font-size: 9px; font-weight: 800;
-  letter-spacing: .12em; text-transform: uppercase;
-  color: var(--hud-text-dim); text-align: left;
-  padding: 8px 10px; border-bottom: 1px solid var(--hud-border);
-}
-.board-face td{
-  padding: 8px 10px; color: var(--hud-text-mid);
-  border-bottom: 1px solid rgba(255,255,255,.05);
-  vertical-align: middle;
-}
-.board-face tr:hover td{ background: rgba(255,255,255,.025); }
-
-/* ── 4 · CONTROLES: botones, inputs, selects, checks — unificados ── */
-.board-face button, .board-face .btn, .board-face a.e5-btn{
-  min-height: 30px; cursor: pointer;
-  font-family: var(--font-mono); font-size: 10px; font-weight: 800;
-  letter-spacing: .1em; text-transform: uppercase;
-  border-radius: var(--rad-chip, 6px);
-  transition: all .18s ease;
-}
+/* ── controles: coherencia sin tocar tamaños de layout ── */
+.board-face button{ cursor: pointer; }
 .board-face button:active{ transform: translateY(1px); }
 .board-face button[disabled]{ opacity: .38; cursor: not-allowed; }
-.board-face input[type="text"], .board-face input[type="search"],
-.board-face input[type="number"], .board-face input[type="date"],
-.board-face input[type="time"], .board-face input[type="tel"],
-.board-face input[type="email"], .board-face select, .board-face textarea{
-  background: rgba(255,255,255,.045);
-  border: 1px solid var(--hud-border);
-  border-radius: var(--rad-card, 8px);
-  color: var(--hud-text);
-  padding: 8px 11px; font-size: 13px; font-family: var(--font-ui);
-  box-sizing: border-box;
-}
-.board-face input:focus, .board-face select:focus, .board-face textarea:focus{
-  outline: none; border-color: var(--hud-border-strong);
-}
 .board-face input[type="checkbox"], .board-face input[type="radio"]{
   accent-color: var(--e5c, #A78BFA);
-  width: 15px; height: 15px; cursor: pointer;
+  cursor: pointer;
 }
 .board-face label{ cursor: pointer; }
-.board-face a{ color: var(--hud-text); }
-.board-face a:hover{ color: #fff; }
 
-/* ── 5 · ESTADOS VACÍOS: una sola voz ── */
-.board-face .e5-vacio, .board-face [class*="vacio"], .board-face .empty{
+/* ── inputs: solo foco visible, sin re-estilizar cajas ── */
+.board-face input:focus-visible,
+.board-face select:focus-visible,
+.board-face textarea:focus-visible{
+  outline: 2px solid var(--hud-border-strong);
+  outline-offset: 1px;
+}
+
+/* ── estados vacíos: una sola voz (solo color/tono) ── */
+.board-face .e5-vacio{
   color: var(--hud-text-faint);
-  font-size: 12px; letter-spacing: .04em;
-  text-align: center; padding: 22px 8px;
+  letter-spacing: .04em;
 }
 
-/* ── 6 · ALINEACIÓN: nada pegado a los bordes, nada descolgado ── */
-.board-face img, .board-face canvas, .board-face svg, .board-face table{
-  max-width: 100%;
-}
-.board-face *{ min-width: 0; }   /* flex/grid no revientan el carril */
+/* ── medios jamás desbordan su contenedor (inofensivo) ── */
+.board-face img, .board-face canvas{ max-width: 100%; }
