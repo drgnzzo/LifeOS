@@ -25,6 +25,7 @@
   <!-- IMPORTANTE: tokens ANTES de raw-app — la cascada y :root necesitan este orden -->
   <link rel="stylesheet" href="raw-tokens.css?v=8400">
   <link rel="stylesheet" href="raw-app.css?v=9090">
+<link rel="stylesheet" href="raw-nivel2.css">
   <link rel="stylesheet" href="raw-mobile.css?v=9050">
 
 <style id="e5-fix">
@@ -53,6 +54,21 @@
    contenido, overlay:3735) scrollea por dentro. Ambos males, cerrados:
    ni aplastadas ni cortadas. */
 html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
+/* E6-I · UNA SOLA VÁLVULA: con el tope activo, los envoltorios
+   internos de tablas (tbl-wrap y familia — v9 les recalcula
+   max-height dinámico: el scroll "bailarín") LIBERAN su scroll
+   propio; todo el exceso fluye por la única válvula exterior
+   (.hud-expanded-content). Dinámico de verdad: si la pantalla es
+   alta y la card cabe, el tope no ata, la válvula duerme y no hay
+   barra alguna. */
+html.cf-on .hud-pnl .hud-expanded-content .tbl-wrap,
+html.cf-on .hud-pnl .hud-expanded-content .fjx-tbl-wrap,
+html.cf-on .hud-pnl .hud-expanded-content .vrx-tbl-wrap,
+html.cf-on .hud-pnl .hud-expanded-content [class*="tbl-wrap"]{
+  max-height:none !important;
+  height:auto !important;
+  overflow:visible !important;
+}
 .hud-pnl .hud-expanded-content::-webkit-scrollbar{width:7px}
 .hud-pnl .hud-expanded-content::-webkit-scrollbar-thumb{
   background:rgba(167,139,250,.3);border-radius:4px}

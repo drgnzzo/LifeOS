@@ -149,6 +149,42 @@ function boton(){
   document.body.appendChild(b);
 }
 
+/* ═══ E6-K · botones() — AUDITOR DE CONTROLES ═══
+   Párate en una pestaña y córrelo EN DEVTOOLS: lista cada botón/link/
+   check VISIBLE y su cableado. muerto=true → candidato a reparación
+   (sin onclick, sin href útil y sin listeners — getEventListeners solo
+   existe en la consola de DevTools; fuera de ahí marca '¿?'). */
+window.botones = function(){
+  var out = [];
+  document.querySelectorAll('button, a, [onclick], input[type=checkbox], input[type=radio], .e5-btn, .e5-tab')
+    .forEach(function(el){
+      var r = el.getBoundingClientRect();
+      if(r.width < 2 || r.height < 2) return;
+      var texto = (el.textContent||el.value||'').trim().slice(0,28) ||
+                  el.getAttribute('title') || el.id || el.tagName;
+      var onclick = !!el.getAttribute('onclick');
+      var href = el.tagName==='A' ? (el.getAttribute('href')||'') : '';
+      var hrefUtil = href && href !== '#';
+      var listeners = '¿?';
+      try{
+        if(typeof getEventListeners === 'function'){
+          var L = getEventListeners(el);
+          listeners = Object.keys(L).length ? Object.keys(L).join(',') : '—';
+        }
+      }catch(e){}
+      var esCheck = el.tagName==='INPUT';
+      var muerto = !onclick && !hrefUtil && !esCheck &&
+                   (listeners==='—');
+      out.push({ ctrl: texto, tag: el.tagName.toLowerCase(),
+        onclick: onclick?'✓':'', href: hrefUtil?'✓':'',
+        listeners: listeners, MUERTO: muerto?'⚠ SÍ':'' });
+    });
+  console.log('🔘 CONTROLES VISIBLES: '+out.length+
+    ' · muertos: '+out.filter(function(x){return x.MUERTO;}).length);
+  console.table(out);
+  return 'Pásame las filas con ⚠ y caen por nombre.';
+};
+
 /* rebeldes(): mapa de pulido (colores inline que resisten al tema) */
 window.rebeldes = function(){
   var mapa = {};
