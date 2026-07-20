@@ -450,8 +450,9 @@ function _ctChips(){
 function _ctBarra(){
   var el=document.getElementById('ct-barra'); if(!el) return;
   var n=Object.keys(_ctMarcados).length;
-  if(!_ctModo){ el.innerHTML=''; return; }
-  el.innerHTML='<span style="font-family:var(--font-mono);font-size:10px;color:#FCA5A5">'+n+' seleccionados</span> '+
+  if(!_ctModo){ el.innerHTML=''; el.style.display='none'; return; }
+  el.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+  el.innerHTML='<span style="font-family:var(--font-mono);font-size:10px;color:#FCA5A5;white-space:nowrap">'+n+' seleccionados</span> '+
     '<button class="e5-btn" style="--e5c:#F87171" id="ct-alista"'+(n?'':' disabled')+'>+ A lista</button> '+
     '<button class="e5-btn" style="--e5c:#EF4444" id="ct-borrar"'+(n?'':' disabled')+'>🗑 Eliminar</button> '+
     '<button class="e5-btn" style="--e5c:#94A3B8" id="ct-cancelar">Cancelar</button>';
@@ -544,17 +545,45 @@ window._contactosMontar=function(target){
     document.head.appendChild(css);
     var root=document.createElement('div'); root.id='ct-root';
     root.innerHTML=
-      '<div id="ct-izq">'+
-      '<div class="e5-hdr" style="margin-bottom:8px"><span class="t" style="--e5c:#F87171">📇 CONTACTOS</span>'+
-      '<span><button class="e5-btn" style="--e5c:#F87171" id="ct-panelbtn" title="Mostrar/ocultar listas">◧</button> '+
-      '<button class="e5-btn" style="--e5c:#FCA5A5" id="ct-selbtn">☑ Seleccionar</button> '+
-      '<button class="e5-btn" style="--e5c:#F87171" onclick="irAContactoForm()">+ Nuevo</button></span></div>'+
-      '<input id="ct-busca" placeholder="Buscar en todo…">'+
-      '<div id="ct-barra" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"></div>'+
-      '<div id="ct-grupos" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>'+
-      '<div id="ct-chips"></div><div id="ct-lista"></div></div>'+
-      '<div id="ct-detalle"></div>';
+      /* E6-J · JERARQUÍA: toolbar plena → selección → cuerpo grid */
+      '<div id="ct-top">'+
+        '<span class="t" style="--e5c:#F87171;font-family:var(--font-mono);font-size:12px;font-weight:800;letter-spacing:.16em;color:#F87171;white-space:nowrap">📇 CONTACTOS</span>'+
+        '<input id="ct-busca" placeholder="Buscar en todo…">'+
+        '<span style="flex:1"></span>'+
+        '<button class="e5-btn" style="--e5c:#FCA5A5" id="ct-panelbtn" title="Mostrar/ocultar filtros">◧ Filtros</button>'+
+        '<button class="e5-btn" style="--e5c:#FCA5A5" id="ct-selbtn">☑ Seleccionar</button>'+
+        '<button class="e5-btn" style="--e5c:#F87171" onclick="irAContactoForm()">+ Nuevo</button>'+
+      '</div>'+
+      '<div id="ct-barra"></div>'+
+      '<div id="ct-cuerpo">'+
+        '<div id="ct-izq">'+
+          '<div id="ct-grupos"></div>'+
+          '<div id="ct-chips"></div>'+
+          '<div id="ct-lista"></div>'+
+        '</div>'+
+        '<div id="ct-detalle"></div>'+
+      '</div>';
     board.appendChild(root);
+    if(!document.getElementById('ct-css2')){
+      var c2=document.createElement('style'); c2.id='ct-css2';
+      c2.textContent=[
+      '#ct-root{display:flex !important;flex-direction:column;gap:12px;grid-template-columns:none !important}',
+      '#ct-root{padding:16px clamp(14px,2vw,32px) 24px;box-sizing:border-box}',
+      '#ct-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;',
+      '  background:var(--hud-panel-bg);border:1px solid var(--hud-border);',
+      '  border-radius:var(--rad-lg,12px);padding:10px 16px}',
+      '#ct-top #ct-busca{flex:1;min-width:180px;max-width:420px;margin:0}',
+      '#ct-barra:empty{display:none}',
+      '#ct-barra{background:var(--hud-panel-bg);border:1px solid var(--hud-border);',
+      '  border-radius:var(--rad-lg,12px);padding:8px 16px;margin:0 !important}',
+      '#ct-cuerpo{display:grid;grid-template-columns:minmax(260px,340px) 1fr;',
+      '  gap:14px;flex:1;min-height:0}',
+      '#ct-izq #ct-grupos:empty,#ct-izq #ct-chips:empty{display:none}',
+      '#ct-izq #ct-grupos,#ct-izq #ct-chips{margin-bottom:8px}',
+      '@media(max-width:1000px){#ct-cuerpo{grid-template-columns:1fr;grid-template-rows:minmax(220px,42%) 1fr}}'
+      ].join('\n');
+      document.head.appendChild(c2);
+    }
     document.getElementById('ct-busca').addEventListener('input',function(){
       _ctQ=this.value; _ctLista();
     });
@@ -742,9 +771,8 @@ if(typeof window._renderBitacoraPanel==='function' && !window._renderBitacoraPan
   window._renderBitacoraPanel=function(){ _rbBase(); _e5BitLimpia(); };
   window._renderBitacoraPanel.__e5b=true;
 }
-setInterval(function(){
-  if(window._osSeccion==='bitacora') _e5BitLimpia();
-},700);
+/* E6-M: sin intervalo — el CSS estático (arriba) oculta salud+nutrición
+   desde el arranque; el JS reactivo causaba el glitch 4→3 al entrar */
 
 /* E5-S — BALIZAS: window.e5estado() reporta qué corre realmente */
 window.e5estado=function(){
@@ -838,7 +866,7 @@ window._medicoMontar=function(target){
 /* reacomodo: la columna/stat médico salen de BITÁCORA (viven aquí) */
 (function(){
   var st=document.createElement('style');
-  st.textContent='#board-bitacora [data-tipo="salud"]{display:none !important}\n'+
+  st.textContent='#board-bitacora [data-tipo="salud"],#board-bitacora [data-tipo="nutricion"]{display:none !important}\n'+
     '#board-bitacora .bit-stat:has(.fa-heart-pulse){display:none !important}';
   document.head.appendChild(st);
 })();
@@ -908,7 +936,10 @@ window.irALucy=function(){
   function _sosStrip(board){
     if(document.getElementById('e5-sos-dest')) return;
     var s=document.createElement('div'); s.id='e5-sos-dest';
-    s.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 26px 2px';
+    s.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;'+
+      'margin:16px 26px 4px;padding:10px 16px;'+
+      'background:var(--hud-panel-bg);border:1px solid var(--hud-border);'+
+      'border-radius:var(--rad-lg,12px)';
     board.insertBefore(s, board.firstChild?board.firstChild.nextSibling:null);
     _sosStripPinta();
   }

@@ -61,13 +61,16 @@ html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
    (.hud-expanded-content). Dinámico de verdad: si la pantalla es
    alta y la card cabe, el tope no ata, la válvula duerme y no hay
    barra alguna. */
+/* E6-M · SOLO liberar el max-height VERTICAL de los wraps; el
+   overflow-x (scroll horizontal de tablas anchas: Variables, Fijos)
+   se CONSERVA — matarlo encimaba las columnas/balas. */
 html.cf-on .hud-pnl .hud-expanded-content .tbl-wrap,
 html.cf-on .hud-pnl .hud-expanded-content .fjx-tbl-wrap,
 html.cf-on .hud-pnl .hud-expanded-content .vrx-tbl-wrap,
 html.cf-on .hud-pnl .hud-expanded-content [class*="tbl-wrap"]{
   max-height:none !important;
-  height:auto !important;
-  overflow:visible !important;
+  overflow-y:visible !important;
+  /* overflow-x intacto: las tablas anchas siguen scrolleando de lado */
 }
 .hud-pnl .hud-expanded-content::-webkit-scrollbar{width:7px}
 .hud-pnl .hud-expanded-content::-webkit-scrollbar-thumb{
