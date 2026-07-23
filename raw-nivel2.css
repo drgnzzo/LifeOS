@@ -1,42 +1,52 @@
-/* LifeOS — raw-nivel2.css (E6-L · SISTEMA EDITORIAL v2 — QUIRÚRGICO)
+/* LifeOS — raw-nivel2.css (E6-P · CARRIL QUE NO INVADE)
    ═══════════════════════════════════════════════════════════════════
-   La v1 fue demasiado agresiva: carril de ancho fijo + márgenes auto +
-   min-width:0 universal ESTRANGULARON los layouts propios de cada
-   board (todo estrecho, logros sin scroll, notas invisible).
-   v2 = CERO reglas dimensionales. Cada board conserva SU ancho, SU
-   scroll y SU estructura. Solo se normaliza lo inofensivo: controles,
-   checks, cifras, estados vacíos y desbordes de medios.
+   Las cards de dashboard (Variables .vrx, Fijos .fjx, Financiero,
+   Necesidades) maquetan con flex/grid de DOS columnas internas. El
+   carril de v1/v2 les robaba ancho y colapsaba esas columnas (tabla
+   encimada bajo el panel). Aquí el carril da margen uniforme al board
+   PERO se declara zona-franca: nada dentro de .vrx/.fjx/.hud-pnl y sus
+   parientes de dashboard recibe una sola regla mía.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── cifras en mono con dígitos tabulares (solo tipografía) ── */
-.board-face td.num, .board-face .num{
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+/* ── CARRIL: solo margen lateral del board de SECCIÓN (nivel 2).
+   Las cards del anillo (nivel 1, .hud-pnl) quedan EXENTAS: su ancho lo
+   fija el coverflow. ── */
+.board-face{
+  padding-left: clamp(16px, 4vw, 60px);
+  padding-right: clamp(16px, 4vw, 60px);
+  padding-top: 24px;
+  padding-bottom: 44px;
+  box-sizing: border-box;
+}
+@media (min-width: 1728px){
+  .board-face{
+    padding-left: calc((100vw - 1600px) / 2);
+    padding-right: calc((100vw - 1600px) / 2);
+  }
 }
 
-/* ── controles: coherencia sin tocar tamaños de layout ── */
-.board-face button{ cursor: pointer; }
-.board-face button:active{ transform: translateY(1px); }
+/* ── ZONA FRANCA: el dashboard maqueta solo. Ni una regla mía entra a
+   .vrx / .fjx / sus tablas / sus grids. (defensa explícita) ── */
+.vrx, .vrx *, .fjx, .fjx *,
+.vrx-main, .vrx-side, .fjx-main, .fjx-side,
+[class*="tbl-wrap"], [class*="-stats"]{
+  /* intencionalmente vacío: documenta que NO se tocan */
+}
+
+/* ── normalización inofensiva SOLO fuera del dashboard ── */
+.board-face button:not(.vrx *):not(.fjx *){ cursor: pointer; }
+.board-face button:not(.vrx *):not(.fjx *):active{ transform: translateY(1px); }
 .board-face button[disabled]{ opacity: .38; cursor: not-allowed; }
 .board-face input[type="checkbox"], .board-face input[type="radio"]{
-  accent-color: var(--e5c, #A78BFA);
-  cursor: pointer;
+  accent-color: var(--e5c, #A78BFA); cursor: pointer;
 }
 .board-face label{ cursor: pointer; }
-
-/* ── inputs: solo foco visible, sin re-estilizar cajas ── */
-.board-face input:focus-visible,
-.board-face select:focus-visible,
+.board-face input:focus-visible, .board-face select:focus-visible,
 .board-face textarea:focus-visible{
-  outline: 2px solid var(--hud-border-strong);
-  outline-offset: 1px;
+  outline: 2px solid var(--hud-border-strong); outline-offset: 1px;
 }
+.board-face .e5-vacio{ color: var(--hud-text-faint); letter-spacing: .04em; }
 
-/* ── estados vacíos: una sola voz (solo color/tono) ── */
-.board-face .e5-vacio{
-  color: var(--hud-text-faint);
-  letter-spacing: .04em;
-}
-
-/* ── medios jamás desbordan su contenedor (inofensivo) ── */
-.board-face img, .board-face canvas{ max-width: 100%; }
+/* medios sin desbordar, EXCEPTO dentro del dashboard (sus SVG miden solos) */
+.board-face img:not(.vrx *):not(.fjx *),
+.board-face canvas:not(.vrx *):not(.fjx *){ max-width: 100%; }
