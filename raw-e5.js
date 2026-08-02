@@ -132,7 +132,7 @@ function _e5AlcoholRender(){
   }).join('');
   host.innerHTML =
     '<div class="e5-hdr"><span class="t">🍺 Alcohol · registro diario</span>'+
-    '<button class="e5-btn" id="e5-alc-add">+ Registrar</button></div>'+
+    '<span style="font-size:9px;color:var(--hud-text-faint);letter-spacing:.08em">CAPTURA DESDE EL DIAL · GAJO NUTRICIÓN</span></div>'+
     '<div class="e5-kpis">'+
     '<div class="e5-kpi"><div class="l">Hoy · ml</div><div class="v">'+d.hoy.ml+'</div></div>'+
     '<div class="e5-kpi"><div class="l">Hoy · alcohol puro</div><div class="v">'+d.hoy.gr+' g</div></div>'+
@@ -142,7 +142,8 @@ function _e5AlcoholRender(){
     (filas
       ? '<table class="e5-tbl"><tr><th>Fecha</th><th>Bebida</th><th>ml</th><th>%</th><th>Puro</th></tr>'+filas+'</table>'
       : '<div class="e5-vacio">Sin registros aún — tu histórico de análisis nace con el primero.</div>');
-  document.getElementById('e5-alc-add').onclick=function(){
+  /* E6-S: el botón del panel se retiró — la captura entra por el dial */
+  window.irAAlcoholForm=function(){
     _modal('#F59E0B','🍺 Registrar bebida',
       _campo('bebida','Bebida (cerveza, vino, mezcal…)')+
       _campo('ml','Cantidad (ml)','number','min="0" step="10"')+
@@ -168,6 +169,8 @@ function _e5AlcoholMontar(){
   if(document.getElementById('e5-alcohol')) return;
   var sec=document.createElement('div');
   sec.className='e5-sec'; sec.id='e5-alcohol'; sec.style.setProperty('--e5c','#F59E0B');
+  /* E6-S: mismo carril que los KPIs de nutrición (nada de márgenes propios) */
+  sec.style.margin='18px 0 0 0'; sec.style.width='100%'; sec.style.boxSizing='border-box';
   body.appendChild(sec);
   _e5AlcoholRender(); _e5AlcoholCargar();
 }
@@ -253,6 +256,27 @@ function _lucyCargar(){
   api.getLucy().then(function(r){ if(r&&r.ok){ _lucyData=r; _lucyRender(); } })
     .catch(function(){});
 }
+/* E6-S · AGUA desde el dial → hoja Nutrición (columna Agua (L)),
+   misma hoja que las comidas: los KPIs y la gráfica ya la leen. */
+window.irAAguaForm=function(){
+  _modal('#38BDF8','💧 Registrar agua',
+    _campo('agua','Cantidad (litros)','number','min="0" step="0.1" value="0.5"')+
+    _campo('notas','Notas (opcional)'),
+    function(datos,cerrar,btn){
+      var L=Number(datos.agua)||0;
+      if(!L){ _toast('Pon los litros'); return; }
+      btn.textContent='Guardando…';
+      api.guardarNutricion({momento:'Agua', comida:'Agua', agua:L, notas:datos.notas||''})
+        .then(function(r){
+          if(r&&r.ok){ _toast('✓ '+L+' L registrados');
+            cerrar();
+            if(typeof window._hydrateNutricion==='function') window._hydrateNutricion();
+            else if(typeof irANutricion==='function') irANutricion();
+          } else _toast('Error: '+((r&&r.mensaje)||'?'));
+        }).catch(function(){ _toast('Error de conexión'); });
+    });
+};
+
 window._lucyEditarCampo=function(campo){
   var actual=(_lucyData&&_lucyData.ficha&&_lucyData.ficha[campo])||'';
   _modal('#EC4899','✎ '+campo,

@@ -283,7 +283,7 @@ var _DIAL_ITEMS = [
     ]},
 
   // ── NUTRICIÓN ──
-  { id:'nutricion', label:'Salud', accent:'#86efac',   /* E5: renombre */
+  { id:'nutricion', label:'Nutrición', accent:'#86efac',   /* E6-S */
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y+2*k,7*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x,y-5*k);ctx.bezierCurveTo(x,y-12*k,x+7*k,y-11*k,x+6*k,y-5*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();},
     subs:[
       {id:'nutricion', label:'Ver sección', accent:'#86efac', draw:_icoTexto('👁'),
@@ -294,6 +294,10 @@ var _DIAL_ITEMS = [
        preset:function(){ window._dialPreset={tab:'nutricion',momento:'Comida'}; }},
       {id:'nutricion', label:'Cena',     accent:'#c4b5fd', draw:_icoTexto('🌙'),
        preset:function(){ window._dialPreset={tab:'nutricion',momento:'Cena'}; }},
+      {id:'nutricion', label:'Agua',     accent:'#38BDF8', draw:_icoTexto('💧'),
+       preset:function(){ window._dialPreset={irA:'irAAguaForm'}; }},
+      {id:'nutricion', label:'Alcohol',  accent:'#F59E0B', draw:_icoTexto('🍺'),
+       preset:function(){ window._dialPreset={irA:'irAAlcoholForm'}; }},
       {id:'nutricion', label:'Snack',    accent:'#f0abfc', draw:_icoTexto('🍎'),
        preset:function(){ window._dialPreset={tab:'nutricion',momento:'Snack'}; }},
     ]},
