@@ -294,6 +294,8 @@ var _DIAL_ITEMS = [
        preset:function(){ window._dialPreset={tab:'nutricion',momento:'Comida'}; }},
       {id:'nutricion', label:'Cena',     accent:'#c4b5fd', draw:_icoTexto('🌙'),
        preset:function(){ window._dialPreset={tab:'nutricion',momento:'Cena'}; }},
+      {id:'nutricion', label:'Sueño',    accent:'#6366F1', draw:_icoTexto('😴'),
+       preset:function(){ window._dialPreset={irA:'irASuenoForm'}; }},
       {id:'nutricion', label:'Agua',     accent:'#38BDF8', draw:_icoTexto('💧'),
        preset:function(){ window._dialPreset={irA:'irAAguaForm'}; }},
       {id:'nutricion', label:'Alcohol',  accent:'#F59E0B', draw:_icoTexto('🍺'),

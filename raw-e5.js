@@ -19,6 +19,7 @@ var EXT = {
   getLucy:      function(){ return EN_GAS?gasRun('getLucy'):apiGet('getLucy'); },
   nuevaLucy:    function(d){ return EN_GAS?gasRun('nuevaLucy',d):apiPost('nuevaLucy',{datos:d}); },
   getAlcohol:   function(){ return EN_GAS?gasRun('getAlcohol'):apiGet('getAlcohol'); },
+  getSueno:     function(){ return EN_GAS?gasRun('getSueno'):apiGet('getSueno'); },
   nuevoAlcohol: function(d){ return EN_GAS?gasRun('nuevoAlcohol',d):apiPost('nuevoAlcohol',{datos:d}); },
   editarLucyFicha: function(d){ return EN_GAS?gasRun('editarLucyFicha',d):apiPost('editarLucyFicha',{datos:d}); }
 };
@@ -120,6 +121,129 @@ function _campo(k,l,tipo,extra,val){
   return '<div class="e5-f"><label>'+l+'</label><input data-k="'+k+'" type="'+(tipo||'text')+'" value="'+v+'" '+(extra||'')+'></div>';
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   E6-T · SUEÑO — captura desde el dial (gajo NUTRICIÓN → 😴 Sueño) y
+   panel de métricas en la sección NUTRICIÓN. Tipos que SUMAN al total
+   del día: siesta matutina, siesta vespertina, descanso nocturno,
+   siesta/otro. Almacén: hoja SUENO. Filtros: día · semana · mes · todo.
+   ═══════════════════════════════════════════════════════════════════ */
+var _SUE_TIPOS = ['Descanso nocturno','Siesta matutina','Siesta vespertina','Otro'];
+var _sueData = null, _sueRango = 'semana';
+
+window.irASuenoForm = function(){
+  function pad(n){ return ('0'+n).slice(-2); }
+  var hoy = new Date();
+  var f = hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+  _modal('#6366F1','😴 Registrar sueño',
+    _campo('fecha','Fecha','date',null,f)+
+    '<div class="e5-f"><label>Tipo</label><select data-k="tipo">'+
+      _SUE_TIPOS.map(function(t){ return '<option>'+t+'</option>'; }).join('')+
+    '</select></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+
+      _campo('horas','Horas','number','min="0" max="24" step="1"',0)+
+      _campo('minutos','Minutos','number','min="0" max="59" step="5"',0)+
+      '<div class="e5-f"><label>Calidad</label><select data-k="calidad">'+
+        '<option value="">—</option><option>1</option><option>2</option>'+
+        '<option>3</option><option>4</option><option>5</option></select></div>'+
+    '</div>'+
+    _campo('notas','Notas (opcional)'),
+    function(datos, cerrar, btn){
+      var hh = Number(datos.horas)||0, mm = Number(datos.minutos)||0;
+      if(hh===0 && mm===0){ _toast('Pon la duración'); return; }
+      btn.textContent = 'Guardando…';
+      api.nuevoSueno(datos).then(function(r){
+        if(r && r.ok){
+          _toast('✓ '+r.total+' h de '+String(datos.tipo).toLowerCase());
+          cerrar(); _sueCargar();
+        } else _toast('Error: '+((r&&r.error)||'?'));
+      }).catch(function(){ _toast('Error de conexión'); });
+    });
+};
+
+function _sueRender(){
+  var host = document.getElementById('e5-sueno'); if(!host) return;
+  var regs = (_sueData && _sueData.registros) || [];
+  var ahora = new Date(), desde = new Date(0);
+  if(_sueRango === 'dia'){ desde = new Date(ahora); desde.setHours(0,0,0,0); }
+  if(_sueRango === 'semana'){ desde = new Date(ahora); desde.setDate(desde.getDate()-6); desde.setHours(0,0,0,0); }
+  if(_sueRango === 'mes'){ desde = new Date(ahora); desde.setDate(desde.getDate()-29); desde.setHours(0,0,0,0); }
+  var f = regs.filter(function(r){ return new Date(r.fecha) >= desde; });
+
+  /* agrupar por día para el total diario y la barra */
+  var porDia = {};
+  f.forEach(function(r){
+    var d = new Date(r.fecha);
+    var k = ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2);
+    porDia[k] = (porDia[k]||0) + r.total;
+  });
+  var dias = Object.keys(porDia);
+  var totalH = f.reduce(function(a,r){ return a + r.total; }, 0);
+  var promedio = dias.length ? totalH/dias.length : 0;
+  var calid = f.filter(function(r){ return r.calidad>0; });
+  var calProm = calid.length ? calid.reduce(function(a,r){ return a+r.calidad; },0)/calid.length : 0;
+
+  /* barras por día (hasta 30) */
+  var orden = dias.slice(-30);
+  var max = Math.max.apply(null, orden.map(function(k){ return porDia[k]; }).concat([1]));
+  var barras = orden.length ? '<div style="display:flex;align-items:flex-end;gap:6px;height:66px;margin:6px 2px 12px">'+
+    orden.map(function(k){
+      var v = Math.round(porDia[k]*10)/10, h = Math.max(3, v/max*54);
+      return '<div style="flex:1;text-align:center;min-width:0">'+
+        '<div style="font-family:var(--font-mono);font-size:9px;color:#818CF8">'+v+'</div>'+
+        '<div style="height:'+h+'px;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#818CF8,#3730A3)"></div>'+
+        '<div style="font-size:8px;color:var(--hud-text-dim);margin-top:3px">'+k+'</div></div>';
+    }).join('')+'</div>' : '';
+
+  /* desglose por tipo */
+  var porTipo = {};
+  f.forEach(function(r){ porTipo[r.tipo||'Otro'] = (porTipo[r.tipo||'Otro']||0) + r.total; });
+  var tipos = Object.keys(porTipo).sort(function(a,b){ return porTipo[b]-porTipo[a]; })
+    .map(function(t){
+      return '<tr><td>'+t+'</td><td class="num">'+(Math.round(porTipo[t]*10)/10)+' h</td>'+
+        '<td class="num">'+Math.round(porTipo[t]/(totalH||1)*100)+'%</td></tr>';
+    }).join('');
+
+  host.innerHTML =
+    '<div class="e5-hdr"><span class="t" style="--e5c:#818CF8">😴 Sueño</span>'+
+    '<span style="font-size:9px;color:var(--hud-text-faint);letter-spacing:.08em">CAPTURA DESDE EL DIAL · GAJO NUTRICIÓN</span></div>'+
+    '<div class="e5-tabs" id="sue-rangos">'+
+      [['dia','Hoy'],['semana','7 días'],['mes','30 días'],['todo','Todo']].map(function(p){
+        return '<span class="e5-tab'+(_sueRango===p[0]?' on':'')+'" data-r="'+p[0]+'" style="--e5c:#818CF8">'+p[1]+'</span>';
+      }).join('')+'</div>'+
+    '<div class="e5-kpis">'+
+      '<div class="e5-kpi" style="--e5c:#818CF8"><div class="l">Total</div><div class="v">'+(Math.round(totalH*10)/10)+' h</div></div>'+
+      '<div class="e5-kpi" style="--e5c:#818CF8"><div class="l">Promedio / día</div><div class="v">'+(Math.round(promedio*10)/10)+' h</div></div>'+
+      '<div class="e5-kpi" style="--e5c:#818CF8"><div class="l">Registros</div><div class="v">'+f.length+'</div></div>'+
+      '<div class="e5-kpi" style="--e5c:#818CF8"><div class="l">Calidad</div><div class="v">'+(calProm?Math.round(calProm*10)/10:'—')+'</div></div>'+
+    '</div>'+
+    barras +
+    (tipos
+      ? '<table class="e5-tbl"><tr><th>Tipo</th><th>Horas</th><th>%</th></tr>'+tipos+'</table>'
+      : '<div class="e5-vacio">Sin registros en este rango — captura desde el gajo NUTRICIÓN → 😴 Sueño.</div>');
+
+  host.querySelectorAll('#sue-rangos .e5-tab').forEach(function(ch){
+    ch.onclick = function(){ _sueRango = ch.dataset.r; _sueRender(); };
+  });
+}
+function _sueCargar(){
+  if(!api.getSueno) return;
+  api.getSueno().then(function(r){ if(r && r.ok){ _sueData = r; _sueRender(); } }).catch(function(){});
+}
+function _sueMontar(){
+  var body = document.getElementById('nut-panel-body') || document.getElementById('board-nutricion');
+  if(!body || document.getElementById('e5-sueno')) return;
+  var sec = document.createElement('div');
+  sec.className = 'e5-sec'; sec.id = 'e5-sueno';
+  sec.style.setProperty('--e5c','#818CF8');
+  sec.style.cssText += ';margin:18px 0 0 0;width:100%;box-sizing:border-box';
+  /* antes del bloque de alcohol si existe */
+  var alc = document.getElementById('e5-alcohol');
+  if(alc && alc.parentNode) alc.parentNode.insertBefore(sec, alc);
+  else body.appendChild(sec);
+  _sueRender(); _sueCargar();
+}
+
 /* ═══ ALCOHOL (dentro de SALUD, ex-Nutrición) ═══ */
 var _alcData=null;
 function _e5AlcoholRender(){
@@ -173,6 +297,7 @@ function _e5AlcoholMontar(){
   sec.style.margin='18px 0 0 0'; sec.style.width='100%'; sec.style.boxSizing='border-box';
   body.appendChild(sec);
   _e5AlcoholRender(); _e5AlcoholCargar();
+  _sueMontar();   /* E6-T */
 }
 /* colgarse del render de nutrición/salud (existe en ambas versiones) */
 (function(){
@@ -342,7 +467,7 @@ window._lucyMontar=function(target){
    escribe nuevoContacto). El gajo 13 CONTACTO captura vía form propio
    (nombre + 1 teléfono obligatorios; el resto opcional pero presente).
    Scrolls contenidos por el Contrato de Contención. ═══ */
-['editarContacto','eliminarContactos','crearMeet','crearEvento'].forEach(function(fn){
+['editarContacto','eliminarContactos','crearMeet','crearEvento','nuevoSueno'].forEach(function(fn){
   if(!window.api[fn]) window.api[fn]=function(d){return EN_GAS?gasRun(fn,d):apiPost(fn,{datos:d});};
 });
 if(!window.api.nuevoContacto)
