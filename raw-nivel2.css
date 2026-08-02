@@ -50,3 +50,24 @@
 /* medios sin desbordar, EXCEPTO dentro del dashboard (sus SVG miden solos) */
 .board-face img:not(.vrx *):not(.fjx *),
 .board-face canvas:not(.vrx *):not(.fjx *){ max-width: 100%; }
+
+/* ═══ E6-R · SCROLL VERTICAL DE LOS BOARDS (logros y compañía) ═══
+   La grilla de logros (58 tarjetas) se cortaba contra la barra de TIP:
+   el board no scrolleaba. Aquí cada board de sección scrollea por sí
+   mismo hasta el alto del viewport, con hueco inferior para la barra
+   inferior fija. Dinámico: si el contenido cabe, no aparece barra. */
+.board-face{
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  /* hueco para la barra inferior fija (TIP / stats) */
+  padding-bottom: 96px;
+}
+/* barra fina, en tokens del tema */
+.board-face::-webkit-scrollbar{ width: 9px; }
+.board-face::-webkit-scrollbar-track{ background: transparent; }
+.board-face::-webkit-scrollbar-thumb{
+  background: var(--hud-border); border-radius: 99px;
+}
+.board-face::-webkit-scrollbar-thumb:hover{ background: var(--hud-border-strong); }
