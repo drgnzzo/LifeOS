@@ -408,6 +408,20 @@ var _DIAL_ITEMS = [
       {id:'contacto', label:'Ver agenda', accent:'#93C5FD', draw:_icoTexto('📇'),
        preset:function(){ window._dialPreset={irA:'irAContactos'}; }}
     ] },
+  // ── LOGRO (E6-V: gajo 14 — metas y compras) ──
+  { id:'logro', label:'Logro', accent:'#FACC15',
+    draw:function(ctx,x,y,s,c){var k=s/22;
+      ctx.beginPath();ctx.moveTo(x-5*k,y-6*k);ctx.lineTo(x+5*k,y-6*k);ctx.lineTo(x+4*k,y-1*k);
+      ctx.arc(x,y-1*k,4.2*k,0,Math.PI);ctx.closePath();ctx.strokeStyle=c;ctx.lineWidth=1.9;ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,y+3.2*k);ctx.lineTo(x,y+6*k);ctx.moveTo(x-3.4*k,y+6.6*k);ctx.lineTo(x+3.4*k,y+6.6*k);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x-5*k,y-5*k);ctx.arc(x-7*k,y-3.6*k,2.2*k,Math.PI*1.5,Math.PI*0.5);
+      ctx.moveTo(x+5*k,y-5*k);ctx.arc(x+7*k,y-3.6*k,2.2*k,Math.PI*1.5,Math.PI*0.5,true);ctx.lineWidth=1.5;ctx.stroke();},
+    subs:[
+      {id:'logro', label:'Nuevo', accent:'#FACC15', draw:_icoTexto('🏆'),
+       preset:function(){ window._dialPreset={irA:'irALogroForm'}; }},
+      {id:'logro', label:'Ver logros', accent:'#FDE68A', draw:_icoTexto('📋'),
+       preset:function(){ window._dialPreset={irA:'irALogros'}; }}
+    ] },
 ];
 
 

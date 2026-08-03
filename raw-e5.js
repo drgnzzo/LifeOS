@@ -131,6 +131,43 @@ function _campo(k,l,tipo,extra,val){
 var _SUE_TIPOS = ['Descanso nocturno','Siesta matutina','Siesta vespertina','Otro'];
 var _sueData = null, _sueRango = 'semana';
 
+/* E6-V · LOGRO — form completo (hoja Logros, mismo esquema que lee
+   getLogros: proyecto · contacto · concepto · monto · recurrencia ·
+   descripción · fecha). Captura desde el dial, gajo LOGRO. */
+window.irALogroForm = function(){
+  function pad(n){ return ('0'+n).slice(-2); }
+  var hoy = new Date();
+  var f = hoy.getFullYear()+'-'+pad(hoy.getMonth()+1)+'-'+pad(hoy.getDate());
+  _modal('#FACC15','🏆 Nuevo logro',
+    _campo('concepto','Concepto * (qué quieres lograr o comprar)')+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+      _campo('monto','Monto ($)','number','min="0" step="1"')+
+      _campo('fecha','Fecha objetivo','date',null,f)+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+      '<div class="e5-f"><label>Categoría / proyecto</label><select data-k="proyecto">'+
+        ['','Salud','Accesorios','Educación','Tecnología','Hogar','Misceláneos']
+          .map(function(t){ return '<option>'+t+'</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="e5-f"><label>Recurrencia</label><select data-k="recurrencia">'+
+        ['','Única','Mensual','Anual'].map(function(t){ return '<option>'+t+'</option>'; }).join('')+
+      '</select></div>'+
+    '</div>'+
+    _campo('contacto','Contacto / proveedor (opcional)')+
+    _campo('descripcion','Descripción (opcional)'),
+    function(datos, cerrar, btn){
+      if(!String(datos.concepto||'').trim()){ _toast('El concepto es obligatorio'); return; }
+      btn.textContent = 'Guardando…';
+      api.nuevoLogro(datos).then(function(r){
+        if(r && r.ok){
+          _toast('✓ Logro '+r.id+' creado');
+          cerrar();
+          if(typeof irALogros === 'function') irALogros();
+        } else _toast('Error: '+((r&&r.error)||'?'));
+      }).catch(function(){ _toast('Error de conexión'); });
+    });
+};
+
 window.irASuenoForm = function(){
   function pad(n){ return ('0'+n).slice(-2); }
   var hoy = new Date();
@@ -467,7 +504,7 @@ window._lucyMontar=function(target){
    escribe nuevoContacto). El gajo 13 CONTACTO captura vía form propio
    (nombre + 1 teléfono obligatorios; el resto opcional pero presente).
    Scrolls contenidos por el Contrato de Contención. ═══ */
-['editarContacto','eliminarContactos','crearMeet','crearEvento','nuevoSueno'].forEach(function(fn){
+['editarContacto','eliminarContactos','crearMeet','crearEvento','nuevoSueno','nuevoLogro'].forEach(function(fn){
   if(!window.api[fn]) window.api[fn]=function(d){return EN_GAS?gasRun(fn,d):apiPost(fn,{datos:d});};
 });
 if(!window.api.nuevoContacto)

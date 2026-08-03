@@ -13,7 +13,7 @@
 (function(){
 'use strict';
 
-var TEMAS = ['cosmico','oficina','echo'];
+var TEMAS = ['cosmico','echo'];   /* E6-N: Oficina retirado por orden del usuario */
 var ETIQ  = {cosmico:'🌌 Cósmico', oficina:'🏢 Oficina', echo:'🩻 Echo (radiografía)'};
 
 var CSS = [
@@ -211,10 +211,143 @@ window.rebeldes = function(){
 
 var guardado = 'cosmico';
 try{ guardado = localStorage.getItem('lifeos-tema') || 'cosmico'; }catch(e){}
-if(guardado === 'ejecutivo') guardado = 'oficina';   /* migración del tema retirado */
+if(guardado === 'ejecutivo' || guardado === 'oficina') guardado = 'cosmico';   /* temas retirados → cósmico */
 aplicar(guardado, false);
 if(document.readyState !== 'loading') boton();
 else document.addEventListener('DOMContentLoaded', boton);
 
-console.log('[temas] E6-F v2 · ' + ETIQ[guardado] + ' · ◐ cicla · rebeldes() audita');
+/* ═══════════════════════════════════════════════════════════════════
+   E6-Q · diagLifeOS() — AUDITORÍA TOTAL EN UN COMANDO.
+   Corre TODO sobre la pestaña actual: layouts colapsados (el bug de
+   Variables), desbordes, márgenes dispares, controles muertos y
+   colores rebeldes al tema. Encadena q007()/auditar() si existen.
+   ═══════════════════════════════════════════════════════════════════ */
+window.diagLifeOS = function(){
+  var R = {};
+  console.log('%c== DIAG LIFEOS · AUDITORIA TOTAL ==','color:#A78BFA;font-weight:bold');
+
+  /* 1 · LAYOUTS COLAPSADOS (columnas encimadas) */
+  var colapsados = [];
+  document.querySelectorAll('body *').forEach(function(el){
+    var cs = getComputedStyle(el);
+    var esFlexFila = (cs.display==='flex' && cs.flexDirection.indexOf('row')===0);
+    var esGridCols = (cs.display==='grid' && cs.gridTemplateColumns.split(' ').length>1);
+    if(!esFlexFila && !esGridCols) return;
+    var r = el.getBoundingClientRect();
+    if(r.width<60 || r.height<20) return;
+    var hijos = Array.prototype.filter.call(el.children, function(c){
+      var rc = c.getBoundingClientRect(); return rc.width>4 && rc.height>4; });
+    if(hijos.length<2) return;
+    var xs = hijos.map(function(c){ return Math.round(c.getBoundingClientRect().left); });
+    var unicos = xs.filter(function(x,i){ return xs.indexOf(x)===i; });
+    if(unicos.length===1){
+      colapsados.push({ zona: el.id || ('.'+String(el.className||'').split(' ')[0]),
+        hijos: hijos.length, display: cs.display, ancho: Math.round(r.width) });
+    }
+  });
+  R.colapsados = colapsados.length;
+  if(colapsados.length){
+    console.log('%c[!] LAYOUTS COLAPSADOS ('+colapsados.length+') — columnas encimadas:','color:#F87171;font-weight:bold');
+    console.table(colapsados.slice(0,12));
+  } else console.log('%c[ok] Layouts sin colapsos','color:#4ADE80');
+
+  /* 2 · DESBORDES */
+  var desbordes = [];
+  document.querySelectorAll('.board-face *, .hud-pnl *').forEach(function(el){
+    var p = el.parentElement; if(!p) return;
+    var r = el.getBoundingClientRect(), rp = p.getBoundingClientRect();
+    if(r.width<10 || rp.width<10) return;
+    if(r.right > rp.right + 6 && getComputedStyle(p).overflowX === 'visible'){
+      desbordes.push({ elem: el.id || ('.'+String(el.className||'').split(' ')[0]) || el.tagName,
+        sobra_px: Math.round(r.right - rp.right) });
+    }
+  });
+  R.desbordes = desbordes.length;
+  if(desbordes.length){
+    console.log('%c[!] DESBORDES ('+desbordes.length+'):','color:#FBBF24;font-weight:bold');
+    console.table(desbordes.slice(0,10));
+  } else console.log('%c[ok] Sin desbordes','color:#4ADE80');
+
+  /* 3 · MÁRGENES DISPARES en el board visible */
+  var boards = Array.prototype.filter.call(document.querySelectorAll('.board-face'), function(b){
+    var r = b.getBoundingClientRect(); return r.width > 100 && r.height > 100; });
+  if(boards.length){
+    var b0 = boards[0];
+    var xs2 = Array.prototype.filter.call(b0.children, function(c){
+      var r = c.getBoundingClientRect(); return r.width>80 && r.height>10; })
+      .map(function(c){ return Math.round(c.getBoundingClientRect().left); });
+    var u2 = xs2.filter(function(x,i){ return xs2.indexOf(x)===i; });
+    R.margenes = u2.length;
+    if(u2.length>1) console.log('%c[!] MARGENES DISPARES: '+u2.length+' arranques -> '+u2.join(', '),'color:#FBBF24');
+    else console.log('%c[ok] Margenes uniformes','color:#4ADE80');
+  }
+
+  /* 4 · CONTROLES SIN CABLEADO */
+  var muertos = [];
+  document.querySelectorAll('button, a[href], [onclick], .e5-btn, .e5-tab').forEach(function(el){
+    var r = el.getBoundingClientRect(); if(r.width<2 || r.height<2) return;
+    var tiene = !!el.getAttribute('onclick') ||
+      (el.tagName==='A' && el.getAttribute('href') && el.getAttribute('href')!=='#');
+    var lis = '?';
+    try{ if(typeof getEventListeners === 'function'){
+      var L = getEventListeners(el);
+      lis = Object.keys(L).length ? 'si' : 'no';
+      if(Object.keys(L).length) tiene = true;
+    } }catch(e){}
+    if(!tiene && lis === 'no')
+      muertos.push({ ctrl: (el.textContent||'').trim().slice(0,26) || el.id || el.tagName });
+  });
+  R.muertos = muertos.length;
+  if(muertos.length){
+    console.log('%c[!] CONTROLES SIN CABLEADO ('+muertos.length+'):','color:#F87171;font-weight:bold');
+    console.table(muertos.slice(0,12));
+  } else console.log('%c[ok] Controles cableados (corre en DevTools para deteccion fina)','color:#4ADE80');
+
+  /* 5 · REBELDES AL TEMA */
+  var tema = TEMAS.filter(function(x){
+    return document.documentElement.classList.contains('tema-'+x); })[0] || 'cosmico';
+  var mapa = {}, RE = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]+\)/g;
+  document.querySelectorAll('body *').forEach(function(el){
+    var st2 = el.getAttribute('style'); if(!st2) return;
+    var r = el.getBoundingClientRect(); if(r.width<2 || r.height<2) return;
+    (st2.match(RE)||[]).forEach(function(c){
+      if(c.indexOf('var(')>=0) return;
+      var k = c.toLowerCase(); mapa[k] = (mapa[k]||0)+1;
+    });
+  });
+  var reb = Object.keys(mapa).map(function(k){ return {color:k, usos:mapa[k]}; })
+    .sort(function(a,b){ return b.usos-a.usos; });
+  R.rebeldes = reb.length;
+  console.log('%c[tema:'+tema+'] REBELDES: '+reb.length+' colores hardcodeados',
+    reb.length>12 ? 'color:#FBBF24' : 'color:#4ADE80');
+  if(reb.length) console.table(reb.slice(0,15));
+
+  /* 5b · CAZADOR DE BLUR: quién aplica filter/backdrop-filter activo */
+  var blurs = [];
+  document.querySelectorAll('body *').forEach(function(el){
+    var cs = getComputedStyle(el);
+    var f = cs.filter || 'none', bf = cs.backdropFilter || cs.webkitBackdropFilter || 'none';
+    if((f.indexOf('blur')<0) && (bf.indexOf('blur')<0)) return;
+    var r = el.getBoundingClientRect();
+    if(r.width<40 || r.height<40) return;
+    blurs.push({ elem: el.id || ('.'+String(el.className||'').split(' ')[0]) || el.tagName,
+      filter: f.slice(0,26), backdrop: bf.slice(0,26),
+      tam: Math.round(r.width)+'x'+Math.round(r.height),
+      opacidad: cs.opacity, zIndex: cs.zIndex });
+  });
+  R.blurs = blurs.length;
+  if(blurs.length){
+    console.log('%c[!] BLURS ACTIVOS ('+blurs.length+') — quien nubla la pantalla:','color:#F87171;font-weight:bold');
+    console.table(blurs.slice(0,12));
+  } else console.log('%c[ok] Sin blurs activos','color:#4ADE80');
+
+  /* 6 · encadenar diagnosticos del proyecto */
+  try{ if(typeof q007==='function'){ console.log('%c-- 007 --','color:#67E8F9'); q007(); } }catch(e){}
+  try{ if(typeof auditar==='function'){ console.log('%c-- auditor --','color:#67E8F9'); auditar(); } }catch(e){}
+
+  console.log('%c== RESUMEN: '+JSON.stringify(R)+' ==','color:#A78BFA;font-weight:bold');
+  return R;
+};
+
+console.log('[temas] E6-F v2 · ' + ETIQ[guardado] + ' · ◐ cicla · diagLifeOS() = auditoría total');
 })();
