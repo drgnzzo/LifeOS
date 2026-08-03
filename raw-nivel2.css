@@ -56,13 +56,31 @@
    el board no scrolleaba. Aquí cada board de sección scrollea por sí
    mismo hasta el alto del viewport, con hueco inferior para la barra
    inferior fija. Dinámico: si el contenido cabe, no aparece barra. */
-.board-face{
-  max-height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  /* hueco para la barra inferior fija (TIP / stats) */
-  padding-bottom: 96px;
+/* E6-U · CORRECCIÓN: el board trae style="overflow:hidden" INLINE
+   (gana a la hoja) y además maqueta con su propio flex/grid interno.
+   Poner el scroll en .board-face no funcionaba y peleaba con su
+   layout ("quiere subir"). El scroll va en el CONTENEDOR INTERNO que
+   desborda — en LOGROS es #lgr-grid-wrap dentro de #lgr-body. */
+
+/* cadena flex/grid: sin min-height:0 el hijo nunca puede scrollear */
+#board-logros{ display:flex; flex-direction:column; }
+#lgr-body{ min-height:0; flex:1; }
+#lgr-grid-wrap{
+  min-height:0;
+  max-height:100%;
+  overflow-y:auto !important;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  padding-bottom:24px;
+}
+#lgr-sidebar{ min-height:0; overflow-y:auto; }
+
+/* mismo patrón para otros boards con envoltura propia de contenido */
+#board-notas .notas-grid,
+#board-timers .tmr-grid,
+#board-medico #e5-medico,
+#board-sos #e5-ct-slot{
+  min-height:0;
 }
 /* barra fina, en tokens del tema */
 .board-face::-webkit-scrollbar{ width: 9px; }
@@ -71,3 +89,10 @@
   background: var(--hud-border); border-radius: 99px;
 }
 .board-face::-webkit-scrollbar-thumb:hover{ background: var(--hud-border-strong); }
+
+/* E6-U · barra visible en la rejilla de logros */
+#lgr-grid-wrap::-webkit-scrollbar,#lgr-sidebar::-webkit-scrollbar{width:10px}
+#lgr-grid-wrap::-webkit-scrollbar-track,#lgr-sidebar::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:99px}
+#lgr-grid-wrap::-webkit-scrollbar-thumb,#lgr-sidebar::-webkit-scrollbar-thumb{background:rgba(167,139,250,.45);border-radius:99px}
+#lgr-grid-wrap::-webkit-scrollbar-thumb:hover,#lgr-sidebar::-webkit-scrollbar-thumb:hover{background:rgba(167,139,250,.75)}
+#lgr-grid-wrap{scrollbar-width:thin;scrollbar-color:rgba(167,139,250,.45) transparent}
