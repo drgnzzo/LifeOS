@@ -143,12 +143,30 @@
 
 /* ── GRID DE CARDS ── */
 #lgr-grid-wrap {
-  /* v6.067: sin scroll vertical — la app no tiene scroll en ninguna
-     sección (igual que el overlay/Home). */
-  overflow:hidden;
+  /* v9.12: scroll vertical propio. La reja de logros crece más allá del
+     alto de la pantalla, así que necesita desplazarse. Acotado a ESTE
+     contenedor: el resto de la app conserva su comportamiento sin scroll.
+     min-height:0 es obligatorio — sin él, un hijo de grid no encoge y la
+     reja se desborda en vez de desplazarse. */
+  overflow-y:auto;
+  overflow-x:hidden;
+  min-height:0;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(139,92,246,0.35) transparent;
   padding:16px 20px 24px;
   background:transparent;
 }
+#lgr-grid-wrap::-webkit-scrollbar        { width:8px; }
+#lgr-grid-wrap::-webkit-scrollbar-track  { background:transparent; }
+#lgr-grid-wrap::-webkit-scrollbar-thumb  {
+  background:rgba(139,92,246,0.30);
+  border-radius:4px;
+  border:2px solid transparent;
+  background-clip:content-box;
+}
+#lgr-grid-wrap::-webkit-scrollbar-thumb:hover { background:rgba(167,139,250,0.55); background-clip:content-box; }
 
 #inv-grid-full {
   display:grid;
