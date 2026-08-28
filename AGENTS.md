@@ -82,6 +82,16 @@ Verifica **evaluando en Node**, no solo comprobando sintaxis.
 - Escribe solo cuando cambia (patrón comparar-y-escribir) para evitar tremolina
 - Nunca midas geometría del DOM durante animaciones
 - `transition-property` en CSS **no** detiene a los escritores JS por cuadro (lerps, parallax)
+- **Un cero y un «sin dato» no son lo mismo.** Si una métrica no tiene
+  fuente, devuelve `null` y píntala en gris. Un `0` se lee como «vas
+  pésimo» y dispara alarma sobre algo que en realidad no se está midiendo.
+
+  > Ya pasó: cinco de las nueve barras del SIM marcaban `0` permanente
+  > porque su fórmula nunca se escribió. Y `_calcLogroReciente` leía
+  > `l.titulo`/`l.avance`, campos que `getLogros()` nunca devolvió, así
+  > que el chip mostraba «—» y 0% desde siempre, en silencio.
+  > **Antes de leer un campo, verifica que el endpoint lo devuelva.**
+
 - **`appendChild` mueve, no copia.** Un nodo con `id` único montado desde
   dos sitios se lo pelean: el segundo se lo arranca al primero y el primero
   se queda vacío. Si dos lugares muestran lo mismo, el que cierra devuelve
@@ -323,6 +333,50 @@ editar → Nueva versión). Pegar sin redesplegar no aplica nada.
 - **LOGROS** mezcla dos esquemas: casi todas las filas sin ID, las dos
   últimas con `L137`/`L138`. Más ~90 filas vacías intercaladas
 - **CONTACTOS:** 206 registros, columna `Afinidad` vacía en todos
+
+### Motor de necesidades (SIM) — `raw-sims.js`
+
+Transposición del sistema de motivos de Los Sims a datos reales. Diez
+barras 0-100 que **bajan solas con el tiempo** y se recargan con lo que
+registras.
+
+**La regla que lo sostiene:** no hay servidor ni tareas programadas, así
+que ninguna barra se guarda. Cada necesidad es una **función pura** de
+*(registros del Sheet, hora actual)*. Consecuencias: bajan en tiempo real
+sin cron, no hay estado que corromper, y abrir la app en otro dispositivo
+da el mismo número. Un `setInterval` de 30 s solo repinta; no toca la red.
+
+| Barra | Fuente | Decae |
+|---|---|---|
+| energia | último sueño: ciclos de 1.5 h + calidad − alcohol | horas despierto |
+| hidratacion | `nutricion.hoy.agua` vs meta | al ritmo del día |
+| hambre | `nutricion.hoy.cal` vs meta + horas sin comer | al ritmo del día |
+| cuerpo | último entrenamiento + minutos de la semana | 50/día |
+| higiene | hábito con tag `higiene` | 4.2/hora |
+| entorno | hábito con tag `entorno` | 33/día |
+| mental | último pensamiento | 35/día |
+| social | última interacción en relaciones | 25/día |
+| disfrute | último logro completado | 15/día |
+| trabajo | % de hábitos Electronics de hoy | diario |
+
+**Sueño por ciclos, no por horas.** 5 ciclos de 1.5 h = 7.5 h = 100.
+Despertar a media fase resta 8 puntos: por eso 7 h (4 ciclos + media
+fase) puntúa 68 y 6 h limpias puntúan 76. La calidad 1-5 multiplica de
+0.85 a 1.05 — dormir excelente da colchón sobre 100 que se gasta durante
+el día.
+
+**El tag `sims`** vive en la columna **I** de la hoja `Activity Check`,
+en las filas de hábitos personales. Escribe ahí `higiene` o `entorno`.
+El mecanismo ya existía en el backend desde antes; nunca se había usado.
+
+- `_calcSimsNeeds` (raw-overlay.js) es solo un **adaptador** que delega en
+  `window.SIMS.calcular()`. Conserva debajo el cálculo viejo como respaldo
+  por si `raw-sims.js` no carga. Los tres sitios que la llaman no cambiaron
+- Todo lo calibrable está en `SIMS.META`, editable en caliente desde consola
+- **`simsDiag()`** imprime cada barra, su valor y **por qué** está ahí
+- Supuesto pendiente: se asume despertar a las 07:00 (`META.horaDespertar`),
+  porque los registros de sueño guardan horas totales pero no la hora de
+  despertar. Capturarla mejoraría energía e hidratación
 
 ### Rumbo a largo plazo
 Capas, en este orden estricto:
