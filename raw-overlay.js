@@ -686,12 +686,31 @@ var _SIMS_NEEDS = [
   { key:'entorno',  label:'Entorno',  icon:'🏠', color:'#86EFAC' },
   { key:'social',   label:'Social',   icon:'👥', color:'#93C5FD' },
   { key:'trabajo',  label:'Trabajo',  icon:'💼', color:'#22D3EE' },
+  /* v9.18 — Hidratación. La rejilla ya era 2x5, el décimo hueco estaba
+     libre. El agua es de lo poco que se registra a diario y no tenía
+     barra: getNutricion ya devuelve hoy.agua desde hace tiempo. */
+  { key:'hidratacion', label:'Hidratación', icon:'💧', color:'#38BDF8' },
 ];
 
 function _calcSimsNeeds(){
+  /* v9.18 — El cálculo vive en raw-sims.js (motor de necesidades).
+     Esta función se queda como adaptador: los tres sitios que la llaman
+     siguen recibiendo el mismo objeto {clave: 0-100}, así que no se tocó
+     ni un renderer.
+
+     Diferencia importante con la versión de abajo: el motor devuelve
+     null cuando NO HAY DATO, en vez de 0. Antes, cinco de las nueve
+     barras marcaban 0 permanente porque su fórmula nunca se escribió, y
+     un 0 se lee como "vas pésimo" cuando en realidad era "no sé".
+
+     El bloque viejo se conserva debajo como respaldo: si raw-sims.js no
+     cargó, la banda sigue pintando algo en lugar de romperse. */
+  if (window.SIMS && typeof window.SIMS.calcular === 'function') {
+    try { return window.SIMS.calcular(); } catch(e){ console.warn('[sims] motor falló, usando respaldo:', e); }
+  }
+  // ── Respaldo (comportamiento previo a v9.18) ──
   // Cada need: 0-100. Empieza en 0 y SUMA según datos reales.
   // Si no hay datos definidos para un need → queda en 0.
-  // (Los thresholds y fórmulas reales se definirán cuando exista la lógica de scoring.)
   var n = { hambre:0, energia:0, cuerpo:0, higiene:0, mental:0, disfrute:0, entorno:0, social:0, trabajo:0 };
   var act = window._actData;
   if(act){
@@ -902,10 +921,15 @@ function renderSimsBandSimsStyle(targetId){
   // Estructura: barra ocupa el espacio principal (flex:2), label a la izquierda
   el.innerHTML = _SIMS_NEEDS.map(function(s){
     var v = needs[s.key];
-    if(v === undefined || v === null) v = 0;
+    /* v9.18 — "sin dato" y "en cero" NO son lo mismo. null se pinta en
+       gris con un guion; el 0 se pinta en rojo, porque es un cero real
+       que sí te está diciendo algo. */
+    var sinDato = (v === undefined || v === null);
+    if(sinDato) v = 0;
     var col = s.color;
-    var barCol = v === 0 ? 'rgba(120,120,130,0.45)' : (v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col));
-    var valCol = v === 0 ? 'rgba(180,184,200,0.50)' : barCol;
+    var barCol = sinDato ? 'rgba(120,120,130,0.45)' : (v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col));
+    var valCol = sinDato ? 'rgba(180,184,200,0.50)' : barCol;
+    var vTxt   = sinDato ? '—' : v;
     return ''+
       '<div class="hud-need">'+
         '<div class="hud-need-top">'+
@@ -913,7 +937,7 @@ function renderSimsBandSimsStyle(targetId){
           '<span class="hud-need-l">'+s.label+'</span>'+
         '</div>'+
         '<div class="hud-need-mid">'+
-          '<span class="hud-need-v" style="color:'+valCol+'">'+v+'<span class="max">/100</span></span>'+
+          '<span class="hud-need-v" style="color:'+valCol+'">'+vTxt+'<span class="max">/100</span></span>'+
         '</div>'+
         '<div class="hud-need-bar-wrap">'+
           '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'aa,'+barCol+');box-shadow:0 0 6px '+barCol+'88"></div>'+
