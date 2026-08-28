@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════
-   LifeOS · raw-sims.js  v1.0
+   LifeOS · raw-sims.js  v1.1
    MOTOR DE NECESIDADES — transposición del sistema de motivos de Los Sims
 
    ── LA IDEA ─────────────────────────────────────────────────────────
@@ -116,6 +116,26 @@
 
   function _clamp(n){ return Math.max(0, Math.min(100, Math.round(n))); }
 
+  /* v1.1 — Nunca confíes en items[0].
+
+     getEntrenamiento y getPensamientos hacen .reverse() antes de
+     devolver, así que items[0] es la ÚLTIMA fila de la hoja. Y la última
+     fila suele venir vacía o a medio llenar: su fecha llega como '' y
+     _aFecha devuelve null. Resultado: "fecha ilegible" aunque hubiera
+     treinta registros buenos detrás.
+
+     Esto recorre TODOS y se queda con el más reciente que sí se pueda
+     leer. Deja de depender del orden en que el backend los mande. */
+  function _diasDelMasReciente(items, campo){
+    if (!items || !items.length) return null;
+    var mejor = null;
+    for (var i = 0; i < items.length; i++){
+      var d = _diasDesde(items[i][campo || 'fecha']);
+      if (d !== null && (mejor === null || d < mejor)) mejor = d;
+    }
+    return mejor;
+  }
+
   /* Nota: devuelve null, NO 0, cuando no hay fuente. Ver cabecera. */
   function _sinDato(motivo){ return { v:null, por:motivo }; }
 
@@ -183,10 +203,18 @@
      castigo por alcohol y desgaste por horas despierto. */
   function _energia(){
     var s = _sue();
-    if (!s || !s.registros || !s.registros.length) return _sinDato('sin registros de sueño');
-    var reg = s.registros[0];                       // el backend los manda al revés (más reciente primero)
-    var dias = _diasDesde(reg.fecha);
-    if (dias === null || dias > 1) return _sinDato('el último sueño registrado es de hace ' + dias + ' días');
+    if (!s) return _sinDato('la fuente de sueño no cargó (revisa api.getSueno)');
+    if (!s.registros || !s.registros.length) return _sinDato('la hoja de sueño está vacía');
+    /* Mismo cuidado que arriba: se elige el registro más reciente que
+       tenga fecha legible, no el primero del arreglo. */
+    var reg = null, mejor = null;
+    for (var i = 0; i < s.registros.length; i++){
+      var d = _diasDesde(s.registros[i].fecha);
+      if (d !== null && (mejor === null || d < mejor)) { mejor = d; reg = s.registros[i]; }
+    }
+    if (!reg) return _sinDato('ningún registro de sueño tiene fecha legible');
+    var dias = mejor;
+    if (dias > 1) return _sinDato('el último sueño registrado es de hace ' + dias + ' días');
 
     var horas   = Number(reg.total) || 0;
     var ciclos  = horas / META.cicloSuenoH;
@@ -218,8 +246,8 @@
   function _cuerpo(){
     var e = _ent();
     if (!e || !e.items || !e.items.length) return _sinDato('sin entrenamientos registrados');
-    var dias = _diasDesde(e.items[0].fecha);
-    if (dias === null) return _sinDato('fecha de entrenamiento ilegible');
+    var dias = _diasDelMasReciente(e.items);
+    if (dias === null) return _sinDato('ningún entrenamiento tiene fecha legible');
     var v = 100 - dias * META.cuerpoPorDia;
 
     var min7 = e.items.reduce(function(acc, it){
@@ -240,8 +268,12 @@
     if (hechoHoy) return { v:100, por:'hecho hoy' };
     var d = _ahora();
     var horas = d.getHours() + d.getMinutes()/60;
+    /* v1.1 — Antes sumaba 12 h "desde anoche", y con 4.2 puntos por hora
+       la barra tocaba fondo a las 11 de la mañana. Demasiado castigo por
+       algo que quizá hiciste hace un rato. Ahora decae desde medianoche:
+       llega a 0 a las 24 h, que era la intención original. */
     var v = caidaPorHora
-      ? 100 - (horas + 12) * caidaPorHora        // ~12 h desde anoche
+      ? 100 - horas * caidaPorHora
       : 100 - caidaPorDia;
     return { v:_clamp(v), por:'sin marcar hoy' };
   }
@@ -249,8 +281,8 @@
   function _mental(){
     var p = window._pensamientosData;
     if (!p || !p.items || !p.items.length) return _sinDato('sin pensamientos registrados');
-    var dias = _diasDesde(p.items[0].fecha);
-    if (dias === null) return _sinDato('fecha ilegible');
+    var dias = _diasDelMasReciente(p.items);
+    if (dias === null) return _sinDato('ningún pensamiento tiene fecha legible');
     return { v:_clamp(100 - dias * META.mentalPorDia),
              por: dias === 0 ? 'escribiste hoy' : 'hace ' + dias + ' día(s)' };
   }
@@ -379,7 +411,7 @@
   }
 
   window.SIMS = {
-    VERSION:'1.0', META:META, calcular:calcular, detalle:detalle, score:score,
+    VERSION:'1.1', META:META, calcular:calcular, detalle:detalle, score:score,
     cargarFuentes:cargarFuentes, arrancarReloj:arrancarReloj
   };
   window.simsDiag = simsDiag;
@@ -392,5 +424,5 @@
     arrancarReloj(30000);
   });
 
-  console.log('[sims] motor de necesidades v1.0 · simsDiag() para ver por qué está cada barra');
+  console.log('[sims] motor de necesidades v1.1 · simsDiag() para ver por qué está cada barra');
 })();
