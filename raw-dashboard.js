@@ -557,7 +557,11 @@ function _renderCFO(containerId){
 let _relacionesData=[];
 function renderRelaciones(data){
   _relacionesData=(data&&data.items)?data.items:[];
-  const body=document.getElementById('relaciones-body');if(!body)return;
+  /* v9.14: el contenedor real en index.html es #bit-col-relaciones (columna
+     de Bitácora). El id viejo 'relaciones-body' ya no existe, así que esta
+     función salía en seco y la columna se quedaba en su estado vacío.
+     Mismo patrón que renderApartados: id nuevo con respaldo al viejo. */
+  const body=document.getElementById('bit-col-relaciones')||document.getElementById('relaciones-body');if(!body)return;
   if(!_relacionesData.length){body.innerHTML='<div style="padding:24px;text-align:center;color:var(--m)">Sin relaciones — agrega personas con el tab 👥</div>';return;}
   const sorted=[..._relacionesData].sort((a,b)=>{if(!a.ultimaVez&&!b.ultimaVez)return 0;if(!a.ultimaVez)return 1;if(!b.ultimaVez)return-1;return new Date(b.ultimaVez)-new Date(a.ultimaVez);});
   const hoy=new Date();hoy.setHours(0,0,0,0);
@@ -575,7 +579,8 @@ function renderRelaciones(data){
 let _saludData=[];
 function renderSalud(data){
   _saludData=(data&&data.items)?data.items:[];
-  const body=document.getElementById('salud-body');if(!body)return;
+  /* v9.14: contenedor real = #bit-col-salud (columna MÉDICO). */
+  const body=document.getElementById('bit-col-salud')||document.getElementById('salud-body');if(!body)return;
   const proximas=(data&&data.proximas)?data.proximas:[];
   const proxBox=document.getElementById('salud-proximas');
   if(proxBox&&proximas.length){proxBox.innerHTML=proximas.slice(0,3).map(c=>`<div class="proxima-cita"><div style="font-size:11px;font-weight:600;color:var(--warn)">📅 Próxima cita</div><div style="font-size:13px;color:#fff;margin-top:3px">${c.descripcion}</div><div style="font-size:11px;color:var(--m);margin-top:2px">${c.doctor?c.doctor+' · ':''}${c.proxima}</div></div>`).join('');}
@@ -605,7 +610,8 @@ function _marcarApartadoUsado(fila){if(!confirm('¿Marcar este apartado como Usa
 let _pensamientosData=[];
 function renderPensamientos(data){
   _pensamientosData=(data&&data.items)?data.items:[];
-  const body=document.getElementById('pensamientos-body');if(!body)return;
+  /* v9.14: contenedor real = #bit-col-pensamientos. */
+  const body=document.getElementById('bit-col-pensamientos')||document.getElementById('pensamientos-body');if(!body)return;
   if(!_pensamientosData.length){body.innerHTML='<div style="padding:24px;text-align:center;color:var(--m)">Sin registros — usa el tab 💭 para agregar</div>';return;}
   const CAT_COLORS={'Emoción':'#EC4899','Idea':'#3B82F6','Reflexión':'#8B5CF6','Decisión':'#F59E0B','Sueño':'#06B6D4'};
   body.innerHTML=_pensamientosData.slice(0,30).map(p=>{

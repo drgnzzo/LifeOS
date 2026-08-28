@@ -9,43 +9,20 @@
    · Cuando subas una versión nueva del SW, incrementa CACHE_NAME
      (cambiando el número) para que se invaliden los archivos viejos.
 */
-const CACHE_NAME = 'lifeos-e6t-3';
+const CACHE_NAME = 'lifeos-e6t-6';
+/* SHELL — v9.13
+   Solo los assets que el HTML pide SIN `?v=`. El resto (todos los raw-*.js
+   y .css) llevan query de versión, y `caches.match(req)` NO ignora la
+   query: precachearlos aquí sin `?v=` creaba entradas que nunca se
+   usaban —30 descargas muertas en cada instalación, incluidos 5 archivos
+   de v11 que la app ni carga—.
+
+   Los versionados se cachean solos en su primera petición (el handler
+   `fetch` de abajo hace `c.put(req, copy)`), y el bump de `?v=` los
+   invalida de forma natural. Un solo mecanismo, sin lista que mantener. */
 const SHELL = [
   '/LifeOS/',
   '/LifeOS/index.html',
-  '/LifeOS/gsap.min.js',
-  '/LifeOS/raw-anim.js',
-  '/LifeOS/raw-auditor.js',
-  '/LifeOS/raw-audio.js',
-  '/LifeOS/raw-mobile.css',
-  '/LifeOS/raw-mobile.js',
-  '/LifeOS/raw-007.js',
-  '/LifeOS/raw-tokens.css',
-  '/LifeOS/raw-app.css',
-  '/LifeOS/raw-core.js',
-  '/LifeOS/raw-overlay.js',
-  '/LifeOS/raw-overlay-dnd.js',
-  '/LifeOS/raw-dashboard.js',
-  '/LifeOS/raw-bitacora.js',
-  '/LifeOS/raw-juice.js',
-  '/LifeOS/raw-v11-mobile.js',
-  '/LifeOS/raw-niveles.js',
-  '/LifeOS/raw-logros.js',
-  '/LifeOS/raw-notas.js',
-  '/LifeOS/raw-niveles.js',
-  '/LifeOS/raw-coverflow.js',
-  '/LifeOS/raw-timers.js',
-  '/LifeOS/raw-loading.js',
-  '/LifeOS/raw-v11-nav.js',
-  '/LifeOS/raw-v11-form.js',
-  '/LifeOS/raw-v11-cosmos.js',
-  '/LifeOS/raw-v11-loading.js',
-  '/LifeOS/raw-e5.js',
-  '/LifeOS/raw-bitacora.js',
-  '/LifeOS/raw-juice.js',
-  '/LifeOS/raw-v11-mobile.js',
-  '/LifeOS/raw-niveles.js',
-  '/LifeOS/raw-carousel.js',
   '/LifeOS/icon-192.png',
   '/LifeOS/icon-512.png',
   '/LifeOS/manifest.webmanifest'

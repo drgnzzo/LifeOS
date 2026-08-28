@@ -176,9 +176,23 @@ async function _apiIntento(url, opciones, action){
   }
 
   try {
-    return JSON.parse(texto);
+    const datos = JSON.parse(texto);
+    // El backend puede responder 200 con un sobre de error dentro:
+    //   { error: 'Acción desconocida: X' }  ó  { ok:false, error:'...' }
+    // El transporte funcionó, así que NO lanzamos (rompería a quien ya
+    // maneja ese objeto). Solo lo dejamos registrado para que sea visible.
+    if (datos && typeof datos === 'object' && !Array.isArray(datos)) {
+      const errBackend = datos.error || (datos.ok === false ? (datos.mensaje || 'ok:false sin detalle') : null);
+      if (errBackend) {
+        _apiRegistrarError(action, 0, new Error('[backend] ' + errBackend));
+      }
+    }
+    return datos;
   } catch(err){
-    throw new Error('Respuesta ilegible (no es JSON): ' + texto.slice(0,120));
+    if (err instanceof SyntaxError){
+      throw new Error('Respuesta ilegible (no es JSON): ' + texto.slice(0,120));
+    }
+    throw err;
   }
 }
 
@@ -212,6 +226,14 @@ async function apiGet(action,params={}){
 async function apiPost(action,data={}){
   return _apiConReintentos(API_URL, {
     method:'POST',
+    /* v9.15 — Sin Content-Type, Apps Script interpreta los bytes UTF-8 como
+       Latin-1 y corrompe emojis y acentos: 🚨 (F0 9F 9A A8) llegaba a la hoja
+       como "ð\u009f\u009a¨". Declarar el charset lo resuelve.
+       Se usa text/plain a propósito: es un tipo permitido por CORS y no
+       dispara preflight. application/json SÍ lo dispara, y Apps Script no
+       responde a OPTIONS — rompería todas las escrituras. doPost hace
+       JSON.parse de e.postData.contents, así que el tipo declarado da igual. */
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
     body: JSON.stringify({action,...data})
   }, action);
 }
