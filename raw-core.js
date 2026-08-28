@@ -87,15 +87,133 @@ function gasRun(fn,...args){
     else reject(new Error('Función no encontrada: '+fn));
   });
 }
+/* ══════════════════════════════════════════════════════════════════════
+   CAPA DE TRANSPORTE BLINDADA  (E6-T)
+   ─────────────────────────────────────────────────────────────────────
+   Sustituye el fetch pelón por uno con:
+     · timeout (AbortController)         → nunca cuelga la UI
+     · verificación de r.ok              → 4xx/5xx fallan con motivo
+     · detección de HTML disfrazado      → GAS devuelve páginas de error
+     · reintento con espera progresiva   → sobrevive tropiezos de red
+     · registro en window._apiErrores    → errores visibles sin consola
+
+   CONTRATO INTACTO: devuelve exactamente lo mismo que antes (el JSON
+   ya parseado). Ningún api.getX cambia. No se envuelve gasRun.
+   ══════════════════════════════════════════════════════════════════ */
+
+const API_TIMEOUT_MS   = 20000;  // GAS tarda 1-4s normal; 20s es el techo
+const API_REINTENTOS   = 2;      // 3 intentos en total
+const API_ESPERA_BASE  = 600;    // ms; sube a 1200 en el segundo reintento
+
+// Bitácora de fallos accesible desde consola: window._apiErrores
+try {
+  if (!window._apiErrores) window._apiErrores = [];
+} catch(e){}
+
+function _apiRegistrarError(action, intento, err){
+  const reg = {
+    ts: new Date().toISOString(),
+    action: action,
+    intento: intento,
+    mensaje: (err && err.message) ? err.message : String(err)
+  };
+  try {
+    window._apiErrores.push(reg);
+    if (window._apiErrores.length > 50) window._apiErrores.shift();
+  } catch(e){}
+  console.error('[API] ' + action + ' (intento ' + intento + '): ' + reg.mensaje);
+  // Gancho opcional para UI. Si alguien define window.onApiError, se avisa.
+  try { if (typeof window.onApiError === 'function') window.onApiError(reg); } catch(e){}
+  return reg;
+}
+
+function _apiDormir(ms){
+  return new Promise(function(res){ setTimeout(res, ms); });
+}
+
+/* Un solo intento. Lanza Error con mensaje legible si algo sale mal. */
+async function _apiIntento(url, opciones, action){
+  let ctrl = null, temporizador = null;
+  const cfg = Object.assign({}, opciones || {});
+
+  // AbortController puede no existir en navegadores muy viejos.
+  if (typeof AbortController !== 'undefined') {
+    ctrl = new AbortController();
+    cfg.signal = ctrl.signal;
+    temporizador = setTimeout(function(){ ctrl.abort(); }, API_TIMEOUT_MS);
+  }
+
+  let r;
+  try {
+    r = await fetch(url, cfg);
+  } catch(err){
+    if (temporizador) clearTimeout(temporizador);
+    if (err && err.name === 'AbortError'){
+      throw new Error('Sin respuesta en ' + (API_TIMEOUT_MS/1000) + 's (timeout)');
+    }
+    throw new Error('Sin conexión con el servidor: ' + (err && err.message ? err.message : err));
+  }
+  if (temporizador) clearTimeout(temporizador);
+
+  if (!r.ok){
+    throw new Error('El servidor respondió ' + r.status + ' ' + (r.statusText || ''));
+  }
+
+  // GAS devuelve páginas HTML de error (login, cuota, script roto) con
+  // status 200. Leemos como texto y decidimos antes de parsear.
+  const texto = await r.text();
+  const cabeza = texto.slice(0, 400).trim().toLowerCase();
+
+  if (cabeza.indexOf('<!doctype') === 0 || cabeza.indexOf('<html') === 0){
+    if (cabeza.indexOf('accounts.google.com') !== -1 || cabeza.indexOf('iniciar sesión') !== -1 || cabeza.indexOf('sign in') !== -1){
+      throw new Error('Apps Script pide iniciar sesión. Revisa el despliegue (acceso: cualquiera).');
+    }
+    throw new Error('Apps Script devolvió una página de error en vez de datos.');
+  }
+
+  if (!texto){
+    throw new Error('Respuesta vacía del servidor.');
+  }
+
+  try {
+    return JSON.parse(texto);
+  } catch(err){
+    throw new Error('Respuesta ilegible (no es JSON): ' + texto.slice(0,120));
+  }
+}
+
+/* Envoltura con reintentos. No reintenta si el fallo es de autenticación
+   o de formato: repetir no lo arregla y solo alarga la espera. */
+async function _apiConReintentos(url, opciones, action){
+  let ultimo = null;
+  for (let i = 0; i <= API_REINTENTOS; i++){
+    try {
+      return await _apiIntento(url, opciones, action);
+    } catch(err){
+      ultimo = err;
+      const msg = err.message || '';
+      const noVale = msg.indexOf('iniciar sesión') !== -1 ||
+                     msg.indexOf('no es JSON')     !== -1 ||
+                     msg.indexOf('página de error')!== -1;
+      _apiRegistrarError(action, i + 1, err);
+      if (noVale || i === API_REINTENTOS) break;
+      await _apiDormir(API_ESPERA_BASE * (i + 1));
+    }
+  }
+  throw ultimo;
+}
+
 async function apiGet(action,params={}){
   const url=new URL(API_URL);
   url.searchParams.set('action',action);
   Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
-  const r=await fetch(url); return r.json();
+  return _apiConReintentos(url.toString(), undefined, action);
 }
 async function apiPost(action,data={}){
-  const r=await fetch(API_URL,{method:'POST',body:JSON.stringify({action,...data})});
-  return r.json();
+  return _apiConReintentos(API_URL, {
+    method:'POST',
+    body: JSON.stringify({action,...data})
+  }, action);
 }
 
 const api = {
