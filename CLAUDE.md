@@ -222,11 +222,31 @@ Scripts de consola. Es el método que resuelve los bugs de este proyecto.
   Cifrar o separar antes de cualquier migración a servidor propio
 
 ### Pendientes de producto
-- Organigrama de notas — el Sheet ya tiene `X`, `Y`, `Conexiones`; falta el frontend
-- Frontend de Timers — el backend está completo (`getTimers`, `crearTimer`, `actualizarTimer`)
+
+> Revisado contra el código el 28/08/2026. Dos de los cinco pendientes que
+> listaba esta sección **ya estaban construidos**: la lista mandaba a
+> reconstruir cosas hechas. Si vuelves a tocar esta lista, verifica contra
+> el código antes de dar algo por pendiente.
+
+- ~~Organigrama de notas~~ — **hecho**. `raw-notas.js` (497 líneas) es un
+  lienzo de grafo completo: nodos arrastrables, enlaces por arrastre,
+  `persistir()` manda `x`/`y`/`conexiones` por `actualizarNota`
+- ~~Frontend de Timers~~ — **hecho**. `raw-timers.js` monta la sección de
+  nivel 2 con crear, pausar, reanudar y finalizar
+- **`score` sigue sin contenedor.** `renderScore` busca `#score-body` y se
+  sale en silencio si no existe. Ese id no está en ningún HTML del repo:
+  `getScoreVida` funciona y se pinta en la nada. Es el pendiente más
+  chico que queda
+- **`enviarSOS` puede reportar envíos que no ocurrieron.** La URL de
+  CallMeBot lleva `apikey=YOUR_API_KEY` literal, sin sustituir, pero
+  `enviados++` corre igual y la función devuelve «SOS enviado a N
+  contacto(s)». El correo sí sale; el WhatsApp no. Rompe §4 (nunca
+  devuelvas datos falsos) en la función de mayor riesgo de la app.
+  Arreglo: contar por canal y decir la verdad; la llave va en
+  `PropertiesService`, nunca en el código
 - Verificar en campo que las invitaciones de Meet lleguen al destinatario
-- Timers que arranquen activos
-- Flujo SOS → WhatsApp
+- El SIM muestra 8 de 9 necesidades en `0/100` y LOGRO RECIENTE sale
+  vacío en `0%`. Sin diagnosticar: puede ser dato real o carga fallida
 
 ### Seguridad — resuelto con TOTP
 
@@ -326,10 +346,13 @@ a milisegundos.
 ### Orden de trabajo acordado
 
 1. ~~Autenticación TOTP~~ — **hecho** (28/08/2026, v5.013 / v9.17)
-2. **Organigrama de notas** — el Sheet ya tiene el esquema listo
-3. **Frontend de Timers** — el backend está completo desde hace tiempo
-4. Sobre `{ok:...}` en los 8 endpoints restantes (backend y frontend a la vez)
-5. Migración por capas (ver arriba)
+2. ~~Organigrama de notas~~ — **ya estaba hecho** (verificado 28/08/2026)
+3. ~~Frontend de Timers~~ — **ya estaba hecho** (verificado 28/08/2026)
+4. **Honestidad de `enviarSOS`** — reportar por canal en vez de un contador
+   que suma envíos fallidos
+5. **Contenedor de `score`** — el backend lleva tiempo pintando en la nada
+6. Sobre `{ok:...}` en los 8 endpoints restantes (backend y frontend a la vez)
+7. Migración por capas (ver arriba)
 
 ---
 
