@@ -1,0 +1,44 @@
+# ── Backend (Apps Script) ──────────────────────────────────────────────
+# Code.gs vive en la carpeta local para que los agentes lo lean, pero NO
+# se sube: mientras el despliegue sea ANYONE_ANONYMOUS, publicar los 96
+# endpoints le ahorra el trabajo de reconocimiento a cualquiera.
+#
+# Revisar esta decisión cuando esté puesta la autenticación TOTP: con
+# sesión válida obligatoria, conocer los endpoints deja de dar ventaja.
+Code.gs
+Code.txt
+*.gs
+appsscript.json
+
+# clasp (si algún día se sincroniza Apps Script desde la terminal)
+.clasp.json
+.clasprc.json
+
+# ── Secretos ───────────────────────────────────────────────────────────
+# Nunca versionar tokens, claves ni semillas TOTP.
+.env
+.env.*
+secrets.json
+*.key
+*.pem
+
+# ── Trabajo local ──────────────────────────────────────────────────────
+node_modules/
+*.log
+*.bak
+*.tmp
+*.orig
+*~
+respaldo/
+backup/
+_local/
+
+# ── Sistema operativo ──────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ── Editores ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
