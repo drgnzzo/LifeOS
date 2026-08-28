@@ -82,6 +82,14 @@ Verifica **evaluando en Node**, no solo comprobando sintaxis.
 - Escribe solo cuando cambia (patrón comparar-y-escribir) para evitar tremolina
 - Nunca midas geometría del DOM durante animaciones
 - `transition-property` en CSS **no** detiene a los escritores JS por cuadro (lerps, parallax)
+- **`appendChild` mueve, no copia.** Un nodo con `id` único montado desde
+  dos sitios se lo pelean: el segundo se lo arranca al primero y el primero
+  se queda vacío. Si dos lugares muestran lo mismo, el que cierra devuelve
+  el nodo a su sitio.
+
+  > Ya pasó: `#e5-lucy` (carnet de Lucy) lo montaban el hueco `#e5-med-lucy`
+  > del panel Médico y la capa de `irALucy`. Abrir el carnet desde el dial
+  > se lo arrancaba a Médico y al cerrar se quedaba en la capa oculta.
 
 ### 2.9 CSS global
 Las reglas genéricas aplicadas globalmente rompen los tableros.
@@ -186,6 +194,11 @@ Scripts de consola. Es el método que resuelve los bugs de este proyecto.
   resultado final, no los pasos
 - **Control de versiones:** el propietario descarga y sube archivos
   directamente. El bump de versiones es responsabilidad del agente
+- **El repo mezcla finales de línea.** `Code.gs` y `raw-e5.js` son CRLF;
+  `raw-core.js`, `index.html` y `sw.js` son LF. Un script de sustitución
+  que asuma `\n` no encuentra nada en los CRLF y falla en silencio.
+  Comprueba antes de parchear y respeta el final de línea del archivo:
+  convertirlo entero ensucia el diff y esconde el cambio real
 
 ---
 
@@ -215,34 +228,57 @@ Scripts de consola. Es el método que resuelve los bugs de este proyecto.
 - Timers que arranquen activos
 - Flujo SOS → WhatsApp
 
-### Seguridad — la decisión más importante abierta
+### Seguridad — resuelto con TOTP
 
-**El backend está completamente expuesto.** `access: ANYONE_ANONYMOUS` más
-la `API_URL` visible en `raw-core.js` significa que cualquiera puede llamar
-los 96 endpoints: leer finanzas, contactos y salud, y escribir.
+**Cerrado el 28/08/2026.** El backend ya no está expuesto: `doGet` y
+`doPost` verifican un pase firmado **antes** de entrar al `switch`.
 
-**Esto no se arregla con un repo privado.** GitHub Pages sirve el JavaScript
-al navegador de todos modos; con F12 se ve la URL. El repo privado esconde
-el historial, no el código servido.
+- Semilla TOTP en `PropertiesService`, nunca en el repo
+- Pase `expiración.nonce.firma` con HMAC-SHA256, 12 h de techo
+- Ventana de ±1 paso de 30 s, sin repetición de códigos ya usados,
+  bloqueo de 5 min tras 5 intentos fallidos
+- Públicas solo tres cosas: `servirHTML` (la app), `authEstado` (GET) y
+  `authLogin` (POST). Telegram conserva su propio camino y su
+  `ALLOWED_CHAT_ID`
+- El pase viaja **dentro** de `apiGet`/`apiPost`: por query en las
+  lecturas, en el cuerpo en las escrituras. Ningún `api.getX` envuelto
+- `raw-auth.js` guarda el pase en **`sessionStorage`** (v9.17): la sesión
+  muere al cerrar la pestaña. Recargar no molesta; cerrar sí vuelve a
+  pedir código. Cada pestaña es una sesión aparte, y la PWA instalada es
+  su propio contexto. Para volver a «recordar 12 h», basta cambiar
+  `ALMACEN` a `localStorage` y subir el `?v=`
 
-**Decidido: autenticación TOTP.** Es el siguiente trabajo.
+**Vías de escape, dos:** la propiedad `AUTH_DESACTIVADA=1`, y además la
+auth nunca se exige si no hay `TOTP_SEMILLA`. Es imposible quedarse fuera
+de la app por un despiste de configuración.
 
-- Semilla en `PropertiesService`, nunca en el repo
-- El usuario teclea el código de 6 dígitos de Google Authenticator
-- GAS valida y devuelve un pase de sesión (12 h)
-- Cada petición lleva el pase; sin pase válido, GAS rechaza lectura y escritura
-- Apps Script tiene HMAC nativo (`Utilities.computeHmacSha256Signature`)
+**Herramientas, todas sin argumentos** (el botón Ejecutar del editor no
+los pasa — se eligen en el desplegable y se corre Ejecutar):
 
-**Regla de implementación, no negociable:** el backend valida **antes** de
-tocar el frontend. Si los dos cambian a la vez y algo falla, el dueño queda
-fuera de su propia app sin forma de entrar. Deja una vía de escape
-(propiedad `AUTH_DESACTIVADA`) hasta comprobar que funciona.
+| Función | Qué hace |
+|---|---|
+| `authGenerarSemilla()` | Genera semilla y clave de pase. Una sola vez |
+| `authCodigoActual()` | El código que el servidor espera ahora. Se compara con el teléfono |
+| `authProbarAuto()` | Recorre el ciclo completo solo. Restaura el contador al terminar |
+| `authDiagnostico()` | Estado de las propiedades |
+| `authActivar()` / `authDesactivar()` | Encender y apagar |
+| `authDesbloquear()` | Limpia el contador de intentos fallidos |
+| `authCerrarSesiones()` | Rota la clave: invalida todos los pases vivos |
+| `authRegenerarSemilla()` | Semilla nueva. Hay que volver a darla de alta en el teléfono |
 
-**Descartado:** contraseña simple en el arranque —es JS de navegador, se
-salta con F12 y el backend sigue abierto—. GitHub Enterprise no aplica.
+En consola del navegador: `AUTH.estado()` y `AUTH.cerrarSesion()`.
 
-**Después del TOTP:** revisar si `Code.gs` puede subirse al repo. Con sesión
-obligatoria, conocer los endpoints deja de dar ventaja.
+**Deuda que dejó abierta:** `raw-escena.js` (v11, congelado) trae su
+**propio** `API_URL` y un `apiGet`/`apiPost` pelón, sin pase y sin
+blindaje. Hoy `index.html` no lo carga, así que no es un agujero. Si
+alguien revive v11, ese transporte se salta la puerta entera.
+
+**Pendiente de decidir:** con sesión obligatoria, conocer los endpoints
+ya no da ventaja, así que `Code.gs` **podría** subirse al repo. La
+semilla vive en `PropertiesService` y nunca estuvo en el archivo. Falta
+sacar de la hoja Fijos los datos sensibles (CURP, RFC, NSS, INE) antes
+de que el repo sea público, no por el código sino por lo que revela del
+esquema.
 
 ### Backend fuera del repo
 
@@ -289,7 +325,7 @@ a milisegundos.
 
 ### Orden de trabajo acordado
 
-1. **Autenticación TOTP** — cierra la exposición
+1. ~~Autenticación TOTP~~ — **hecho** (28/08/2026, v5.013 / v9.17)
 2. **Organigrama de notas** — el Sheet ya tiene el esquema listo
 3. **Frontend de Timers** — el backend está completo desde hace tiempo
 4. Sobre `{ok:...}` en los 8 endpoints restantes (backend y frontend a la vez)

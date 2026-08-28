@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════
-   LifeOS · raw-auth.js  v9.16
+   LifeOS · raw-auth.js  v9.17
    ─────────────────────────────────────────────────────────────────────
    Puerta TOTP. Pide el código de 6 dígitos, guarda el pase y lo deja a
    disposición del transporte.
@@ -23,12 +23,28 @@
 
   var CLAVE   = 'lifeos_pase_v1';
   var MARGEN  = 60000;   // ms: se da por vencido 1 min antes, por si acaso
+
+  /* v9.17 — El pase vive en sessionStorage, NO en localStorage: se borra
+     solo al cerrar la pestaña. Recargar no molesta; cerrar sí obliga a
+     teclear el codigo otra vez.
+
+     Consecuencias, para que no sorprendan:
+     · Cada pestaña es una sesion aparte. Abrir la app en una pestaña
+       nueva pide codigo aunque la otra siga abierta.
+     · La app instalada (PWA) es su propio contexto: tambien pide.
+     · El pase del servidor sigue durando 12 h. Esto es el cliente
+       olvidandolo antes, no el backend acortandolo — el techo de arriba
+       manda y no se puede estirar desde aqui.
+
+     Para volver a "recordar 12 h", cambia ALMACEN a window.localStorage
+     y sube el ?v= de este archivo. Nada mas. */
+  var ALMACEN = window.sessionStorage;
   var _espera = null;    // promesa única mientras el modal está abierto
 
   /* ── Almacén del pase ─────────────────────────────────────────── */
   function _leer() {
     try {
-      var s = localStorage.getItem(CLAVE);
+      var s = ALMACEN.getItem(CLAVE);
       if (!s) return null;
       var o = JSON.parse(s);
       if (!o || !o.pase || !o.expira) return null;
@@ -38,12 +54,12 @@
   }
 
   function _guardar(pase, expira) {
-    try { localStorage.setItem(CLAVE, JSON.stringify({ pase: pase, expira: expira })); }
-    catch (e) { /* modo privado: el pase vive solo en esta pestaña */ }
+    try { ALMACEN.setItem(CLAVE, JSON.stringify({ pase: pase, expira: expira })); }
+    catch (e) { /* si el almacen falla, el pase vive solo en memoria */ }
   }
 
   function _borrar() {
-    try { localStorage.removeItem(CLAVE); } catch (e) {}
+    try { ALMACEN.removeItem(CLAVE); } catch (e) {}
   }
 
   function pase() { var o = _leer(); return o ? o.pase : null; }
@@ -116,7 +132,7 @@
                'maxlength="6" placeholder="000000" aria-label="Codigo de 6 digitos">' +
         '<div class="la-barra"><i id="la-barra"></i></div>' +
         '<p class="la-aviso la-neutro" id="la-aviso">El codigo cambia cada 30 segundos.</p>' +
-        '<p class="la-nota">La sesion dura 12 horas en este dispositivo.</p>' +
+        '<p class="la-nota">La sesion termina al cerrar esta pestana.</p>' +
       '</div>';
     document.body.appendChild(el);
     return el;
@@ -231,6 +247,10 @@
     console.log('[AUTH] Pase borrado. Recarga la pagina para volver a entrar.');
     return true;
   }
+
+  /* El pase no sale de esta pestaña, pero si el equipo es compartido
+     conviene tirarlo al cerrar en vez de confiar en el navegador. */
+  window.addEventListener('pagehide', function () { _borrar(); });
 
   function estado() {
     var o = _leer();

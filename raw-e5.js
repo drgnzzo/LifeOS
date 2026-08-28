@@ -1060,17 +1060,65 @@ window._medicoMontar=function(target){
 window.irALucyVacuna =function(){ window._lucyForm('vacuna'); };
 window.irALucyVisita =function(){ window._lucyForm('visita'); };
 window.irALucyDespara=function(){ window._lucyForm('despara'); };
+/* === v9.17 - LA CAPA DEL CARNET ==================================
+   Habia UN solo nodo #e5-lucy y dos sitios montandolo: el hueco
+   #e5-med-lucy del panel Medico y esta capa. _lucyMontar hace
+   appendChild, que MUEVE el nodo, no lo copia: abrir el carnet desde el
+   dial se lo arrancaba a Medico, y al cerrar se quedaba dentro de la
+   capa oculta. Medico aparecia sin carnet hasta volver a pintarse.
+
+   Arreglado en tres puntos:
+     1. Al cerrar, el nodo REGRESA a su hueco en Medico.
+     2. La barra de Volver es sticky y respeta la safe-area: ya no se
+        pierde con el scroll ni la corta la muesca del telefono.
+     3. Se sale tambien con Escape.
+
+   Sitios que llaman _lucyMontar: exactamente dos (el hueco de Medico y
+   esta capa). Auditados los dos antes de tocar (CLAUDE.md 2.5). */
+(function(){
+  var est=document.createElement('style');
+  est.id='e5-lucy-ov-css';
+  /* Todo acotado a #e5-lucy-ov. Ni una regla global (CLAUDE.md 2.9). */
+  est.textContent=
+    '#e5-lucy-ov{position:fixed;inset:0;z-index:9500;display:none;overflow-y:auto;'+
+      '-webkit-overflow-scrolling:touch;background:var(--hud-bg-base,#020810)}'+
+    '#e5-lucy-ov .e5lo-barra{position:sticky;top:0;z-index:2;display:flex;'+
+      'align-items:center;gap:14px;'+
+      'padding:calc(env(safe-area-inset-top,0px) + 16px) 4vw 12px;'+
+      'background:linear-gradient(var(--hud-bg-base,#020810) 74%,transparent)}'+
+    '#e5-lucy-ov .e5lo-tit{font-size:12px;letter-spacing:.12em;text-transform:uppercase;'+
+      'color:var(--hud-text-dim,rgba(200,210,220,.45))}'+
+    '#e5-lucy-ov #e5-lucy-slot{padding:0 4vw calc(env(safe-area-inset-bottom,0px) + 48px)}';
+  document.head.appendChild(est);
+})();
+
+function _lucyEsc(ev){ if(ev.key==='Escape'){ ev.stopPropagation(); window._lucyCerrarOv(); } }
+
+window._lucyCerrarOv=function(){
+  var ov=document.getElementById('e5-lucy-ov');
+  if(ov) ov.style.display='none';
+  document.removeEventListener('keydown',_lucyEsc,true);
+  /* Devolver el carnet a su hueco en Medico: si no, ese panel se queda
+     sin el hasta que algo lo obligue a repintar. */
+  var slot=document.getElementById('e5-med-lucy');
+  var host=document.getElementById('e5-lucy');
+  if(slot&&host&&host.parentNode!==slot) slot.appendChild(host);
+};
+
 window.irALucy=function(){
   var ov=document.getElementById('e5-lucy-ov');
   if(!ov){
     ov=document.createElement('div');ov.id='e5-lucy-ov';
-    ov.style.cssText='position:fixed;inset:0;z-index:9500;background:var(--hud-bg-base,#020810);overflow-y:auto;padding:26px 4vw;display:none';
-    ov.innerHTML='<button class="e5-btn" style="--e5c:#94A3B8;margin-bottom:12px" '+
-      'onclick="document.getElementById(\'e5-lucy-ov\').style.display=\'none\'">‹ Volver</button>'+
+    ov.innerHTML='<div class="e5lo-barra">'+
+      '<button class="e5-btn" id="e5-lucy-volver" style="--e5c:#94A3B8">\u2039 Volver</button>'+
+      '<span class="e5lo-tit">\ud83d\udc3e Lucy \u00b7 Carnet</span></div>'+
       '<div id="e5-lucy-slot"></div>';
     document.body.appendChild(ov);
+    ov.querySelector('#e5-lucy-volver').onclick=window._lucyCerrarOv;
   }
   ov.style.display='block';
+  ov.scrollTop=0;
+  document.addEventListener('keydown',_lucyEsc,true);
   window._lucyMontar(document.getElementById('e5-lucy-slot'));
 };
 
