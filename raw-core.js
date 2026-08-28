@@ -183,7 +183,10 @@ async function _apiIntento(url, opciones, action){
     // maneja ese objeto). Solo lo dejamos registrado para que sea visible.
     if (datos && typeof datos === 'object' && !Array.isArray(datos)) {
       const errBackend = datos.error || (datos.ok === false ? (datos.mensaje || 'ok:false sin detalle') : null);
-      if (errBackend) {
+      // AUTH_REQUERIDA no es un fallo de comunicación: es el backend
+      // diciendo "identifícate". Registrarlo llenaría _apiErrores en cada
+      // arranque y rompería la regla de "vacío = comunicación sana".
+      if (errBackend && datos.error !== 'AUTH_REQUERIDA') {
         _apiRegistrarError(action, 0, new Error('[backend] ' + errBackend));
       }
     }
@@ -217,14 +220,52 @@ async function _apiConReintentos(url, opciones, action){
   throw ultimo;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   PASE TOTP  (v9.16)
+   ─────────────────────────────────────────────────────────────────
+   El pase viaja DENTRO de apiGet/apiPost, no envolviendo api.getX.
+   raw-auth.js expone window.AUTH; si ese archivo no cargó, _pase()
+   devuelve null y todo se comporta exactamente como antes.
+
+   Un solo reintento por petición: si tras identificarse el backend
+   sigue diciendo que no, se devuelve el sobre de error al que llamó
+   en vez de girar en círculos.
+   ══════════════════════════════════════════════════════════════ */
+function _pase(){
+  try { return (window.AUTH && window.AUTH.pase()) || null; }
+  catch(e){ return null; }
+}
+function _esAuthRequerida(r){
+  return !!(r && typeof r === 'object' && r.error === 'AUTH_REQUERIDA');
+}
+/* Recibe el pase que acaba de ser rechazado para que AUTH distinga
+   "hay que pedir código" de "otra petición ya lo renovó". */
+function _pedirPase(paseCaducado){
+  if (window.AUTH && typeof window.AUTH.asegurarPase === 'function'){
+    return window.AUTH.asegurarPase(paseCaducado);
+  }
+  return Promise.reject(new Error('Falta raw-auth.js: no hay forma de pedir el codigo de acceso.'));
+}
+
 async function apiGet(action,params={}){
-  const url=new URL(API_URL);
-  url.searchParams.set('action',action);
-  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
-  return _apiConReintentos(url.toString(), undefined, action);
+  const armar=()=>{
+    const url=new URL(API_URL);
+    url.searchParams.set('action',action);
+    Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+    const p=_pase();
+    if(p) url.searchParams.set('pase',p);
+    return url.toString();
+  };
+  const usado = _pase();
+  let r = await _apiConReintentos(armar(), undefined, action);
+  if (_esAuthRequerida(r)){
+    await _pedirPase(usado);
+    r = await _apiConReintentos(armar(), undefined, action);
+  }
+  return r;
 }
 async function apiPost(action,data={}){
-  return _apiConReintentos(API_URL, {
+  const armar=()=>({
     method:'POST',
     /* v9.15 — Sin Content-Type, Apps Script interpreta los bytes UTF-8 como
        Latin-1 y corrompe emojis y acentos: 🚨 (F0 9F 9A A8) llegaba a la hoja
@@ -234,8 +275,15 @@ async function apiPost(action,data={}){
        responde a OPTIONS — rompería todas las escrituras. doPost hace
        JSON.parse de e.postData.contents, así que el tipo declarado da igual. */
     headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-    body: JSON.stringify({action,...data})
-  }, action);
+    body: JSON.stringify(Object.assign({action}, data, { pase:_pase() }))
+  });
+  const usado = _pase();
+  let r = await _apiConReintentos(API_URL, armar(), action);
+  if (_esAuthRequerida(r)){
+    await _pedirPase(usado);
+    r = await _apiConReintentos(API_URL, armar(), action);
+  }
+  return r;
 }
 
 const api = {

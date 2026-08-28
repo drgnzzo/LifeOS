@@ -100,7 +100,7 @@ html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
         <div class="hero-icon"><i class="fas fa-diamond"></i></div>
         <div class="hero-brand-txt">
           <div class="hero-title">Life<span>OS</span></div>
-          <div class="hero-sub">v.9.15 · Sheets</div>
+          <div class="hero-sub">v.9.16 · Sheets · TOTP</div>
         </div>
       </div>
     </div>
@@ -729,7 +729,11 @@ html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
 <script src="raw-auditor.js?v=8280"></script>
 <!-- Audio diegético del HUD (opt-in, botón ♪ abajo-izquierda) -->
 <script src="raw-audio.js?v=8430"></script>
-<script src="raw-core.js?v=8413"></script>
+<script src="raw-core.js?v=9160"></script>
+<!-- v9.16 — Puerta TOTP. Va DESPUES de raw-core.js: usa su API_URL.
+     Antes de raw-overlay.js y del resto, para que window.AUTH exista
+     cuando arranque la primera peticion. -->
+<script src="raw-auth.js?v=9160"></script>
 <script src="raw-overlay.js?v=9090"></script>
 <script src="raw-overlay-dnd.js?v=7069"></script>
 <script src="raw-dashboard.js?v=891"></script>
