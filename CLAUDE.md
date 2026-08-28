@@ -215,6 +215,59 @@ Scripts de consola. Es el método que resuelve los bugs de este proyecto.
 - Timers que arranquen activos
 - Flujo SOS → WhatsApp
 
+### Seguridad — la decisión más importante abierta
+
+**El backend está completamente expuesto.** `access: ANYONE_ANONYMOUS` más
+la `API_URL` visible en `raw-core.js` significa que cualquiera puede llamar
+los 96 endpoints: leer finanzas, contactos y salud, y escribir.
+
+**Esto no se arregla con un repo privado.** GitHub Pages sirve el JavaScript
+al navegador de todos modos; con F12 se ve la URL. El repo privado esconde
+el historial, no el código servido.
+
+**Decidido: autenticación TOTP.** Es el siguiente trabajo.
+
+- Semilla en `PropertiesService`, nunca en el repo
+- El usuario teclea el código de 6 dígitos de Google Authenticator
+- GAS valida y devuelve un pase de sesión (12 h)
+- Cada petición lleva el pase; sin pase válido, GAS rechaza lectura y escritura
+- Apps Script tiene HMAC nativo (`Utilities.computeHmacSha256Signature`)
+
+**Regla de implementación, no negociable:** el backend valida **antes** de
+tocar el frontend. Si los dos cambian a la vez y algo falla, el dueño queda
+fuera de su propia app sin forma de entrar. Deja una vía de escape
+(propiedad `AUTH_DESACTIVADA`) hasta comprobar que funciona.
+
+**Descartado:** contraseña simple en el arranque —es JS de navegador, se
+salta con F12 y el backend sigue abierto—. GitHub Enterprise no aplica.
+
+**Después del TOTP:** revisar si `Code.gs` puede subirse al repo. Con sesión
+obligatoria, conocer los endpoints deja de dar ventaja.
+
+### Backend fuera del repo
+
+`Code.gs` y `appsscript.json` viven en la carpeta **local**, no en GitHub.
+El `.gitignore` los bloquea (incluida la variante `Code.gs.txt` que produce
+Windows al descargar).
+
+Consecuencia: los cambios al backend se pegan a mano en el editor de Apps
+Script y se **redespliega** (Implementar → Administrar implementaciones →
+editar → Nueva versión). Pegar sin redesplegar no aplica nada.
+
+`clasp` (herramienta oficial de Google) automatizaría ese pegado con
+`clasp push`. Pendiente de valorar; no es urgente.
+
+### Estado del Sheet — hallazgos de auditoría
+
+- **RAW está sano:** 1,148 filas, enero–diciembre 2026, sin IDs duplicados
+  ni saltos, fechas y montos válidos, saldo acumulado coherente. Las 31
+  «rupturas» del saldo son filas de `Rectificación` que resetean a propósito
+- La hoja **SALUD** arrastra un bloque huérfano `Timer | Inicio | Mejor tiempo`
+  de antes de que existiera TIMERS
+- **LOGROS** mezcla dos esquemas: casi todas las filas sin ID, las dos
+  últimas con `L137`/`L138`. Más ~90 filas vacías intercaladas
+- **CONTACTOS:** 206 registros, columna `Afinidad` vacía en todos
+
 ### Rumbo a largo plazo
 Capas, en este orden estricto:
 
@@ -225,6 +278,22 @@ Capas, en este orden estricto:
 
 Van de arriba abajo, nunca al revés, y una sección a la vez.
 **La app funciona en todo momento. Nunca una reescritura de golpe.**
+
+**Supabase es la opción elegida para la capa 1**, no Firebase: los datos ya
+son tabulares (timers, alcohol, sueño, contactos, médico) y eso es SQL puro.
+Firebase obligaría a rearmar la forma de todo. Supabase además resuelve
+login y sesión sin montar servidor, que es lo que hoy falta.
+
+Ganancia concreta esperada: los 1–4 segundos de espera de Apps Script pasan
+a milisegundos.
+
+### Orden de trabajo acordado
+
+1. **Autenticación TOTP** — cierra la exposición
+2. **Organigrama de notas** — el Sheet ya tiene el esquema listo
+3. **Frontend de Timers** — el backend está completo desde hace tiempo
+4. Sobre `{ok:...}` en los 8 endpoints restantes (backend y frontend a la vez)
+5. Migración por capas (ver arriba)
 
 ---
 
