@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════
-   LifeOS · raw-sims.js  v1.1
+   LifeOS · raw-sims.js  v1.2
    MOTOR DE NECESIDADES — transposición del sistema de motivos de Los Sims
 
    ── LA IDEA ─────────────────────────────────────────────────────────
@@ -407,22 +407,58 @@
     });
     if (console.table) console.table(filas); else console.log(filas);
     console.log('Score de vida:', score(), '· horas despierto:', _horasDespierto().toFixed(1));
+
+    /* v1.2 — Muestra las fechas TAL CUAL llegan. Cuando una barra dice
+       "ninguna fecha legible" hay que ver el formato real, no suponerlo. */
+    function _muestra(nombre, arr){
+      if (!arr || !arr.length) { console.log('  ' + nombre + ': (vacío)'); return; }
+      var m = arr.slice(0,3).map(function(x){
+        var f = x.fecha !== undefined ? x.fecha : x.ultimaVez;
+        return JSON.stringify(f) + ' (' + typeof f + ') → ' +
+               (_aFecha(f) ? 'OK' : 'NO SE PUEDE LEER');
+      });
+      console.log('  ' + nombre + ' [' + arr.length + ']: ' + m.join(' | '));
+    }
+    console.log('── fechas crudas ──');
+    _muestra('entrenamiento', (window._entData||{}).items);
+    _muestra('pensamientos',  (window._pensamientosData||{}).items);
+    _muestra('relaciones',    (window._relacionesData||{}).items);
+    _muestra('logros',        (window._logrosData||{}).items);
+    console.log('  sueño: fuente =', window._sueDataSims ? 'cargada' : 'NO cargada',
+                '· api.getSueno =', (window.api && typeof window.api.getSueno));
     return filas;
   }
 
   window.SIMS = {
-    VERSION:'1.1', META:META, calcular:calcular, detalle:detalle, score:score,
+    VERSION:'1.2', META:META, calcular:calcular, detalle:detalle, score:score,
     cargarFuentes:cargarFuentes, arrancarReloj:arrancarReloj
   };
   window.simsDiag = simsDiag;
 
-  cargarFuentes().then(function(){
+  /* v1.2 — api.getSueno y api.getAlcohol los define raw-e5.js, que en
+     index.html va DESPUÉS de este archivo. Al arrancar todavía no
+     existen, así que pedir las fuentes de inmediato fallaba en silencio
+     y energía se quedaba sin dato para siempre.
+     Se espera a que aparezcan, con techo de 10 s para no colgarse. */
+  function _esperarApi(cb){
+    var intentos = 0;
+    (function reintentar(){
+      var listo = window.api && typeof window.api.getSueno === 'function';
+      if (listo || intentos++ > 20) return cb(listo);
+      setTimeout(reintentar, 500);
+    })();
+  }
+
+  _esperarApi(function(listo){
+    if (!listo) console.warn('[sims] api.getSueno no apareció; energía se quedará sin dato');
+    cargarFuentes().then(function(){
     try {
       if (typeof window.renderSimsBandSimsStyle === 'function')
         window.renderSimsBandSimsStyle('hud-sim-band-grid');
     } catch(e){}
     arrancarReloj(30000);
+    });
   });
 
-  console.log('[sims] motor de necesidades v1.1 · simsDiag() para ver por qué está cada barra');
+  console.log('[sims] motor de necesidades v1.2 · simsDiag() para ver por qué está cada barra');
 })();

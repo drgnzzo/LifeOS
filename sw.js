@@ -9,7 +9,7 @@
    · Cuando subas una versión nueva del SW, incrementa CACHE_NAME
      (cambiando el número) para que se invaliden los archivos viejos.
 */
-const CACHE_NAME = 'lifeos-e6t-11';
+const CACHE_NAME = 'lifeos-e6t-12';
 /* SHELL — v9.13
    Solo los assets que el HTML pide SIN `?v=`. El resto (todos los raw-*.js
    y .css) llevan query de versión, y `caches.match(req)` NO ignora la
