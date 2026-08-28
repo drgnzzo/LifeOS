@@ -1080,11 +1080,18 @@ window.irALucyDespara=function(){ window._lucyForm('despara'); };
   est.id='e5-lucy-ov-css';
   /* Todo acotado a #e5-lucy-ov. Ni una regla global (CLAUDE.md 2.9). */
   est.textContent=
-    '#e5-lucy-ov{position:fixed;inset:0;z-index:9500;display:none;overflow-y:auto;'+
+    /* v9.17b — La capa arranca DEBAJO del nav, no en inset:0.
+       .hero es position:fixed con z-index:10000 (raw-app.css ~l.109, y ese
+       10000 viene de otra regresion ya pagada: no se le baja). Con la capa
+       en 9500 e inset:0, el nav le pasaba encima y se comia justo los 58px
+       donde vive la barra de Volver. Invisible, y el usuario atrapado.
+       Empezando debajo del nav se arregla y ademas el nav queda usable:
+       dos salidas en vez de una. */
+    '#e5-lucy-ov{position:fixed;left:0;right:0;bottom:0;top:var(--hero-h,58px);'+
+      'z-index:9500;display:none;overflow-y:auto;'+
       '-webkit-overflow-scrolling:touch;background:var(--hud-bg-base,#020810)}'+
     '#e5-lucy-ov .e5lo-barra{position:sticky;top:0;z-index:2;display:flex;'+
-      'align-items:center;gap:14px;'+
-      'padding:calc(env(safe-area-inset-top,0px) + 16px) 4vw 12px;'+
+      'align-items:center;gap:14px;padding:16px 4vw 12px;'+
       'background:linear-gradient(var(--hud-bg-base,#020810) 74%,transparent)}'+
     '#e5-lucy-ov .e5lo-tit{font-size:12px;letter-spacing:.12em;text-transform:uppercase;'+
       'color:var(--hud-text-dim,rgba(200,210,220,.45))}'+
