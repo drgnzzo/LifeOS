@@ -6,8 +6,10 @@
 # Revisar esta decisión cuando esté puesta la autenticación TOTP: con
 # sesión válida obligatoria, conocer los endpoints deja de dar ventaja.
 Code.gs
+Code.gs.txt
 Code.txt
 *.gs
+*.gs.txt
 appsscript.json
 
 # clasp (si algún día se sincroniza Apps Script desde la terminal)
