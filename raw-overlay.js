@@ -768,16 +768,19 @@ function renderSimsNeeds(targetId){
   var needs = _calcSimsNeeds();
   el.innerHTML = _SIMS_NEEDS.map(function(s){
     var v = needs[s.key];
-    if(v === undefined || v === null) v = 50; // fallback siempre visible
+    /* v9.19 — Antes inventaba 50 "para que siempre se viera algo". Un 50
+       falso se lee como dato real; es peor que no mostrar nada. */
+    var sinDato = (v === undefined || v === null);
+    if(sinDato) v = 0;
     var col = s.color;
-    var lowCol = v < 30 ? '#EF4444' : (v < 60 ? '#FBBF24' : col);
+    var lowCol = sinDato ? 'rgba(120,120,130,0.45)' : (v < 30 ? '#EF4444' : (v < 60 ? '#FBBF24' : col));
     return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0">'+
       '<div style="font-size:18px;line-height:1;filter:drop-shadow(0 0 6px '+col+'66)">'+s.icon+'</div>'+
       '<div style="font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,220,240,0.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+s.label+'</div>'+
       '<div style="width:100%;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">'+
         '<div style="height:100%;width:'+v+'%;background:'+lowCol+';box-shadow:0 0 6px '+lowCol+'80;transition:width .6s ease;border-radius:2px"></div>'+
       '</div>'+
-      '<div style="font-size:11px;font-weight:800;color:'+lowCol+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+lowCol+'55">'+v+'</div>'+
+      '<div style="font-size:11px;font-weight:800;color:'+lowCol+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+lowCol+'55">'+(sinDato?'—':v)+'</div>'+
     '</div>';
   }).join('');
 }
@@ -931,7 +934,7 @@ function renderSimsBandSimsStyle(targetId){
     var valCol = sinDato ? 'rgba(180,184,200,0.50)' : barCol;
     var vTxt   = sinDato ? '—' : v;
     return ''+
-      '<div class="hud-need">'+
+      '<div class="hud-need" data-need="'+s.key+'" title="Registrar '+s.label+'">'+
         '<div class="hud-need-top">'+
           '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
           '<span class="hud-need-l">'+s.label+'</span>'+
@@ -944,6 +947,15 @@ function renderSimsBandSimsStyle(targetId){
         '</div>'+
       '</div>';
   }).join('');
+
+  /* Un solo oyente, reasignado en cada pintado (no se acumulan).
+     Por delegación: la celda dice a qué necesidad pertenece. */
+  el.onclick = function(ev){
+    var celda = ev.target && ev.target.closest ? ev.target.closest('.hud-need') : null;
+    if(!celda) return;
+    var clave = celda.getAttribute('data-need');
+    if(clave && window.SIMS && typeof window.SIMS.capturar === 'function') window.SIMS.capturar(clave);
+  };
 }
 window.renderSimsBandSimsStyle = renderSimsBandSimsStyle;
 
@@ -3835,16 +3847,21 @@ function _crearDialOverlay(){
       '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-left:15px}',
       '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
       // need (sims) - layout VERTICAL compacto para 9 columnas en una fila
-      '.hud-need{display:flex;flex-direction:column;gap:3px;min-width:0;padding:0}',
+      /* v9.19 — Clicable: lleva al formulario que alimenta esa barra.
+         Coherente con "el dial captura, los paneles muestran": no edita
+         en sitio, abre la captura de siempre. */
+      '.hud-need{display:flex;flex-direction:column;gap:3px;min-width:0;padding:3px 5px;border-radius:7px;cursor:pointer;transition:background .15s,transform .15s}',
+      '.hud-need:hover{background:rgba(255,255,255,0.06);transform:translateY(-1px)}',
+      '.hud-need:hover .hud-need-l{color:rgba(240,244,248,0.95)}',
       '.hud-need-top{display:flex;align-items:center;gap:5px;min-width:0}',
       '.hud-need-mid{display:flex;align-items:baseline;gap:6px;min-width:0}',
       '.hud-need-bot{display:flex;align-items:center;gap:6px;min-width:0}',
       '.hud-need-ico{font-size:13px;flex-shrink:0;width:14px;display:flex;align-items:center;justify-content:center;line-height:1}',
-      '.hud-need-l{flex:1;font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.65);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.hud-need-l{flex:1;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.65);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.hud-need-bar-wrap{width:100%;height:5px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.10);position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,0.55);margin-top:2px}',
       '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative;min-width:1px}',
       '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:1.5px;background:rgba(255,255,255,0.45);border-radius:999px;filter:blur(0.6px)}',
-      '.hud-need-v{font-size:9px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;line-height:1;white-space:nowrap}',
+      '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;line-height:1;white-space:nowrap}',
       '.hud-need-v .max{opacity:.40;font-weight:700;font-size:7.5px}',
       // CTA pie
       '.hud-cta{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 16px;cursor:pointer;border-top:1px solid var(--ac-15);transition:padding .15s,background .15s}',
@@ -3912,7 +3929,13 @@ function _crearDialOverlay(){
       '.hud-sim-h .ico i{font-size:11px}',
       '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
-      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 10px;padding:0;flex:1;min-width:0}',
+      /* v9.19 — Era repeat(9) clavado. Al entrar Hidratación como décima
+         necesidad, la última se caía sola a un segundo renglón, huérfana
+         bajo la primera. 5x2 reparte diez en dos filas parejas y da casi
+         el doble de ancho a cada celda: los rótulos ya no se cortan. */
+      '.hud-sim-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px 14px;padding:0;flex:1;min-width:0}',
+      '@media (max-width:1100px){.hud-sim-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}',
+      '@media (max-width:700px){.hud-sim-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}',
       // stats panel
       '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:4px;padding:8px 10px;height:100%;box-sizing:border-box}',
       '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:8px;min-width:0;padding:0 3px}',
@@ -4187,7 +4210,7 @@ function _crearDialOverlay(){
           '<i class="fas fa-heart-pulse"></i>'+
           '<div class="hud-sim-h-txt">'+
             '<span class="t">Estado del Sim</span>'+
-            '<span class="meta">9 needs</span>'+
+            '<span class="meta">'+(typeof _SIMS_NEEDS!=='undefined'?_SIMS_NEEDS.length:9)+' needs</span>'+
           '</div>'+
         '</div>'+
         '<div id="hud-sim-band-grid" class="hud-sim-grid"></div>'+

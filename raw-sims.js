@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════
-   LifeOS · raw-sims.js  v1.2
+   LifeOS · raw-sims.js  v1.3
    MOTOR DE NECESIDADES — transposición del sistema de motivos de Los Sims
 
    ── LA IDEA ─────────────────────────────────────────────────────────
@@ -366,6 +366,54 @@
     return peso ? Math.round(suma / peso) : null;
   }
 
+  /* ── Clic en una barra → su formulario de captura ──────────────────
+     Mismo mecanismo que usa el dial: o llamar la función global irA*, o
+     dejar el preset en window._dialPreset y abrir el formulario. No se
+     inventa un editor nuevo: se reutiliza la captura de siempre, que es
+     la que ya sabe validar y escribir en la hoja correcta.
+
+     "El dial captura, los paneles muestran" (CLAUDE.md §1). Esto no
+     rompe esa regla: la banda no edita nada, solo es un atajo al dial. */
+  var _RUTA = {
+    hidratacion: { fn:'irAAguaForm' },
+    energia:     { fn:'irASuenoForm' },
+    disfrute:    { fn:'irALogroForm' },
+    higiene:     { fn:'irAActivity' },
+    entorno:     { fn:'irAActivity' },
+    trabajo:     { fn:'irAActivity' },
+    hambre:      { form:'nutricion',     preset:function(){
+                     var h = _ahora().getHours();
+                     var m = h < 11 ? 'Desayuno' : (h < 17 ? 'Comida' : (h < 22 ? 'Cena' : 'Snack'));
+                     return { tab:'nutricion', momento:m };
+                   } },
+    cuerpo:      { form:'entrenamiento', preset:function(){ return { tab:'entrenamiento', tipo:'Deporte' }; } },
+    mental:      { form:'pensamiento',   preset:function(){ return { tab:'pensamiento', categoria:'Reflexión' }; } },
+    social:      { form:'persona',       preset:function(){ return { tab:'persona', energia:0 }; } }
+  };
+
+  function capturar(clave){
+    var r = _RUTA[clave];
+    if (!r) { console.warn('[sims] sin ruta de captura para "' + clave + '"'); return false; }
+    try {
+      if (r.fn) {
+        if (typeof window[r.fn] !== 'function') {
+          console.warn('[sims] no existe window.' + r.fn); return false;
+        }
+        window[r.fn]();
+        return true;
+      }
+      window._dialPreset = r.preset ? r.preset() : {};
+      if (typeof window.abrirFormulario !== 'function') {
+        console.warn('[sims] no existe abrirFormulario'); return false;
+      }
+      window.abrirFormulario(r.form);
+      return true;
+    } catch(e){
+      console.warn('[sims] falló la captura de ' + clave + ':', e);
+      return false;
+    }
+  }
+
   /* ── Fuentes que no vienen en getAll ───────────────────────────────── */
   function cargarFuentes(){
     var api = window.api; if (!api) return Promise.resolve();
@@ -430,8 +478,8 @@
   }
 
   window.SIMS = {
-    VERSION:'1.2', META:META, calcular:calcular, detalle:detalle, score:score,
-    cargarFuentes:cargarFuentes, arrancarReloj:arrancarReloj
+    VERSION:'1.3', META:META, calcular:calcular, detalle:detalle, score:score,
+    cargarFuentes:cargarFuentes, arrancarReloj:arrancarReloj, capturar:capturar
   };
   window.simsDiag = simsDiag;
 
@@ -460,5 +508,5 @@
     });
   });
 
-  console.log('[sims] motor de necesidades v1.2 · simsDiag() para ver por qué está cada barra');
+  console.log('[sims] motor de necesidades v1.3 · simsDiag() para ver por qué está cada barra');
 })();
