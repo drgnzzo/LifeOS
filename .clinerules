@@ -385,6 +385,47 @@ El mecanismo ya existía en el backend desde antes; nunca se había usado.
   porque los registros de sueño guardan horas totales pero no la hora de
   despertar. Capturarla mejoraría energía e hidratación
 
+### Versión móvil — `movil.html` + `movil.js`
+
+Página de bolsillo: capturar rápido y consultar de un vistazo. Vive en el
+mismo repo, mismo backend, misma puerta TOTP.
+
+**Carga tres archivos, no veintiuno:** `raw-core.js` (API_URL, objeto
+`api`, `_DIAL_ITEMS`), `raw-auth.js` y `raw-sims.js`. Fuera quedan
+`raw-overlay.js` (500 KB), `three.js` (600 KB), GSAP y `raw-app.css`
+(143 KB). De ~1.6 MB a ~230 KB.
+
+**El menú de capturas se genera solo.** No hay lista escrita a mano: sale
+de `_DIAL_ITEMS`. Para saber a dónde va cada sub se ejecuta su propio
+`preset()` y se lee el `window._dialPreset` que deja. Agregar un gajo al
+dial lo hace aparecer en el móvil sin tocar nada.
+
+**Los formularios sí son propios.** Los del escritorio están dentro de
+`raw-overlay.js`, que es justo lo que no se baja al celular. `movil.js`
+tiene un motor genérico con la tabla `FORMS`, indexada por el `tab` o el
+`irA` del preset. Lo que no tiene ficha se lista igual, marcado «aún no»
+— nunca se finge que funciona.
+
+  Con ficha hoy: agua, sueño, alcohol, nutrición, pensamiento,
+  entrenamiento. Para sumar otra, basta agregar su entrada a `FORMS`.
+
+**El cuadro de preguntas NO es un modelo de lenguaje.** Es un buscador de
+patrones sobre datos ya en memoria: instantáneo, sin red, sin llave, sin
+costo. Las respuestas salen de `SIMS.detalle()`, que ya explica en
+español por qué cada barra está donde está. Lenguaje natural de verdad
+exigiría una API con llave — otra decisión (costo, latencia, un secreto
+que cuidar).
+
+**Una sola llamada a `getAll()`** trae todo (viene cacheado) y de paso
+abre la compuerta de endpoints diferidos de `raw-core`. Sin eso, cada
+lectura suelta esperaría hasta 12 s al `setTimeout` de esa compuerta.
+
+**El desvío va en la primera línea de `index.html`**, antes de cualquier
+`<link>` o `<script>`: si estuviera abajo, el celular ya habría empezado
+a bajar el CSS y los JS pesados antes de irse. Pide pantalla chica **y**
+táctil, para que una laptop angosta no acabe en la de bolsillo. Salidas:
+`index.html?full=1`, o `localStorage.lifeos_forzar_escritorio = "1"`.
+
 ### Rumbo a largo plazo
 Capas, en este orden estricto:
 

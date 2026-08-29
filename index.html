@@ -2,6 +2,33 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+
+  <!-- ══ v9.21 — DESVÍO A MÓVIL ═══════════════════════════════════
+       Va aquí arriba, ANTES de cualquier <link> o <script>, y usa
+       location.replace. Si estuviera abajo el celular ya habría
+       empezado a bajar raw-app.css (143 KB), raw-overlay.js (500 KB)
+       y three.js (600 KB) antes de irse — justo lo que se quiere
+       evitar. replace() en vez de href para no dejar basura en el
+       historial: el botón Atrás no debe rebotar entre las dos.
+
+       Dos salidas, por si el desvío estorba:
+         · index.html?full=1  → fuerza el escritorio esta vez
+         · localStorage lifeos_forzar_escritorio = "1" → siempre
+       Y pide pantalla chica Y táctil: una laptop con ventana angosta
+       no debe acabar en la versión de bolsillo.
+       ══════════════════════════════════════════════════════════ -->
+  <script>
+  (function(){
+    try{
+      if(location.search.indexOf("full=1") !== -1) return;
+      if(localStorage.getItem("lifeos_forzar_escritorio") === "1") return;
+      var ancho  = Math.min(screen.width || 9999, window.innerWidth || 9999);
+      var tactil = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+      if(ancho <= 820 && tactil) location.replace("movil.html");
+    }catch(e){}
+  })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>LifeOS</title>
 
