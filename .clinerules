@@ -243,17 +243,24 @@ Scripts de consola. Es el método que resuelve los bugs de este proyecto.
   `persistir()` manda `x`/`y`/`conexiones` por `actualizarNota`
 - ~~Frontend de Timers~~ — **hecho**. `raw-timers.js` monta la sección de
   nivel 2 con crear, pausar, reanudar y finalizar
+- ~~`LOGRO RECIENTE` vacío~~ — **arreglado** (v9.20). `_calcLogroReciente`
+  leía `l.titulo` y `l.avance`, campos que `getLogros()` nunca devolvió;
+  caía siempre al valor por defecto. Ahora el título es el último logro
+  **completado** por fecha (campo `concepto`) y el avance es el progreso
+  general, el mismo número que muestra el panel LOGROS
+
 - **`score` sigue sin contenedor.** `renderScore` busca `#score-body` y se
   sale en silencio si no existe. Ese id no está en ningún HTML del repo:
   `getScoreVida` funciona y se pinta en la nada. Es el pendiente más
   chico que queda
-- **`enviarSOS` puede reportar envíos que no ocurrieron.** La URL de
-  CallMeBot lleva `apikey=YOUR_API_KEY` literal, sin sustituir, pero
-  `enviados++` corre igual y la función devuelve «SOS enviado a N
-  contacto(s)». El correo sí sale; el WhatsApp no. Rompe §4 (nunca
-  devuelvas datos falsos) en la función de mayor riesgo de la app.
-  Arreglo: contar por canal y decir la verdad; la llave va en
-  `PropertiesService`, nunca en el código
+- ~~`enviarSOS` reportaba envíos que no ocurrieron~~ — **arreglado**
+  (v5.015). La llave se lee de la propiedad de script
+  **`CALLMEBOT_APIKEY`**; sin ella el WhatsApp ni se intenta y se avisa.
+  El envío se verifica por código HTTP **y** por contenido (CallMeBot
+  responde 200 con cuerpo de error). Se cuenta por canal —`porEmail` y
+  `porWhatsapp`— y si no sale nada devuelve `ok:false`.
+  **Pendiente:** dar de alta `CALLMEBOT_APIKEY` para que el WhatsApp
+  funcione; hoy solo sale el correo
 - Verificar en campo que las invitaciones de Meet lleguen al destinatario
 - El SIM muestra 8 de 9 necesidades en `0/100` y LOGRO RECIENTE sale
   vacío en `0%`. Sin diagnosticar: puede ser dato real o carga fallida

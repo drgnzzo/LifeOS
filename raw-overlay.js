@@ -873,19 +873,64 @@ function _calcMisionDiaria(){
   };
 }
 
+/* v9.20 — Esta función NUNCA funcionó. Leía l.titulo y l.avance, y
+   getLogros() no devuelve ninguno de los dos: sus campos son id,
+   proyecto, contacto, concepto, ie, recurrencia, descripcion,
+   completado, fila y fecha. El resultado caía siempre al valor por
+   defecto, así que el chip mostraba «—» y 0% desde el día uno, en
+   silencio, con 15 logros completados en la hoja.
+
+   Tampoco se puede cumplir la intención original ("el pendiente con
+   mayor avance"): no existe un campo de avance por logro. Con los datos
+   que sí hay, la lectura honesta del rótulo "LOGRO RECIENTE" es:
+     · título  = el último logro COMPLETADO (por fecha)
+     · avance  = progreso general, completados / total
+   Eso es lo mismo que muestra el panel LOGROS en su "PROGRESO GENERAL",
+   así que los dos números concuerdan en vez de contradecirse. */
 function _calcLogroReciente(){
-  // Logro reciente NO completado con mayor avance
   var lg = window._logrosData;
   if(!lg || !lg.items || !lg.items.length) return { titulo:'—', avance:0 };
-  var pendientes = lg.items.filter(function(l){ return !(l.completado==='Sí'||l.completado===true); });
-  if(!pendientes.length){
-    var ult = lg.items[lg.items.length-1];
-    return { titulo:(ult && ult.titulo)||'—', avance:100 };
+
+  var items = lg.items;
+  var nombre = function(l){
+    return l.concepto || l.descripcion || l.proyecto || '—';
+  };
+  var hechos = items.filter(function(l){
+    return l.completado === 'Sí' || l.completado === true;
+  });
+
+  var avance = Math.round(hechos.length / items.length * 100);
+
+  if(!hechos.length){
+    // Nada completado todavía: se enseña el primero pendiente, con 0%.
+    return { titulo: nombre(items[0]), avance: 0 };
   }
-  // Tomar el de mayor avance
-  pendientes.sort(function(a,b){ return (b.avance||0)-(a.avance||0); });
-  var p = pendientes[0];
-  return { titulo:p.titulo||'—', avance:Math.round(p.avance||0) };
+
+  /* El más reciente por fecha. Muchos logros no la traen, así que los
+     sin fecha quedan al final y solo se usan si no hay ninguno con ella. */
+  var conFecha = hechos.filter(function(l){ return l.fecha; });
+  var elegido;
+  if(conFecha.length){
+    conFecha.sort(function(a,b){
+      var fa = _lrFecha(a.fecha), fb = _lrFecha(b.fecha);
+      return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
+    });
+    elegido = conFecha[0];
+  } else {
+    elegido = hechos[hechos.length - 1];
+  }
+  return { titulo: nombre(elegido), avance: avance };
+}
+
+/* dd/MM/yyyy es lo que manda getLogros; yyyy-MM-dd por si cambia. */
+function _lrFecha(v){
+  if(!v) return null;
+  if(v instanceof Date) return isNaN(v) ? null : v;
+  var s = String(v).trim();
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  var d = new Date(s.length > 10 ? s : s + 'T00:00:00');
+  return isNaN(d) ? null : d;
 }
 
 function _calcNivelSiguiente(){
