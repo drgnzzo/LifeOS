@@ -51,7 +51,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <!-- IMPORTANTE: tokens ANTES de raw-app — la cascada y :root necesitan este orden -->
   <link rel="stylesheet" href="raw-tokens.css?v=8400">
-  <link rel="stylesheet" href="raw-app.css?v=9090">
+  <link rel="stylesheet" href="raw-app.css?v=9240">
 <link rel="stylesheet" href="raw-nivel2.css?v=9130">
   <link rel="stylesheet" href="raw-mobile.css?v=9050">
 
@@ -127,7 +127,7 @@ html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
         <div class="hero-icon"><i class="fas fa-diamond"></i></div>
         <div class="hero-brand-txt">
           <div class="hero-title">Life<span>OS</span></div>
-          <div class="hero-sub">v.9.23 · Sheets · TOTP</div>
+          <div class="hero-sub">v.9.24 · Sheets · TOTP</div>
         </div>
       </div>
     </div>
@@ -172,6 +172,9 @@ html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
       <button class="hero-act" id="btn-sheets-direct" onclick="window.open('https://docs.google.com/spreadsheets/d/15T14Hb7tvmv24ZAaC3su1NRtDwVS6-dWbJGxQYUGP1o/edit#gid=0','_blank')" title="Abrir RAW directo en Google Sheets">
         <i class="fab fa-google-drive"></i>
       </button>
+      <!-- v9.24 — Cuenta regresiva del auto-refresco. Un clic aqui lo
+           apaga o lo prende; el boton de al lado refresca y la reinicia. -->
+      <span id="rf-cuenta" title="Auto-refresco — clic para apagarlo o prenderlo">—</span>
       <button class="hero-act" id="btn-rf" onclick="refreshTodo()" title="Actualizar">
         <i class="fas fa-rotate-right"></i>
       </button>
@@ -766,7 +769,7 @@ html.cf-on .hud-pnl{ max-height:calc(100vh - 165px); }
 <script src="raw-sims.js?v=9190"></script>
 <script src="raw-overlay.js?v=9200"></script>
 <script src="raw-overlay-dnd.js?v=7069"></script>
-<script src="raw-dashboard.js?v=891"></script>
+<script src="raw-dashboard.js?v=9240"></script>
 <script src="raw-logros.js?v=6069"></script>
 <script src="raw-bitacora.js?v=5189"></script>
 <script src="raw-carousel.js?v=6030"></script>

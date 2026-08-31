@@ -394,6 +394,9 @@ function addItem(idx){
 //  REFRESH
 // ══════════════════════════════════════════
 function refreshTodo(){
+  /* v9.24 — Picar ↻ reinicia la cuenta regresiva: acabas de tener datos
+     frescos, no tiene sentido que el automático salte enseguida. */
+  try { if(window._autoRefresco) window._autoRefresco.reiniciar(); } catch(e){}
   // ════════════════════════════════════════════════════════════════
   // v6.040 — ACTUALIZAR sin salir del overlay.
   // refreshTodo NO navega: no llama cerrarDial ni cambia de sección.
@@ -1531,3 +1534,106 @@ function renderVariablesGrafica(){
 
 window.renderVariablesExpandido=renderVariablesExpandido;
 window.renderVariablesGrafica=renderVariablesGrafica;
+
+/* ══════════════════════════════════════════════════════════════════
+   AUTO-REFRESCO CON CUENTA REGRESIVA  ·  v9.24
+   ─────────────────────────────────────────────────────────────────
+   Sin servidor, cada dispositivo es una isla: el escritorio no se
+   entera de lo que capturaste en el celular hasta que vuelve a
+   preguntar. Esto pregunta solo cada tanto, y enseña cuánto falta.
+
+   POR QUÉ 10 MINUTOS Y NO 2
+   Cada refresco es una llamada a Apps Script de varios segundos, y la
+   lentitud es la queja número uno. Además refreshTodo llama a
+   _reposicionarHUD, que CLAUDE.md §2.2 marca como no idempotente:
+   su candado es de reentrada, y aunque el impl reconcilia la posición
+   del dial en cada pasada, subir la frecuencia sin necesidad sería
+   tentar a una regresión ya pagada. Diez minutos da frescura
+   suficiente sin convertir el HUD en un metrónomo.
+
+   CUÁNDO NO REFRESCA
+     · Pestaña oculta — el contador se congela. Refrescar lo que nadie
+       ve solo gasta cuota. Al volver, si ya se pasó el tiempo,
+       refresca en ese momento: justo el caso de capturar en el
+       celular y regresar a la compu.
+     · Estás escribiendo en un campo — repintar a media captura sería
+       lo peor que puede hacer. Se pospone 30 s.
+     · Ya hay un refresco en vuelo.
+
+   Un clic en el contador apaga o prende el automático. Un clic en ↻
+   refresca y reinicia la cuenta.
+   ══════════════════════════════════════════════════════════════ */
+window._autoRefresco = (function(){
+  var CADA_MS   = 10 * 60 * 1000;
+  var POSPONER  = 30 * 1000;
+  var ultimo    = Date.now();
+  var encendido = true;
+  var reloj     = null;
+
+  function reiniciar(){ ultimo = Date.now(); }
+
+  function escribiendo(){
+    var a = document.activeElement;
+    if(!a) return false;
+    var t = (a.tagName || "").toUpperCase();
+    return t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || a.isContentEditable;
+  }
+
+  function mmss(ms){
+    var s = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
+  }
+
+  function pintar(txt, apagado){
+    var el = document.getElementById("rf-cuenta");
+    if(!el) return;
+    el.textContent = txt;
+    el.classList.toggle("off", !!apagado);
+  }
+
+  function tic(){
+    if(!encendido){ pintar("auto", true); return; }
+    /* Oculta: se congela el contador moviendo el ancla. Así al volver no
+       aparece un número negativo ni dispara una ráfaga de refrescos. */
+    if(document.hidden){ pintar(mmss(CADA_MS - (Date.now() - ultimo))); return; }
+
+    var falta = CADA_MS - (Date.now() - ultimo);
+    if(falta > 0){ pintar(mmss(falta)); return; }
+
+    if(escribiendo()){ ultimo = Date.now() - CADA_MS + POSPONER; pintar(mmss(POSPONER)); return; }
+    var btn = document.getElementById("btn-rf");
+    if(btn && btn.disabled){ return; }          // ya hay uno en vuelo
+
+    if(typeof refreshTodo === "function"){ reiniciar(); refreshTodo(); }
+  }
+
+  /* Al volver a la ventana: si ya venció, refresca de inmediato. */
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden) return;
+    if(!encendido) return;
+    if(Date.now() - ultimo >= CADA_MS) tic();
+  });
+
+  function alternar(){
+    encendido = !encendido;
+    if(encendido) reiniciar();
+    tic();
+    if(typeof showToast === "function"){
+      showToast(encendido ? "Auto-refresco cada 10 min" : "Auto-refresco apagado");
+    }
+  }
+
+  function arrancar(){
+    if(reloj) clearInterval(reloj);
+    reloj = setInterval(tic, 1000);
+    var el = document.getElementById("rf-cuenta");
+    if(el && !el._enlazado){ el._enlazado = true; el.addEventListener("click", alternar); }
+    tic();
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", arrancar);
+  else arrancar();
+
+  return { reiniciar: reiniciar, alternar: alternar, arrancar: arrancar,
+           get encendido(){ return encendido; }, CADA_MS: CADA_MS };
+})();

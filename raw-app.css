@@ -3103,3 +3103,15 @@ html.niv-warp .board-face{ opacity:0 !important; transition:opacity .9s ease !im
 
 /* boards de sección: fundido de entrada (además de su boardEmerge) */
 .board-face{ transition:opacity 1s ease; }
+
+/* ── v9.24 — Cuenta regresiva del auto-refresco ────────────────────
+   Discreta a proposito: es informacion de fondo, no un elemento de la
+   interfaz que pida atencion. Solo se nota si la buscas. */
+#rf-cuenta{
+  font-family:JetBrains Mono,ui-monospace,monospace;
+  font-size:10px;font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  color:rgba(200,210,220,.32);cursor:pointer;user-select:none;
+  padding:3px 6px;border-radius:6px;transition:color .18s,background .18s;
+}
+#rf-cuenta:hover{color:rgba(220,228,240,.75);background:rgba(255,255,255,.05)}
+#rf-cuenta.off{color:rgba(200,210,220,.18);text-decoration:line-through}
