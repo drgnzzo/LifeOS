@@ -887,9 +887,16 @@ function _calcMisionDiaria(){
      · avance  = progreso general, completados / total
    Eso es lo mismo que muestra el panel LOGROS en su "PROGRESO GENERAL",
    así que los dos números concuerdan en vez de contradecirse. */
+/* v9.26 — «todavía no llegó» y «no hay» no son lo mismo.
+   getAll tarda 10-25s y _logrosData no existe hasta que responde.
+   Devolver '—' en ese hueco hacía que la espera se viera idéntica a
+   un chip roto: yo mismo diagnostiqué un bug que era solo latencia.
+   Ahora el hueco dice '…' y el guion queda reservado para su
+   significado real: llegaron los datos y no hay nada que mostrar. */
 function _calcLogroReciente(){
   var lg = window._logrosData;
-  if(!lg || !lg.items || !lg.items.length) return { titulo:'—', avance:0 };
+  if(!lg || !lg.items) return { titulo:'…', avance:0, cargando:true };
+  if(!lg.items.length)  return { titulo:'—', avance:0 };
 
   var items = lg.items;
   var nombre = function(l){
