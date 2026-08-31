@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════
-   LifeOS · raw-auth.js  v9.17
+   LifeOS · raw-auth.js  v9.22
    ─────────────────────────────────────────────────────────────────────
    Puerta TOTP. Pide el código de 6 dígitos, guarda el pase y lo deja a
    disposición del transporte.
@@ -127,12 +127,17 @@
       '<div class="la-caja" role="dialog" aria-modal="true" aria-label="Acceso a LifeOS">' +
         '<p class="la-marca">LifeOS</p>' +
         '<h1 class="la-titulo">Codigo de acceso</h1>' +
-        '<p class="la-pie">Los 6 digitos de Google Authenticator.</p>' +
-        '<input id="la-codigo" type="text" inputmode="numeric" autocomplete="one-time-code" ' +
-               'maxlength="6" placeholder="000000" aria-label="Codigo de 6 digitos">' +
+        '<p class="la-pie">Los 6 digitos de Google Authenticator,<br>o un codigo de respaldo.</p>' +
+        /* v9.22 — maxlength 9 y sin inputmode numerico: los codigos de
+           respaldo son XXXX-XXXX y llevan letras. Con el filtro anterior
+           (solo digitos, tope 6) eran imposibles de teclear. */
+        '<input id="la-codigo" type="text" inputmode="text" autocomplete="one-time-code" ' +
+               'autocapitalize="characters" spellcheck="false" ' +
+               'maxlength="9" placeholder="000000" aria-label="Codigo de acceso">' +
         '<div class="la-barra"><i id="la-barra"></i></div>' +
         '<p class="la-aviso la-neutro" id="la-aviso">El codigo cambia cada 30 segundos.</p>' +
         '<p class="la-nota">La sesion termina al cerrar esta pestana.</p>' +
+        '<p class="la-nota" style="margin-top:4px">Sin telefono: teclea un codigo de respaldo y pulsa Enter.</p>' +
       '</div>';
     document.body.appendChild(el);
     return el;
@@ -177,8 +182,10 @@
       };
 
       var enviar = function () {
-        var cod = (campo.value || '').replace(/\D/g, '');
-        if (cod.length !== 6 || enVuelo) return;
+        /* v9.22 — Ya no se limpia a digitos: eso borraba los codigos de
+           respaldo. Se manda tal cual y el backend decide cual es. */
+        var cod = (campo.value || '').trim();
+        if (cod.length < 6 || enVuelo) return;
         enVuelo = true;
         campo.disabled = true;
         el.classList.remove('la-mal');
@@ -187,7 +194,8 @@
         _login(cod).then(function (r) {
           if (r && r.ok && r.pase) {
             _guardar(r.pase, r.expira);
-            decir('Listo.', true);
+            /* Si entro con un respaldo se avisa: son finitos y no vuelven. */
+            decir(r.conRespaldo ? (r.aviso || 'Listo.') : 'Listo.', true);
             setTimeout(function () { cerrar(r.pase); }, 250);
             return;
           }
@@ -207,10 +215,16 @@
       };
 
       campo.addEventListener('input', function () {
-        var limpio = (campo.value || '').replace(/\D/g, '').slice(0, 6);
+        /* Se permiten letras (respaldo) y digitos (TOTP). El guion se
+           conserva por legibilidad; el backend lo ignora. */
+        var limpio = (campo.value || '').toUpperCase()
+                       .replace(/[^A-Z0-9-]/g, '').slice(0, 9);
         if (campo.value !== limpio) campo.value = limpio;
         el.classList.remove('la-mal');
-        if (limpio.length === 6) enviar();
+        /* Se envia solo cuando son 6 digitos puros: el TOTP tiene largo
+           fijo. Un respaldo se manda con Enter, porque si no se
+           dispararia a medio teclear. */
+        if (/^\d{6}$/.test(limpio)) enviar();
       });
       campo.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter') { ev.preventDefault(); enviar(); }
