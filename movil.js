@@ -23,14 +23,38 @@
   var el = function (id) { return document.getElementById(id); };
   var DATOS = null;
 
+  /* ── v1.1 — Métodos de api que aquí no existían ────────────────────
+     BUG DE CAMPO: "api.nuevoSueno is not a function", y energía sin dato
+     por "api.getSueno no apareció".
+
+     Causa: raw-core.js NO trae esos cuatro. Los agrega raw-e5.js — unos
+     en su objeto literal y nuevoSueno en un bucle (raw-e5.js:507). Y
+     raw-e5.js no se carga aquí a propósito: son 73 KB de interfaz que
+     espera un DOM que el móvil no tiene.
+
+     Yo di por hecho que estaban y no lo verifiqué. Se definen aquí, que
+     son tres líneas cada uno, en vez de arrastrar el archivo entero.
+     Se comprueba antes de asignar: si algún día raw-core los incluye,
+     esto no los pisa. */
+  function _completarApi() {
+    if (typeof api === 'undefined') return;
+    if (!api.getSueno)     api.getSueno     = function(){ return apiGet('getSueno'); };
+    if (!api.getAlcohol)   api.getAlcohol   = function(){ return apiGet('getAlcohol'); };
+    if (!api.nuevoSueno)   api.nuevoSueno   = function(d){ return apiPost('nuevoSueno',   { datos:d }); };
+    if (!api.nuevoAlcohol) api.nuevoAlcohol = function(d){ return apiPost('nuevoAlcohol', { datos:d }); };
+    if (!api.nuevoLogro)   api.nuevoLogro   = function(d){ return apiPost('nuevoLogro',   { datos:d }); };
+    if (!api.getContactos) api.getContactos = function(){ return apiGet('getContactos'); };
+  }
+  _completarApi();
+
   function esc(s) {
     return String(s === undefined || s === null ? '' : s)
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   /* ── Arranque ───────────────────────────────────────────────────── */
-  function cargar() {
-    el('barras').innerHTML = '<div class="vacio">Cargando…</div>';
+  function cargar(silencioso) {
+    if (!silencioso) el('barras').innerHTML = '<div class="vacio">Cargando…</div>';
     return api.getAll().then(function (d) {
       if (!d || d.error) throw new Error((d && d.error) || 'respuesta vacía');
       DATOS = d;
@@ -218,26 +242,60 @@
     }).join('');
   }
 
+  /* v1.1 — Los subs se despliegan EN LÍNEA, debajo del menú.
+     Antes: tocar gajo abría pantalla completa, elegir sub abría otra, y
+     el formulario una tercera. Tres saltos para registrar un vaso de
+     agua. Ahora el gajo se abre en su sitio, se ve qué contiene sin
+     perder el resto de la pantalla, y solo el formulario ocupa todo —
+     que sí lo necesita, porque se escribe en él. */
+  var _gajoAbierto = -1;
+
   el('gajos').addEventListener('click', function (ev) {
     var b = ev.target.closest && ev.target.closest('.gajo');
-    if (b) abrirGajo(_DIAL_ITEMS[+b.getAttribute('data-g')]);
+    if (!b) return;
+    var i = +b.getAttribute('data-g');
+    if (_gajoAbierto === i) { cerrarSubs(); return; }   // segundo toque: cierra
+    abrirGajo(i);
   });
 
-  function abrirGajo(g) {
+  function cerrarSubs() {
+    _gajoAbierto = -1;
+    var c = el('subs-inline');
+    if (c) { c.innerHTML = ''; c.classList.remove('on'); }
+    [].forEach.call(document.querySelectorAll('#gajos .gajo'),
+      function (x) { x.classList.remove('on'); });
+  }
+
+  function abrirGajo(i) {
+    var g = _DIAL_ITEMS[i];
     if (!g) return;
+    _gajoAbierto = i;
+    [].forEach.call(document.querySelectorAll('#gajos .gajo'), function (x, j) {
+      x.classList.toggle('on', j === i);
+    });
+
     /* "Ver sección" es navegación del escritorio, no captura. */
     var subs = (g.subs || []).filter(function (s) { return !/^ver /i.test(s.label || ''); });
-    if (!subs.length) { hoja(g.label, '<div class="vacio">Este gajo no tiene capturas.</div>'); return; }
-    var html = '<div class="subs">' + subs.map(function (s, i) {
+    var c = el('subs-inline');
+    if (!subs.length) {
+      c.innerHTML = '<div class="vacio">' + esc(g.label) + ' no tiene capturas.</div>';
+      c.classList.add('on');
+      return;
+    }
+    c.innerHTML = '<div class="subs">' + subs.map(function (s, k) {
       var d = destinoDe(s);
       var ficha = FORMS[d.tab] || FORMS[d.irA];
-      return '<button class="sub" data-s="' + i + '">' +
+      return '<button class="sub" data-s="' + k + '">' +
         '<span class="pt" style="background:' + (s.accent || '#8b5cf6') + '"></span>' +
         esc(s.label || s.id) + (ficha ? '' : '<span class="na">aún no</span>') +
       '</button>';
     }).join('') + '</div>';
-    hoja(g.label, html);
-    el('hoja').querySelector('.subs').addEventListener('click', function (ev) {
+    c.classList.add('on');
+    /* Comodidad visual: si el navegador no la trae, no debe tumbar la
+       captura. Un adorno nunca puede romper la funcion. */
+    try { c.scrollIntoView({ behavior:'smooth', block:'nearest' }); } catch(e){}
+
+    c.querySelector('.subs').onclick = function (ev) {
       var b = ev.target.closest && ev.target.closest('.sub');
       if (!b) return;
       var s = subs[+b.getAttribute('data-s')];
@@ -250,7 +308,7 @@
         return;
       }
       abrirForm(ficha, s.label, d);
-    });
+    };
   }
 
   /* ── Motor de formularios ───────────────────────────────────────── */
@@ -320,7 +378,17 @@
           (bien ? '✓ Guardado' : 'No se guardó: ' + esc((r && (r.error || r.mensaje)) || 'error desconocido')) +
           '</div>';
         el('gd').disabled = false;
-        if (bien) setTimeout(function () { el('hoja').classList.remove('on'); cargar(); }, 700);
+        if (bien) setTimeout(function () {
+          el('hoja').classList.remove('on');
+          /* v1.1 — Se pinta YA con lo que se acaba de escribir y luego se
+             refresca callado. getAll tarda segundos contra Apps Script;
+             esperarlo hacía sentir la app lentísima justo en el momento
+             de más satisfacción, que es ver subir la barra. */
+          if (typeof ficha.optimista === 'function') {
+            try { ficha.optimista(v); pintarBarras(); } catch(e){}
+          }
+          cargar(true);
+        }, 500);
       }).catch(function (e) {
         el('res').innerHTML = '<div class="aviso mal">Falló: ' + esc(e && e.message ? e.message : e) + '</div>';
         el('gd').disabled = false;
@@ -346,6 +414,12 @@
       ],
       guardar: function (v) {
         return api.guardarNutricion({ fecha:v.fecha, momento:'Agua', comida:'Agua', agua:v.agua });
+      },
+      /* Lo que se acaba de escribir, aplicado a la copia local para que
+         la barra suba antes de que el servidor conteste. */
+      optimista: function (v) {
+        if (window._nutData && window._nutData.hoy)
+          window._nutData.hoy.agua = (Number(window._nutData.hoy.agua) || 0) + Number(v.agua || 0);
       }
     },
     irASuenoForm: {
@@ -380,7 +454,14 @@
         { id:'proteina', et:'Proteína (g)', tipo:'number' },
         { id:'agua',     et:'Agua (L)', tipo:'number' }
       ],
-      guardar: function (v) { return api.guardarNutricion(v); }
+      guardar: function (v) { return api.guardarNutricion(v); },
+      optimista: function (v) {
+        if (window._nutData && window._nutData.hoy) {
+          var h = window._nutData.hoy;
+          h.cal  = (Number(h.cal)  || 0) + Number(v.calorias || 0);
+          h.agua = (Number(h.agua) || 0) + Number(v.agua || 0);
+        }
+      }
     },
     pensamiento: {
       campos: [

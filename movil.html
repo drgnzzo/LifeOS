@@ -53,45 +53,84 @@ header{position:sticky;top:0;z-index:10;background:rgba(5,7,12,.94);
 .score{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
 .score small{font-size:10px;color:var(--dim);font-weight:600;display:block;letter-spacing:.1em}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-.icobtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--bor);
-  background:var(--sup);font-size:16px;display:flex;align-items:center;justify-content:center}
+.icobtn{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.04);font-size:16px;display:flex;align-items:center;
+  justify-content:center;transition:transform .16s,background .16s}
+.icobtn:active{transform:scale(.92);background:rgba(255,255,255,.09)}
 main{padding:16px;max-width:640px;margin:0 auto}
 h2{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
   margin:26px 0 10px;font-weight:800}
 h2:first-child{margin-top:6px}
 
 /* ── Barras ── */
-.barras{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.b{background:var(--sup);border:1px solid var(--bor);border-radius:11px;padding:9px 10px}
+.barras{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* v1.1 — Menos caja: esquinas mas suaves, borde mas tenue, un degradado
+   apenas perceptible que le quita el aire de tabla, y entrada escalonada
+   para que la pantalla no aparezca de golpe. */
+.b{border-radius:16px;padding:11px 12px;
+  background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.07);
+  transition:transform .18s cubic-bezier(.2,.8,.2,1),border-color .18s;
+  animation:aparece .4s both}
+.b:nth-child(2){animation-delay:.03s} .b:nth-child(3){animation-delay:.06s}
+.b:nth-child(4){animation-delay:.09s} .b:nth-child(5){animation-delay:.12s}
+.b:nth-child(6){animation-delay:.15s} .b:nth-child(7){animation-delay:.18s}
+.b:nth-child(8){animation-delay:.21s} .b:nth-child(9){animation-delay:.24s}
+.b:nth-child(10){animation-delay:.27s}
+.b:active{transform:scale(.97)}
+@keyframes aparece{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 .b-top{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .b-ico{font-size:14px;line-height:1}
 .b-l{flex:1;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
   color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .b-v{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
-.b-bar{height:5px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}
-.b-bar>i{display:block;height:100%;border-radius:999px;transition:width .6s ease}
+.b-bar{height:6px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden}
+/* La barra crece con rebote suave, no con un salto seco. */
+.b-bar>i{display:block;height:100%;border-radius:999px;
+  transition:width .85s cubic-bezier(.2,.9,.25,1);
+  box-shadow:0 0 10px currentColor}
 
 /* ── Preguntar ── */
 .preg{display:flex;gap:8px}
-.preg input{flex:1;min-width:0;padding:13px 14px;font-size:15px;color:var(--tx);
-  background:var(--sup);border:1px solid var(--bor);border-radius:11px;outline:none}
+.preg input{flex:1;min-width:0;padding:14px 16px;font-size:15px;color:var(--tx);
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:999px;outline:none;transition:border-color .18s,background .18s}
 .preg input:focus{border-color:var(--acc)}
-.rta{margin-top:10px;padding:13px 14px;background:var(--sup);border:1px solid var(--bor);
-  border-left:3px solid var(--acc);border-radius:11px;font-size:14px;line-height:1.5;white-space:pre-line}
+.rta{margin-top:10px;padding:14px 16px;border:1px solid rgba(255,255,255,.07);
+  border-left:3px solid var(--acc);border-radius:14px;font-size:14px;line-height:1.55;
+  white-space:pre-line;animation:aparece .3s both;
+  background:linear-gradient(160deg,rgba(139,92,246,.09),rgba(255,255,255,.015))}
 .sug{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-.sug button{font-size:12px;padding:7px 11px;border-radius:999px;
-  border:1px solid var(--bor);background:var(--sup);color:var(--dim)}
+.sug button{font-size:12px;padding:8px 13px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);color:var(--dim);
+  transition:transform .16s,color .16s,border-color .16s}
+.sug button:active{transform:scale(.94);color:var(--tx)}
 
 /* ── Capturar ── */
-.gajos{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px}
-.gajo{background:var(--sup);border:1px solid var(--bor);border-radius:12px;
-  padding:14px 8px;text-align:center;font-size:11px;font-weight:700;
-  letter-spacing:.04em;text-transform:uppercase;color:var(--dim);
-  border-top:2px solid var(--gc,var(--acc))}
-.gajo:active{background:#141a25}
+.gajos{display:grid;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));gap:9px}
+/* v1.1 — Antes: caja con una linea dura arriba. Ahora pastilla con el
+   acento como punto y halo, que pesa menos y se lee igual de rapido. */
+.gajo{border-radius:999px;padding:13px 10px;text-align:center;font-size:11px;
+  font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);
+  transition:transform .18s cubic-bezier(.2,.8,.2,1),color .18s,border-color .18s,background .18s}
+.gajo::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+  margin-right:7px;vertical-align:1px;background:var(--gc,var(--acc));
+  box-shadow:0 0 7px var(--gc,var(--acc))}
+.gajo:active{transform:scale(.95)}
+.gajo.on{color:var(--tx);background:rgba(255,255,255,.09);
+  border-color:var(--gc,var(--acc));box-shadow:0 0 0 1px var(--gc,var(--acc)) inset}
+
+/* Subs desplegados en linea, justo bajo el menu. */
+#subs-inline{max-height:0;overflow:hidden;opacity:0;
+  transition:max-height .3s ease,opacity .25s ease,margin .3s ease}
+#subs-inline.on{max-height:620px;opacity:1;margin-top:11px}
 .subs{display:flex;flex-direction:column;gap:7px}
-.sub{display:flex;align-items:center;gap:10px;padding:14px;border-radius:11px;
-  background:var(--sup);border:1px solid var(--bor);text-align:left;width:100%;font-size:15px}
+.sub{display:flex;align-items:center;gap:11px;padding:14px 15px;border-radius:14px;
+  background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.07);text-align:left;width:100%;font-size:15px;
+  transition:transform .16s cubic-bezier(.2,.8,.2,1),border-color .16s}
+.sub:active{transform:scale(.985);border-color:rgba(255,255,255,.18)}
 .sub .pt{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .sub .na{margin-left:auto;font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
 
@@ -106,16 +145,21 @@ h2:first-child{margin-top:6px}
 .campo{margin:0 16px 14px}
 .campo label{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--faint);font-weight:800;margin-bottom:6px}
-.campo input,.campo select,.campo textarea{width:100%;padding:13px 14px;font-size:16px;
-  color:var(--tx);background:var(--sup);border:1px solid var(--bor);border-radius:11px;outline:none}
+.campo input,.campo select,.campo textarea{width:100%;padding:14px 15px;font-size:16px;
+  color:var(--tx);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;outline:none;transition:border-color .18s,background .18s}
 .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:var(--acc)}
 .campo textarea{min-height:88px;resize:vertical}
 .rapidos{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
-.rapidos button{font-size:13px;padding:9px 13px;border-radius:9px;
-  border:1px solid var(--bor);background:var(--sup)}
+.rapidos button{font-size:13px;padding:10px 14px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);
+  transition:transform .16s,background .16s,border-color .16s}
+.rapidos button:active{transform:scale(.94)}
 .rapidos button.on{border-color:var(--acc);background:rgba(139,92,246,.16);color:var(--tx)}
-.guardar{margin:22px 16px 0;width:calc(100% - 32px);padding:16px;font-size:16px;font-weight:700;
-  color:#fff;background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:12px}
+.guardar{margin:22px 16px 0;width:calc(100% - 32px);padding:17px;font-size:16px;font-weight:700;
+  color:#fff;background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:16px;
+  box-shadow:0 8px 22px rgba(124,58,237,.32);transition:transform .16s,box-shadow .16s}
+.guardar:active{transform:scale(.98);box-shadow:0 4px 12px rgba(124,58,237,.28)}
 .guardar:disabled{opacity:.5}
 .aviso{margin:14px 16px 0;padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.45}
 .aviso.ok{background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.35);color:var(--ok)}
@@ -144,6 +188,7 @@ h2:first-child{margin-top:6px}
 
   <h2>Capturar</h2>
   <div class="gajos" id="gajos"><div class="vacio">Cargando…</div></div>
+  <div id="subs-inline"></div>
 </main>
 
 <div id="hoja"></div>
@@ -153,4 +198,4 @@ h2:first-child{margin-top:6px}
 <script src="raw-core.js?v=9230"></script>
 <script src="raw-auth.js?v=9220"></script>
 <script src="raw-sims.js?v=9190"></script>
-<script src="movil.js?v=1000"></script>
+<script src="movil.js?v=1100"></script>
