@@ -893,17 +893,37 @@ function _calcLogroReciente(){
 
   var items = lg.items;
   var nombre = function(l){
-    return l.concepto || l.descripcion || l.proyecto || '—';
+    return l.concepto || l.descripcion || l.proyecto || '';
   };
-  var hechos = items.filter(function(l){
-    return l.completado === 'Sí' || l.completado === true;
-  });
+
+  /* v9.25 — Dos errores de la v9.20, corregidos en campo.
+
+     1) "completado" no es un valor, son seis. raw-logros.js ya tenía
+        _lgrIsDone resolviendo eso ('Sí','Si','sí','si','1',true) y yo
+        reimplementé la prueba aceptando solo dos. Con la hoja guardando
+        "Si" sin acento, el filtro daba cero completados. Ahora se reusa
+        la función canónica cuando existe; el respaldo cubre lo mismo.
+
+     2) Al no hallar completados caía a items[0], que resultó no tener
+        nombre — de ahí el guion. Ahora se busca el primero que SÍ tenga
+        cómo llamarse. Misma lección que con las fechas: no confiar en
+        la posición. */
+  var esHecho = (typeof _lgrIsDone === 'function') ? _lgrIsDone : function(l){
+    var v = String(l.completado || '').trim().toLowerCase();
+    return v === 'sí' || v === 'si' || v === '1' || l.completado === true;
+  };
+  var conNombre = function(lista){
+    for(var i = 0; i < lista.length; i++) if(nombre(lista[i])) return lista[i];
+    return null;
+  };
+  var hechos = items.filter(esHecho);
 
   var avance = Math.round(hechos.length / items.length * 100);
 
   if(!hechos.length){
-    // Nada completado todavía: se enseña el primero pendiente, con 0%.
-    return { titulo: nombre(items[0]), avance: 0 };
+    // Nada completado: el primer pendiente que tenga nombre, con 0%.
+    var pend = conNombre(items);
+    return { titulo: pend ? nombre(pend) : '—', avance: 0 };
   }
 
   /* El más reciente por fecha. Muchos logros no la traen, así que los
@@ -916,10 +936,13 @@ function _calcLogroReciente(){
       return (fb ? fb.getTime() : 0) - (fa ? fa.getTime() : 0);
     });
     elegido = conFecha[0];
-  } else {
-    elegido = hechos[hechos.length - 1];
   }
-  return { titulo: nombre(elegido), avance: avance };
+  /* Si el más reciente por fecha no tiene nombre, o no había fechas, se
+     busca hacia atrás el último completado que sí se pueda nombrar. */
+  if(!elegido || !nombre(elegido)){
+    elegido = conNombre(hechos.slice().reverse()) || elegido;
+  }
+  return { titulo: (elegido && nombre(elegido)) || '—', avance: avance };
 }
 
 /* dd/MM/yyyy es lo que manda getLogros; yyyy-MM-dd por si cambia. */
