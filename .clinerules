@@ -289,6 +289,24 @@ Scripts de consola. Es el método que resuelve los bugs de este proyecto.
 auth nunca se exige si no hay `TOTP_SEMILLA`. Es imposible quedarse fuera
 de la app por un despiste de configuración.
 
+**Códigos de respaldo (v5.016).** Ocho de un solo uso para cuando no
+tengas el Authenticator. Se teclean en la MISMA pantalla de acceso, así
+que sirven sin computadora y sin abrir el editor — justo lo que falta
+cuando se pierde el teléfono estando en la calle.
+
+- Se guarda solo el **hash SHA-256**. Por eso se muestran una sola vez:
+  ni el dueño los recupera después. Si se pierden, se regeneran
+- Cada uno muere al usarse, y al entrar se avisa cuántos quedan
+- El campo de acceso acepta 9 caracteres con letras (`raw-auth.js` v9.22).
+  **Antes filtraba a solo dígitos con tope de 6: un código de respaldo
+  era físicamente imposible de teclear.** Si alguien vuelve a tocar ese
+  filtro, que se acuerde de esto
+- El TOTP no gasta respaldos: son caminos independientes
+- **Nunca se queda fuera:** Authenticator ilimitado, el editor genera
+  ocho nuevos cuando sea, y sin semilla la puerta no se exige
+- `authEmergencia()` es alias de `authDesactivar()` — en una emergencia
+  nadie recuerda el segundo nombre
+
 **Herramientas, todas sin argumentos** (el botón Ejecutar del editor no
 los pasa — se eligen en el desplegable y se corre Ejecutar):
 
