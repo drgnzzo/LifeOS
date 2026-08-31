@@ -2369,7 +2369,14 @@ document.addEventListener('DOMContentLoaded', function(){
         // hora queda accesible en el tooltip (title).
         return '<div class="_act-chk" data-fila="'+fila+'" data-dia="'+dia+'" data-tipo="'+tipo+'"'+
           ' '+tooltip+
-          ' style="position:relative;width:22px;height:22px;min-width:22px;border-radius:50%;cursor:pointer;transition:all 200ms;'+
+          /* v9.23 — caret-color:transparent + user-select:none.
+             Estos círculos son divs vacíos: solo se pican, nunca se
+             escriben. Sin esto, el navegador puede plantarles el cursor
+             de texto parpadeando adentro (pasa con la navegación por
+             cursor de Chrome, F7) y parecen estar esperando que
+             escribas algo. Un control de solo clic no debe aceptar
+             caret ni selección. */
+          ' style="position:relative;width:22px;height:22px;min-width:22px;border-radius:50%;cursor:pointer;transition:all 200ms;caret-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;'+
           'border:1.5px solid '+(isChecked?c.color:esH?'rgba(255,255,255,.35)':'rgba(100,80,160,0.3)')+';'+
           'background:'+(isChecked?c.color:'transparent')+';'+
           'box-shadow:'+(isChecked?'0 0 8px '+c.glow+',0 0 4px '+c.glow:'none')+';'+
@@ -2390,7 +2397,8 @@ document.addEventListener('DOMContentLoaded', function(){
         } catch(e){}
         var tooltip = (done && fechaLocal) ? 'title="'+fechaLocal+'"' : '';
         return '<div class="_act-item" data-fila="'+fila+'" data-tipo="'+tipo+'" '+tooltip+
-          ' style="width:24px;height:24px;min-width:24px;border-radius:50%;cursor:pointer;transition:all 200ms;flex-shrink:0;'+
+          /* v9.23 — mismo motivo que _act-chk: solo clic, sin caret. */
+          ' style="width:24px;height:24px;min-width:24px;border-radius:50%;cursor:pointer;transition:all 200ms;flex-shrink:0;caret-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;'+
           'border:1.5px solid '+(done?c.color:'#26304A')+';'+
           'background:'+(done?c.color:'transparent')+';'+
           'box-shadow:'+(done?'0 0 8px '+c.glow:'none')+';'+

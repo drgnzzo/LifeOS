@@ -706,7 +706,8 @@ window._contactosMontar=function(target){
     '.ct-item.on{background:rgba(96,165,250,.16);box-shadow:inset 2px 0 0 #F87171}',
     '.ct-item{display:flex;align-items:center;gap:8px}',
     '.ct-item>div{min-width:0}',
-    '.ct-chk{width:16px;height:16px;border-radius:50%;border:1.5px solid #F87171;flex-shrink:0}',
+    /* v9.23 — igual que los checks de Activity: solo clic. */
+    '.ct-chk{width:16px;height:16px;border-radius:50%;border:1.5px solid #F87171;flex-shrink:0;caret-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}',
     '.ct-chk.on{background:#F87171;box-shadow:0 0 8px rgba(96,165,250,.6)}',
     '.ct-n{font-size:13.5px;color:var(--hud-text);font-weight:600}',
     '.ct-a{font-size:10px;color:var(--hud-text-dim);text-transform:uppercase;letter-spacing:.08em}',
